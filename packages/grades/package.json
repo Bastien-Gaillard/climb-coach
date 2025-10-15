@@ -1,0 +1,20 @@
+{
+  "name": "@climb-coach/grades",
+  "version": "0.1.0",
+  "description": "Conversion de cotations d'escalade (française, YDS, Fontainebleau, V-scale) et des couleurs de salles",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "~5.8.3",
+    "vitest": "^3.2.4"
+  }
+}
