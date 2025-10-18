@@ -3,10 +3,11 @@
  * sur une échelle de référence commune à la discipline.
  *
  * - Voie : la référence est l'index de la cotation française (4a = 0, 9c = 28).
+ * - Bloc : la référence est l'index de la cotation Fontainebleau (3 = 0, 9A = 22).
  */
 
 export type Discipline = 'route' | 'boulder';
-export type GradeSystem = 'french' | 'yds';
+export type GradeSystem = 'french' | 'yds' | 'font' | 'vscale';
 
 export interface Scale {
   system: GradeSystem;
@@ -45,7 +46,37 @@ export const YDS: Scale = {
   ],
 };
 
+const FONT_GRADES = [
+  '3', '4', '5', '5+',
+  '6A', '6A+', '6B', '6B+', '6C', '6C+',
+  '7A', '7A+', '7B', '7B+', '7C', '7C+',
+  '8A', '8A+', '8B', '8B+', '8C', '8C+',
+  '9A',
+] as const;
+
+export const FONT: Scale = {
+  system: 'font',
+  discipline: 'boulder',
+  label: 'Fontainebleau',
+  grades: FONT_GRADES.map((g, i) => [g, i] as const),
+};
+
+/** Plusieurs cotations Font correspondent parfois à un seul V : on prend la valeur médiane. */
+export const VSCALE: Scale = {
+  system: 'vscale',
+  discipline: 'boulder',
+  label: 'V-scale (USA)',
+  grades: [
+    ['VB', 0], ['V0', 1], ['V1', 2], ['V2', 3],
+    ['V3', 4.5], ['V4', 6.5], ['V5', 8.5],
+    ['V6', 10], ['V7', 11], ['V8', 12.5], ['V9', 14], ['V10', 15],
+    ['V11', 16], ['V12', 17], ['V13', 18], ['V14', 19], ['V15', 20], ['V16', 21], ['V17', 22],
+  ],
+};
+
 export const SCALES: Record<GradeSystem, Scale> = {
   french: FRENCH,
   yds: YDS,
+  font: FONT,
+  vscale: VSCALE,
 };

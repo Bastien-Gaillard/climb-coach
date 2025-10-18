@@ -17,8 +17,9 @@ export function getScale(system: GradeSystem): Scale {
 export function normalizeGrade(grade: string, system: GradeSystem): string {
   const g = grade.trim().replace(/\s+/g, '');
   switch (system) {
-    case 'yds':
-      return g.toLowerCase();
+    case 'font':
+    case 'vscale':
+      return g.toUpperCase();
     default:
       return g.toLowerCase();
   }
