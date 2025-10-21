@@ -1,0 +1,14 @@
+{
+  "id": "alpha-bloc",
+  "name": "Salle Alpha (bloc)",
+  "discipline": "boulder",
+  "system": "font",
+  "colors": [
+    { "color": "jaune", "hex": "#facc15", "min": "3", "max": "4" },
+    { "color": "vert", "hex": "#22c55e", "min": "4", "max": "5" },
+    { "color": "bleu", "hex": "#3b82f6", "min": "5+", "max": "6A" },
+    { "color": "rouge", "hex": "#ef4444", "min": "6A+", "max": "6B+" },
+    { "color": "noir", "hex": "#111827", "min": "6C", "max": "7A" },
+    { "color": "violet", "hex": "#8b5cf6", "min": "7A+", "max": "8A" }
+  ]
+}

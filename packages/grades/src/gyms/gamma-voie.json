@@ -1,0 +1,14 @@
+{
+  "id": "gamma-voie",
+  "name": "Salle Gamma (voie)",
+  "discipline": "route",
+  "system": "french",
+  "colors": [
+    { "color": "vert", "hex": "#22c55e", "min": "4a", "max": "5a" },
+    { "color": "bleu", "hex": "#3b82f6", "min": "5b", "max": "5c" },
+    { "color": "jaune", "hex": "#facc15", "min": "6a", "max": "6a+" },
+    { "color": "orange", "hex": "#f97316", "min": "6b", "max": "6b+" },
+    { "color": "rouge", "hex": "#ef4444", "min": "6c", "max": "7a" },
+    { "color": "noir", "hex": "#111827", "min": "7a+", "max": "8a" }
+  ]
+}

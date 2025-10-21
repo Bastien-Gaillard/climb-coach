@@ -1,0 +1,14 @@
+{
+  "id": "beta-bloc",
+  "name": "Salle Beta (bloc)",
+  "discipline": "boulder",
+  "system": "font",
+  "colors": [
+    { "color": "blanc", "hex": "#f9fafb", "min": "3", "max": "4" },
+    { "color": "orange", "hex": "#f97316", "min": "5", "max": "5+" },
+    { "color": "vert", "hex": "#22c55e", "min": "6A", "max": "6A+" },
+    { "color": "bleu", "hex": "#3b82f6", "min": "6B", "max": "6C" },
+    { "color": "rose", "hex": "#ec4899", "min": "6C", "max": "7A+" },
+    { "color": "noir", "hex": "#111827", "min": "7B", "max": "8B" }
+  ]
+}
