@@ -1,13 +1,25 @@
 import { z } from 'zod';
 
-export const ClimbInputSchema = z.object({
-  style: z.enum(['boulder', 'route']),
-  grade: z.string().min(1),
-  /** Système de la cotation saisie. Par défaut : french (voie) ou font (bloc). */
-  system: z.enum(['french', 'yds', 'font', 'vscale']).optional(),
-  sent: z.boolean(),
-  attempts: z.number().int().min(1).max(50).default(1),
-});
+/** Une voie se saisit soit par sa cotation, soit par sa couleur dans une salle. */
+export const ClimbInputSchema = z
+  .object({
+    style: z.enum(['boulder', 'route']),
+    grade: z.string().min(1).optional(),
+    /** Système de la cotation saisie. Par défaut : french (voie) ou font (bloc). */
+    system: z.enum(['french', 'yds', 'font', 'vscale']).optional(),
+    color: z.string().min(1).optional(),
+    gymId: z.string().min(1).optional(),
+    sent: z.boolean(),
+    attempts: z.number().int().min(1).max(50).default(1),
+  })
+  .refine((c) => Boolean(c.grade) !== Boolean(c.color), {
+    message: 'Renseigner soit grade, soit color (pas les deux)',
+    path: ['grade'],
+  })
+  .refine((c) => !c.color || Boolean(c.gymId), {
+    message: 'gymId est obligatoire quand la voie est saisie par couleur',
+    path: ['gymId'],
+  });
 
 export const CreateSessionSchema = z.object({
   date: z.coerce.date(),
