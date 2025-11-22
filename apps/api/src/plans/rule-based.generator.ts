@@ -24,7 +24,7 @@ export class RuleBasedGenerator implements PlanGenerator {
     const time = splitTime(ctx.availableMinutes);
     const light = a.intensity === 'light' ? 1 : 0;
 
-    const blocks: PlanBlock[] = [this.warmup(a, time.warmup)];
+    const blocks: PlanBlock[] = [this.warmup(a, time.warmup, light)];
     blocks.push(this.main(a, time.main, light));
     if (time.core > 0) blocks.push(this.core(time.core, light));
     if (time.cooldown > 0) blocks.push(this.cooldown(time.cooldown));
@@ -47,7 +47,7 @@ export class RuleBasedGenerator implements PlanGenerator {
     return plural ? 'voies' : 'voie';
   }
 
-  private warmup(a: HistoryAnalysis, minutes: number): PlanBlock {
+  private warmup(a: HistoryAnalysis, minutes: number, light: number): PlanBlock {
     return {
       kind: 'warmup',
       title: 'Échauffement',
@@ -55,7 +55,7 @@ export class RuleBasedGenerator implements PlanGenerator {
       instructions: [
         '5 min de mobilité : poignets, doigts, épaules, hanches',
         'Traversée facile en continu pendant 3-4 min',
-        `3-4 ${this.unit(a.style)} faciles en ${this.grade(a.style, a.maxSent - 4)}, puis 2 en ${this.grade(a.style, a.maxSent - 2)}`,
+        `3-4 ${this.unit(a.style)} faciles en ${this.grade(a.style, a.maxSent - 4 - light)}, puis 2 en ${this.grade(a.style, a.maxSent - 2 - light)}`,
       ],
     };
   }
