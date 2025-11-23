@@ -61,7 +61,7 @@ export class MistralGenerator implements PlanGenerator {
 
     const history = ctx.history.slice(0, 5).map((s) => {
       const climbs = s.climbs
-        .map((c) => `${c.grade}${c.sent ? '' : ` (échec, ${c.attempts} essais)`}`)
+        .map((c) => `${c.grade}${c.sent ? '' : ` (échec, ${c.attempts} essai${c.attempts > 1 ? 's' : ''})`}`)
         .join(', ');
       return `- ${s.date.toISOString().slice(0, 10)} : ${FOCUS_LABEL[s.focus]}, ${s.durationMinutes} min, fatigue ${s.fatigue}/5${climbs ? `, voies : ${climbs}` : ''}${s.notes ? `, notes : ${s.notes}` : ''}`;
     });
