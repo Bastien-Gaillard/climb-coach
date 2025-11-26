@@ -9,6 +9,14 @@ export type SessionWithClimbs = typeof sessions.$inferSelect & {
   climbs: (typeof climbs.$inferSelect)[];
 };
 
+export interface ProgressionPoint {
+  sessionId: string;
+  date: Date;
+  style: 'boulder' | 'route';
+  grade: string;
+  value: number;
+}
+
 @Injectable()
 export class SessionsService {
   constructor(@Inject(DB) private readonly db: Database) {}
@@ -53,6 +61,22 @@ export class SessionsService {
     });
     if (!session) throw new NotFoundException(`Séance ${id} introuvable`);
     return session;
+  }
+
+  /** Meilleure réussite par séance et par style, du plus ancien au plus récent (pour le graphique). */
+  async progression(limit = 50): Promise<ProgressionPoint[]> {
+    const recent = await this.findRecent(limit);
+    return recent
+      .slice()
+      .reverse()
+      .flatMap((s) =>
+        (['boulder', 'route'] as const).flatMap((style) => {
+          const sent = s.climbs.filter((c) => c.style === style && c.sent);
+          if (sent.length === 0) return [];
+          const best = sent.reduce((a, b) => (b.gradeValue > a.gradeValue ? b : a));
+          return [{ sessionId: s.id, date: s.date, style, grade: best.grade, value: best.gradeValue }];
+        }),
+      );
   }
 
   async remove(id: string): Promise<void> {

@@ -12,6 +12,11 @@ export class SessionsController {
     return this.sessions.findRecent(query.limit);
   }
 
+  @Get('stats/progression')
+  progression() {
+    return this.sessions.progression();
+  }
+
   @Get(':id')
   get(@Param('id', ParseUUIDPipe) id: string) {
     return this.sessions.findOne(id);
