@@ -1,0 +1,145 @@
+import { INestApplication } from '@nestjs/common';
+import { Test } from '@nestjs/testing';
+import { sql } from 'drizzle-orm';
+import request from 'supertest';
+import { AppModule } from '../src/app.module';
+import { Database, DB } from '../src/db/db.module';
+import { CLOCK } from '../src/plans/plans.service';
+
+/**
+ * Tests de bout en bout sur une vraie base Postgres.
+ * DATABASE_URL doit pointer vers une base de test (vidée avant chaque test).
+ */
+describe('API (e2e)', () => {
+  let app: INestApplication;
+  let db: Database;
+  const now = new Date('2025-11-29T18:00:00Z');
+
+  beforeAll(async () => {
+    process.env.DATABASE_URL ??= 'postgresql://climb:climb@localhost:5432/climbcoach_test';
+    process.env.MISTRAL_API_KEY = '';
+
+    const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
+      .overrideProvider(CLOCK)
+      .useValue(() => now)
+      .compile();
+
+    app = moduleRef.createNestApplication();
+    app.setGlobalPrefix('api');
+    await app.init();
+    db = app.get(DB);
+  });
+
+  beforeEach(async () => {
+    await db.execute(sql`TRUNCATE sessions, climbs, generated_plans CASCADE`);
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  const http = () => request(app.getHttpServer());
+
+  it('GET /api/health', () => http().get('/api/health').expect(200, { status: 'ok' }));
+
+  describe('séances', () => {
+    const body = {
+      date: '2025-11-27T19:00:00Z',
+      durationMinutes: 90,
+      focus: 'strength',
+      fatigue: 3,
+      climbs: [
+        { style: 'boulder', grade: 'V4', system: 'vscale', sent: true },
+        { style: 'boulder', color: 'noir', gymId: 'alpha-bloc', sent: false, attempts: 4 },
+      ],
+    };
+
+    it('crée une séance et normalise les cotations', async () => {
+      const res = await http().post('/api/sessions').send(body).expect(201);
+      expect(res.body.climbs).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ grade: '6B', color: null }),
+          expect.objectContaining({ grade: '6C+', color: 'noir', gymId: 'alpha-bloc', attempts: 4 }),
+        ]),
+      );
+    });
+
+    it('liste, lit et supprime', async () => {
+      const created = await http().post('/api/sessions').send(body).expect(201);
+      const id = created.body.id;
+
+      const list = await http().get('/api/sessions').expect(200);
+      expect(list.body).toHaveLength(1);
+      await http().get(`/api/sessions/${id}`).expect(200);
+      await http().delete(`/api/sessions/${id}`).expect(204);
+      await http().get(`/api/sessions/${id}`).expect(404);
+    });
+
+    it('renvoie une 400 détaillée sur un body invalide', async () => {
+      const res = await http()
+        .post('/api/sessions')
+        .send({ ...body, fatigue: 8 })
+        .expect(400);
+      expect(res.body.errors).toEqual([expect.objectContaining({ path: 'fatigue' })]);
+    });
+
+    it('renvoie une 400 sur une couleur inconnue', async () => {
+      await http()
+        .post('/api/sessions')
+        .send({ ...body, climbs: [{ style: 'boulder', color: 'turquoise', gymId: 'alpha-bloc', sent: true }] })
+        .expect(400);
+    });
+
+    it('calcule la progression', async () => {
+      await http().post('/api/sessions').send(body).expect(201);
+      const res = await http().get('/api/sessions/stats/progression').expect(200);
+      expect(res.body).toEqual([expect.objectContaining({ style: 'boulder', grade: '6B' })]);
+    });
+  });
+
+  describe('génération', () => {
+    it('génère une séance par les règles sans clé Mistral, et l’enregistre', async () => {
+      await http()
+        .post('/api/sessions')
+        .send({
+          date: '2025-11-27T19:00:00Z',
+          durationMinutes: 90,
+          focus: 'strength',
+          fatigue: 3,
+          climbs: [{ style: 'boulder', grade: '6C', sent: true }],
+        })
+        .expect(201);
+
+      const res = await http().post('/api/plans/generate').send({ availableMinutes: 60 }).expect(201);
+      expect(res.body.source).toBe('rules');
+      expect(res.body.plan.focus).toBe('endurance');
+      const total = res.body.plan.blocks.reduce((s: number, b: { minutes: number }) => s + b.minutes, 0);
+      expect(total).toBe(60);
+
+      const history = await http().get('/api/plans').expect(200);
+      expect(history.body).toHaveLength(1);
+    });
+
+    it('refuse moins de 30 min', () =>
+      http().post('/api/plans/generate').send({ availableMinutes: 10 }).expect(400));
+  });
+
+  describe('cotations et salles', () => {
+    it('convertit une cotation', () =>
+      http()
+        .get('/api/grades/convert')
+        .query({ grade: '7a', from: 'french', to: 'yds' })
+        .expect(200)
+        .expect((res) => expect(res.body.result).toBe('5.11d')));
+
+    it('convertit une couleur entre deux salles', async () => {
+      const res = await http()
+        .get('/api/gyms/alpha-bloc/convert')
+        .query({ color: 'rouge', to: 'beta-bloc' })
+        .expect(200);
+      expect(res.body.matches[0]).toEqual({ color: 'bleu', overlap: 0.67 });
+    });
+
+    it('renvoie une 404 sur une salle inconnue', () => http().get('/api/gyms/inconnue').expect(404));
+  });
+});
