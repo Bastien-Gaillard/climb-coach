@@ -1,0 +1,92 @@
+<h1>Convertisseur</h1>
+<p class="muted">Cotations entre systèmes, et couleurs d'une salle à l'autre.</p>
+
+<section class="card stack">
+  <h2>Cotation</h2>
+  <div class="row">
+    <label>
+      Système
+      <select [value]="from()" (change)="setFrom($any($event.target).value)">
+        @for (s of scales; track s.system) {
+          <option [value]="s.system">{{ s.label }}</option>
+        }
+      </select>
+    </label>
+    <label>
+      Cotation
+      <select [value]="grade()" (change)="grade.set($any($event.target).value)">
+        @for (g of fromGrades(); track g) {
+          <option [value]="g">{{ g }}</option>
+        }
+      </select>
+    </label>
+    <span class="arrow" aria-hidden="true">→</span>
+    <label>
+      Vers
+      <select [value]="to()" (change)="to.set($any($event.target).value)">
+        @for (s of targets(); track s.system) {
+          <option [value]="s.system">{{ s.label }}</option>
+        }
+      </select>
+    </label>
+    <output class="result" [class.error]="!gradeResult().ok" data-testid="grade-result">
+      {{ gradeResult().text }}
+    </output>
+  </div>
+</section>
+
+<section class="card stack">
+  <h2>Couleurs de salles</h2>
+  <div class="row">
+    <label>
+      Ma salle
+      <select [value]="fromGymId()" (change)="setFromGym($any($event.target).value)">
+        @for (g of gyms; track g.id) {
+          <option [value]="g.id">{{ g.name }}</option>
+        }
+      </select>
+    </label>
+    <label>
+      Couleur
+      <select [value]="color()" (change)="color.set($any($event.target).value)">
+        @for (c of fromGym().colors; track c.color) {
+          <option [value]="c.color">{{ c.color }} ({{ c.min }} → {{ c.max }})</option>
+        }
+      </select>
+    </label>
+    <span class="arrow" aria-hidden="true">→</span>
+    <label>
+      Autre salle
+      <select [value]="toGymId()" (change)="toGymId.set($any($event.target).value)">
+        @for (g of compatibleGyms(); track g.id) {
+          <option [value]="g.id">{{ g.name }}</option>
+        }
+      </select>
+    </label>
+  </div>
+
+  @if (compatibleGyms().length === 0) {
+    <p class="muted">Aucune autre salle de cette discipline pour l'instant.</p>
+  } @else {
+    @if (sourceRange(); as range) {
+      <p class="muted">
+        <span class="dot" [style.background]="hex(fromGym(), range.color)"></span>
+        <strong>{{ range.color }}</strong> chez {{ fromGym().name }} = {{ range.min }} à {{ range.max }}.
+        Chez {{ toGym().name }}, ça correspond à :
+      </p>
+    }
+    <ul class="matches" data-testid="color-matches">
+      @for (m of matches(); track m.color) {
+        <li>
+          <span class="dot" [style.background]="m.hex"></span>
+          <strong>{{ m.color }}</strong>
+          <span class="muted">{{ m.min }} → {{ m.max }}</span>
+          <span class="bar"><span [style.width]="percent(m.overlap)"></span></span>
+          <span class="pct">{{ percent(m.overlap) }}</span>
+        </li>
+      } @empty {
+        <li class="muted">Aucune couleur équivalente.</li>
+      }
+    </ul>
+  }
+</section>
