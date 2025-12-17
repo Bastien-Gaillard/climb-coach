@@ -1,0 +1,52 @@
+<h1>Historique</h1>
+
+@if (error(); as e) {
+  <p class="error">{{ e }}</p>
+}
+
+@if (loading()) {
+  <p class="muted">Chargement…</p>
+} @else {
+  <ul class="sessions">
+    @for (s of sessions(); track s.id) {
+      <li class="card">
+        <div class="head">
+          <div>
+            <strong>{{ s.date | date: 'EEEE d MMMM' }}</strong>
+            <span class="muted"> · {{ s.durationMinutes }} min</span>
+          </div>
+          <div class="meta">
+            <span class="badge accent">{{ focusLabel[s.focus] }}</span>
+            <span class="badge" [title]="'Fatigue ' + s.fatigue + '/5'">Fatigue {{ s.fatigue }}/5</span>
+            <button type="button" class="ghost" (click)="remove(s)" aria-label="Supprimer">✕</button>
+          </div>
+        </div>
+
+        @if (s.climbs.length) {
+          <p class="muted small">{{ sentCount(s) }}/{{ s.climbs.length }} réussis</p>
+          <ul class="chips">
+            @for (c of s.climbs; track c.id) {
+              <li [class.sent]="c.sent" [title]="styleLabel[c.style]">
+                {{ c.grade }}
+                @if (c.color) {
+                  <span class="muted">({{ c.color }})</span>
+                }
+                @if (!c.sent) {
+                  <span class="muted">· {{ c.attempts }} ess.</span>
+                }
+              </li>
+            }
+          </ul>
+        }
+        @if (s.notes) {
+          <p class="notes">{{ s.notes }}</p>
+        }
+      </li>
+    } @empty {
+      <li class="card empty">
+        <p>Aucune séance pour l'instant.</p>
+        <a routerLink="/seance">Enregistrer ma première séance →</a>
+      </li>
+    }
+  </ul>
+}
