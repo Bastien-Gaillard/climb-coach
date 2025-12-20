@@ -1,5 +1,11 @@
 <h1>Historique</h1>
 
+@if (progression().length) {
+  <section class="card">
+    <app-progression-chart [points]="progression()" />
+  </section>
+}
+
 @if (error(); as e) {
   <p class="error">{{ e }}</p>
 }
