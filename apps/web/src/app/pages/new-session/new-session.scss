@@ -1,3 +1,9 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
 .head {
   display: flex;
   align-items: baseline;

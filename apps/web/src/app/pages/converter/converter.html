@@ -8,7 +8,7 @@
       Système
       <select [value]="from()" (change)="setFrom($any($event.target).value)">
         @for (s of scales; track s.system) {
-          <option [value]="s.system">{{ s.label }}</option>
+          <option [value]="s.system" [selected]="s.system === from()">{{ s.label }}</option>
         }
       </select>
     </label>
@@ -16,7 +16,7 @@
       Cotation
       <select [value]="grade()" (change)="grade.set($any($event.target).value)">
         @for (g of fromGrades(); track g) {
-          <option [value]="g">{{ g }}</option>
+          <option [value]="g" [selected]="g === grade()">{{ g }}</option>
         }
       </select>
     </label>
@@ -25,7 +25,7 @@
       Vers
       <select [value]="to()" (change)="to.set($any($event.target).value)">
         @for (s of targets(); track s.system) {
-          <option [value]="s.system">{{ s.label }}</option>
+          <option [value]="s.system" [selected]="s.system === to()">{{ s.label }}</option>
         }
       </select>
     </label>
@@ -42,7 +42,7 @@
       Ma salle
       <select [value]="fromGymId()" (change)="setFromGym($any($event.target).value)">
         @for (g of gyms; track g.id) {
-          <option [value]="g.id">{{ g.name }}</option>
+          <option [value]="g.id" [selected]="g.id === fromGymId()">{{ g.name }}</option>
         }
       </select>
     </label>
@@ -50,7 +50,7 @@
       Couleur
       <select [value]="color()" (change)="color.set($any($event.target).value)">
         @for (c of fromGym().colors; track c.color) {
-          <option [value]="c.color">{{ c.color }} ({{ c.min }} → {{ c.max }})</option>
+          <option [value]="c.color" [selected]="c.color === color()">{{ c.color }} ({{ c.min }} → {{ c.max }})</option>
         }
       </select>
     </label>
@@ -59,7 +59,7 @@
       Autre salle
       <select [value]="toGymId()" (change)="toGymId.set($any($event.target).value)">
         @for (g of compatibleGyms(); track g.id) {
-          <option [value]="g.id">{{ g.name }}</option>
+          <option [value]="g.id" [selected]="g.id === toGymId()">{{ g.name }}</option>
         }
       </select>
     </label>

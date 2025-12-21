@@ -43,6 +43,11 @@ h3 {
 
 h1 {
   font-size: 1.6rem;
+  margin: 0;
+}
+
+h1 + p.muted {
+  margin: -0.75rem 0 0;
 }
 
 .card {

@@ -45,7 +45,7 @@ export class ConverterPage {
   // --- Couleurs
   protected readonly fromGymId = signal(GYMS[0].id);
   protected readonly toGymId = signal(GYMS[1].id);
-  protected readonly color = signal(GYMS[0].colors[0].color);
+  protected readonly color = signal(GYMS[0].colors[3].color);
 
   protected readonly fromGym = computed(() => findGym(this.fromGymId()));
   protected readonly toGym = computed(() => findGym(this.toGymId()));
