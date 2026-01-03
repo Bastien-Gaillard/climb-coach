@@ -73,7 +73,7 @@ describe('GeneratePage', () => {
     fixture.detectChanges();
 
     expect(el.textContent).toContain('⚙ Règles');
-    expect(el.textContent).toContain('Mistral n\'a pas pu répondre (Timeout)');
+    expect(el.textContent).toContain("Mistral n'a pas pu répondre (Timeout)");
   });
 
   it('affiche l’erreur de l’API', () => {

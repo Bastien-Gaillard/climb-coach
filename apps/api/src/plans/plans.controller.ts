@@ -12,7 +12,9 @@ export class PlansController {
   constructor(private readonly plans: PlansService) {}
 
   @Post('generate')
-  generate(@Body(new ZodValidationPipe(GeneratePlanSchema)) body: z.infer<typeof GeneratePlanSchema>) {
+  generate(
+    @Body(new ZodValidationPipe(GeneratePlanSchema)) body: z.infer<typeof GeneratePlanSchema>,
+  ) {
     return this.plans.generate(body.availableMinutes);
   }
 

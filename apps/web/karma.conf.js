@@ -20,21 +20,18 @@ module.exports = function (config) {
       },
     },
     jasmineHtmlReporter: {
-      suppressAll: true // removes the duplicated traces
+      suppressAll: true, // removes the duplicated traces
     },
     coverageReporter: {
       dir: require('path').join(__dirname, './coverage/web'),
       subdir: '.',
-      reporters: [
-        { type: 'html' },
-        { type: 'text-summary' }
-      ]
+      reporters: [{ type: 'html' }, { type: 'text-summary' }],
     },
     reporters: ['progress', 'kjhtml'],
     browsers: ['Chrome'],
     customLaunchers: {
       ChromeHeadlessCI: { base: 'ChromeHeadless', flags: ['--no-sandbox'] },
     },
-    restartOnFileChange: true
+    restartOnFileChange: true,
   });
 };

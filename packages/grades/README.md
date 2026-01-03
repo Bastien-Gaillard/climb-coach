@@ -4,10 +4,10 @@ Petite lib TypeScript sans dépendance pour convertir des cotations d'escalade e
 
 ## Cotations
 
-| Discipline | Systèmes |
-|---|---|
-| Voie | française (`french`), YDS (`yds`) |
-| Bloc | Fontainebleau (`font`), V-scale (`vscale`) |
+| Discipline | Systèmes                                   |
+| ---------- | ------------------------------------------ |
+| Voie       | française (`french`), YDS (`yds`)          |
+| Bloc       | Fontainebleau (`font`), V-scale (`vscale`) |
 
 ```ts
 import { convertGrade } from '@climb-coach/grades';

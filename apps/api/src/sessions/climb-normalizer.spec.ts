@@ -21,15 +21,15 @@ describe('normalizeClimb', () => {
 
   it('convertit une couleur de salle vers le milieu de sa plage', () => {
     // rouge chez Alpha = 6A+ à 6B+ -> 6B
-    expect(climb({ style: 'boulder', color: 'rouge', gymId: 'alpha-bloc', sent: true })).toMatchObject(
-      { grade: '6B', color: 'rouge', gymId: 'alpha-bloc' },
-    );
+    expect(
+      climb({ style: 'boulder', color: 'rouge', gymId: 'alpha-bloc', sent: true }),
+    ).toMatchObject({ grade: '6B', color: 'rouge', gymId: 'alpha-bloc' });
   });
 
   it('refuse une couleur de bloc pour une voie', () => {
-    expect(() => climb({ style: 'route', color: 'rouge', gymId: 'alpha-bloc', sent: true })).toThrow(
-      BadRequestException,
-    );
+    expect(() =>
+      climb({ style: 'route', color: 'rouge', gymId: 'alpha-bloc', sent: true }),
+    ).toThrow(BadRequestException);
   });
 
   it('refuse une cotation inconnue avec une 400', () => {
@@ -41,12 +41,19 @@ describe('ClimbInputSchema', () => {
   it('exige soit une cotation soit une couleur', () => {
     expect(ClimbInputSchema.safeParse({ style: 'boulder', sent: true }).success).toBe(false);
     expect(
-      ClimbInputSchema.safeParse({ style: 'boulder', grade: '6A', color: 'vert', gymId: 'x', sent: true })
-        .success,
+      ClimbInputSchema.safeParse({
+        style: 'boulder',
+        grade: '6A',
+        color: 'vert',
+        gymId: 'x',
+        sent: true,
+      }).success,
     ).toBe(false);
   });
 
   it('exige la salle quand on saisit une couleur', () => {
-    expect(ClimbInputSchema.safeParse({ style: 'boulder', color: 'vert', sent: true }).success).toBe(false);
+    expect(
+      ClimbInputSchema.safeParse({ style: 'boulder', color: 'vert', sent: true }).success,
+    ).toBe(false);
   });
 });

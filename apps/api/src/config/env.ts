@@ -17,7 +17,9 @@ export type Env = z.infer<typeof EnvSchema>;
 export function validateEnv(raw: Record<string, unknown>): Env {
   const parsed = EnvSchema.safeParse(raw);
   if (!parsed.success) {
-    const issues = parsed.error.issues.map((i) => `  - ${i.path.join('.')}: ${i.message}`).join('\n');
+    const issues = parsed.error.issues
+      .map((i) => `  - ${i.path.join('.')}: ${i.message}`)
+      .join('\n');
     throw new Error(`Variables d'environnement invalides :\n${issues}`);
   }
   return parsed.data;

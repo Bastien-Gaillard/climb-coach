@@ -59,7 +59,12 @@ describe('API (e2e)', () => {
       expect(res.body.climbs).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ grade: '6B', color: null }),
-          expect.objectContaining({ grade: '6C+', color: 'noir', gymId: 'alpha-bloc', attempts: 4 }),
+          expect.objectContaining({
+            grade: '6C+',
+            color: 'noir',
+            gymId: 'alpha-bloc',
+            attempts: 4,
+          }),
         ]),
       );
     });
@@ -86,7 +91,10 @@ describe('API (e2e)', () => {
     it('renvoie une 400 sur une couleur inconnue', async () => {
       await http()
         .post('/api/sessions')
-        .send({ ...body, climbs: [{ style: 'boulder', color: 'turquoise', gymId: 'alpha-bloc', sent: true }] })
+        .send({
+          ...body,
+          climbs: [{ style: 'boulder', color: 'turquoise', gymId: 'alpha-bloc', sent: true }],
+        })
         .expect(400);
     });
 
@@ -110,10 +118,16 @@ describe('API (e2e)', () => {
         })
         .expect(201);
 
-      const res = await http().post('/api/plans/generate').send({ availableMinutes: 60 }).expect(201);
+      const res = await http()
+        .post('/api/plans/generate')
+        .send({ availableMinutes: 60 })
+        .expect(201);
       expect(res.body.source).toBe('rules');
       expect(res.body.plan.focus).toBe('endurance');
-      const total = res.body.plan.blocks.reduce((s: number, b: { minutes: number }) => s + b.minutes, 0);
+      const total = res.body.plan.blocks.reduce(
+        (s: number, b: { minutes: number }) => s + b.minutes,
+        0,
+      );
       expect(total).toBe(60);
 
       const history = await http().get('/api/plans').expect(200);
@@ -140,6 +154,7 @@ describe('API (e2e)', () => {
       expect(res.body.matches[0]).toEqual({ color: 'bleu', overlap: 0.67 });
     });
 
-    it('renvoie une 404 sur une salle inconnue', () => http().get('/api/gyms/inconnue').expect(404));
+    it('renvoie une 404 sur une salle inconnue', () =>
+      http().get('/api/gyms/inconnue').expect(404));
   });
 });

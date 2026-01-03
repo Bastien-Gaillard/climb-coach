@@ -61,7 +61,10 @@ export class MistralGenerator implements PlanGenerator {
 
     const history = ctx.history.slice(0, 5).map((s) => {
       const climbs = s.climbs
-        .map((c) => `${c.grade}${c.sent ? '' : ` (échec, ${c.attempts} essai${c.attempts > 1 ? 's' : ''})`}`)
+        .map(
+          (c) =>
+            `${c.grade}${c.sent ? '' : ` (échec, ${c.attempts} essai${c.attempts > 1 ? 's' : ''})`}`,
+        )
         .join(', ');
       return `- ${s.date.toISOString().slice(0, 10)} : ${FOCUS_LABEL[s.focus]}, ${s.durationMinutes} min, fatigue ${s.fatigue}/5${climbs ? `, voies : ${climbs}` : ''}${s.notes ? `, notes : ${s.notes}` : ''}`;
     });
@@ -73,7 +76,9 @@ export class MistralGenerator implements PlanGenerator {
       `Meilleure réussite récente : ${gradeFromValue(a.maxSent, system)}. Niveau à viser : ${gradeFromValue(a.project, system)}.`,
       `Proposition : focus ${a.focus}, intensité ${a.intensity}.`,
       `Raisons : ${a.reasons.join(' ; ')}.`,
-      history.length > 0 ? `Dernières séances :\n${history.join('\n')}` : 'Aucune séance enregistrée.',
+      history.length > 0
+        ? `Dernières séances :\n${history.join('\n')}`
+        : 'Aucune séance enregistrée.',
     ].join('\n');
   }
 

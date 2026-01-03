@@ -30,9 +30,19 @@ const SCALE_BY_STYLE = { boulder: FONT, route: FRENCH } as const;
     @if (series().length < 2) {
       <p class="muted">Encore quelques séances et la courbe apparaîtra ici.</p>
     } @else {
-      <svg [attr.viewBox]="'0 0 ' + w + ' ' + h" role="img" aria-label="Meilleure réussite par séance">
+      <svg
+        [attr.viewBox]="'0 0 ' + w + ' ' + h"
+        role="img"
+        aria-label="Meilleure réussite par séance"
+      >
         @for (t of ticks(); track t.value) {
-          <line [attr.x1]="pad.left" [attr.x2]="w - pad.right" [attr.y1]="t.y" [attr.y2]="t.y" class="grid" />
+          <line
+            [attr.x1]="pad.left"
+            [attr.x2]="w - pad.right"
+            [attr.y1]="t.y"
+            [attr.y2]="t.y"
+            class="grid"
+          />
           <text [attr.x]="pad.left - 8" [attr.y]="t.y + 4" text-anchor="end">{{ t.label }}</text>
         }
         <polyline [attr.points]="line()" class="line" />
@@ -49,15 +59,48 @@ const SCALE_BY_STYLE = { boulder: FONT, route: FRENCH } as const;
     }
   `,
   styles: `
-    .head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
-    .head h2 { margin: 0; }
-    .toggle { display: flex; gap: 0.25rem; }
-    .toggle button.selected { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
-    svg { width: 100%; height: auto; display: block; }
-    text { font-size: 11px; fill: var(--muted); }
-    .grid { stroke: var(--line); stroke-dasharray: 3 3; }
-    .line { fill: none; stroke: var(--accent); stroke-width: 2.5; stroke-linejoin: round; }
-    .dot { fill: var(--surface); stroke: var(--accent); stroke-width: 2; }
+    .head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.5rem;
+    }
+    .head h2 {
+      margin: 0;
+    }
+    .toggle {
+      display: flex;
+      gap: 0.25rem;
+    }
+    .toggle button.selected {
+      background: var(--accent-soft);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    svg {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+    text {
+      font-size: 11px;
+      fill: var(--muted);
+    }
+    .grid {
+      stroke: var(--line);
+      stroke-dasharray: 3 3;
+    }
+    .line {
+      fill: none;
+      stroke: var(--accent);
+      stroke-width: 2.5;
+      stroke-linejoin: round;
+    }
+    .dot {
+      fill: var(--surface);
+      stroke: var(--accent);
+      stroke-width: 2;
+    }
   `,
 })
 export class ProgressionChart {
@@ -110,7 +153,11 @@ export class ProgressionChart {
     const step = Math.max(1, Math.ceil((max - min) / 5));
     const ticks = [];
     for (let v = Math.max(0, min); v <= Math.min(grades.length - 1, max); v += step) {
-      ticks.push({ value: v, label: grades[v][0], y: PAD.top + innerH - ((v - min) / (max - min)) * innerH });
+      ticks.push({
+        value: v,
+        label: grades[v][0],
+        y: PAD.top + innerH - ((v - min) / (max - min)) * innerH,
+      });
     }
     return ticks;
   });

@@ -44,7 +44,9 @@ export function defineGym(raw: unknown): Gym {
   }
   const scale = getScale(gym.system);
   if (scale.discipline !== gym.discipline) {
-    throw new GradeError(`Salle ${gym.id} : le système ${gym.system} n'est pas un système de ${gym.discipline}`);
+    throw new GradeError(
+      `Salle ${gym.id} : le système ${gym.system} n'est pas un système de ${gym.discipline}`,
+    );
   }
   const seen = new Set<string>();
   for (const c of gym.colors) {
@@ -79,7 +81,11 @@ export function colorRange(gym: Gym, color: string): ColorRange {
 }
 
 /** Couleurs de la salle qui contiennent la cotation (plusieurs si les plages se chevauchent). */
-export function colorsForGrade(gym: Gym, grade: string, system: GradeSystem = gym.system): string[] {
+export function colorsForGrade(
+  gym: Gym,
+  grade: string,
+  system: GradeSystem = gym.system,
+): string[] {
   const inGymSystem = system === gym.system ? grade : convertGrade(grade, system, gym.system);
   const value = gradeValue(inGymSystem, gym.system);
   return gym.colors

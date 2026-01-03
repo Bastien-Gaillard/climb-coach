@@ -89,7 +89,9 @@ export class NewSessionPage {
 
   protected onSystemChange(group: FormGroup): void {
     const system = group.value.system as GradeSystem;
-    group.patchValue({ grade: SCALES[system].grades[Math.min(6, SCALES[system].grades.length - 1)][0] });
+    group.patchValue({
+      grade: SCALES[system].grades[Math.min(6, SCALES[system].grades.length - 1)][0],
+    });
   }
 
   protected onGymChange(group: FormGroup): void {

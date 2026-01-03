@@ -8,7 +8,12 @@ import { PlansModule } from './plans/plans.module';
 import { SessionsModule } from './sessions/sessions.module';
 
 @Module({
-  imports: [ConfigModule.forRoot({ isGlobal: true, validate: validateEnv }), DbModule, SessionsModule, PlansModule],
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true, validate: validateEnv }),
+    DbModule,
+    SessionsModule,
+    PlansModule,
+  ],
   controllers: [HealthController, GradesController],
 })
 export class AppModule {}

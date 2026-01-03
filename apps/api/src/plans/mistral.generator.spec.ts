@@ -13,7 +13,10 @@ function makeGenerator(env: Record<string, unknown> = {}) {
     MISTRAL_TIMEOUT_MS: 1000,
     ...env,
   };
-  return new MistralGenerator({ get: (k: string) => values[k] } as unknown as ConfigService<never, true>);
+  return new MistralGenerator({ get: (k: string) => values[k] } as unknown as ConfigService<
+    never,
+    true
+  >);
 }
 
 const validPlan: Plan = {
@@ -54,11 +57,15 @@ describe('MistralGenerator.parse', () => {
   });
 
   it('rejette un plan hors schéma', () => {
-    expect(() => gen.parse(JSON.stringify({ ...validPlan, focus: 'yoga' }), 60)).toThrow(/hors schéma/);
+    expect(() => gen.parse(JSON.stringify({ ...validPlan, focus: 'yoga' }), 60)).toThrow(
+      /hors schéma/,
+    );
   });
 
   it('rejette un plan trop long pour le temps dispo', () => {
-    expect(() => gen.parse(JSON.stringify(validPlan), 45)).toThrow('Séance de 60 min pour 45 min dispo');
+    expect(() => gen.parse(JSON.stringify(validPlan), 45)).toThrow(
+      'Séance de 60 min pour 45 min dispo',
+    );
   });
 
   it('rejette un plan qui gaspille le temps dispo', () => {
@@ -121,7 +128,7 @@ describe('MistralGenerator.buildUserPrompt', () => {
         }),
       ],
     });
-    expect(prompt).toContain('Temps dispo aujourd\'hui : 90 min');
+    expect(prompt).toContain("Temps dispo aujourd'hui : 90 min");
     expect(prompt).toContain('Meilleure réussite récente : 6C');
     expect(prompt).toContain('focus endurance');
     expect(prompt).toContain('7A (échec, 1 essai)');

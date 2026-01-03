@@ -20,7 +20,9 @@ export const BLOCK_ICON: Record<PlanBlock['kind'], string> = {
 
 /** Message lisible à partir d'une erreur HTTP de l'API. */
 export function errorMessage(err: unknown): string {
-  const e = err as { error?: { message?: string | string[]; errors?: { path: string; message: string }[] } };
+  const e = err as {
+    error?: { message?: string | string[]; errors?: { path: string; message: string }[] };
+  };
   if (e?.error?.errors?.length) {
     return e.error.errors.map((x) => `${x.path} : ${x.message}`).join(' · ');
   }

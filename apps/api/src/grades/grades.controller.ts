@@ -7,7 +7,14 @@ import {
   GYMS,
   SCALES,
 } from '@climb-coach/grades';
-import { BadRequestException, Controller, Get, NotFoundException, Param, Query } from '@nestjs/common';
+import {
+  BadRequestException,
+  Controller,
+  Get,
+  NotFoundException,
+  Param,
+  Query,
+} from '@nestjs/common';
 import { z } from 'zod';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 

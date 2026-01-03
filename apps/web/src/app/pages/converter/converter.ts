@@ -32,7 +32,9 @@ export class ConverterPage {
 
   protected readonly fromGrades = computed(() => SCALES[this.from()].grades.map(([g]) => g));
   protected readonly targets = computed(() =>
-    this.scales.filter((s) => s.discipline === SCALES[this.from()].discipline && s.system !== this.from()),
+    this.scales.filter(
+      (s) => s.discipline === SCALES[this.from()].discipline && s.system !== this.from(),
+    ),
   );
   protected readonly gradeResult = computed<ConversionResult>(() => {
     try {
@@ -50,7 +52,9 @@ export class ConverterPage {
   protected readonly fromGym = computed(() => findGym(this.fromGymId()));
   protected readonly toGym = computed(() => findGym(this.toGymId()));
   protected readonly compatibleGyms = computed(() =>
-    this.gyms.filter((g) => g.discipline === this.fromGym().discipline && g.id !== this.fromGymId()),
+    this.gyms.filter(
+      (g) => g.discipline === this.fromGym().discipline && g.id !== this.fromGymId(),
+    ),
   );
   protected readonly sourceRange = computed(() => {
     try {

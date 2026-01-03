@@ -74,7 +74,9 @@ export class SessionsService {
           const sent = s.climbs.filter((c) => c.style === style && c.sent);
           if (sent.length === 0) return [];
           const best = sent.reduce((a, b) => (b.gradeValue > a.gradeValue ? b : a));
-          return [{ sessionId: s.id, date: s.date, style, grade: best.grade, value: best.gradeValue }];
+          return [
+            { sessionId: s.id, date: s.date, style, grade: best.grade, value: best.gradeValue },
+          ];
         }),
       );
   }

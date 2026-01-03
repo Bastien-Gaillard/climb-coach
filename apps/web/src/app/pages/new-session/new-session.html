@@ -1,5 +1,7 @@
 <h1>Nouvelle séance</h1>
-<p class="muted">À remplir en sortant de la salle : c'est ce qui nourrit la génération de la prochaine séance.</p>
+<p class="muted">
+  À remplir en sortant de la salle : c'est ce qui nourrit la génération de la prochaine séance.
+</p>
 
 <form [formGroup]="form" (ngSubmit)="submit()" class="stack">
   <section class="card stack">
@@ -16,7 +18,7 @@
         Type de séance
         <select formControlName="focus">
           @for (f of focusOptions; track f[0]) {
-            <option [value]="f[0]">{{ f[1] }}</option>
+          <option [value]="f[0]">{{ f[1] }}</option>
           }
         </select>
       </label>
@@ -26,15 +28,15 @@
       <span class="muted">Fatigue en fin de séance</span>
       <div class="scale" role="radiogroup" aria-label="Fatigue de 1 à 5">
         @for (n of [1, 2, 3, 4, 5]; track n) {
-          <button
-            type="button"
-            role="radio"
-            [attr.aria-checked]="form.value.fatigue === n"
-            [class.selected]="form.value.fatigue === n"
-            (click)="setFatigue(n)"
-          >
-            {{ n }}
-          </button>
+        <button
+          type="button"
+          role="radio"
+          [attr.aria-checked]="form.value.fatigue === n"
+          [class.selected]="form.value.fatigue === n"
+          (click)="setFatigue(n)"
+        >
+          {{ n }}
+        </button>
         }
       </div>
       <span class="muted hint">1 = frais · 5 = cramé</span>
@@ -42,7 +44,11 @@
 
     <label>
       Notes
-      <textarea formControlName="notes" rows="2" placeholder="Doigts tendus, super projet en 7A…"></textarea>
+      <textarea
+        formControlName="notes"
+        rows="2"
+        placeholder="Doigts tendus, super projet en 7A…"
+      ></textarea>
     </label>
   </section>
 
@@ -54,61 +60,61 @@
 
     <ol class="climbs" formArrayName="climbs">
       @for (climb of climbs.controls; track climb; let i = $index) {
-        <li [formGroupName]="i" class="climb">
-          <select formControlName="style" (change)="onStyleChange(climb)" aria-label="Style">
-            @for (s of styleOptions; track s[0]) {
-              <option [value]="s[0]">{{ s[1] }}</option>
-            }
-          </select>
-
-          <div class="mode" role="radiogroup" aria-label="Saisie">
-            <label class="pill">
-              <input type="radio" formControlName="mode" value="grade" /> Cotation
-            </label>
-            <label class="pill" [class.disabled]="gymsFor(climb.value.style).length === 0">
-              <input
-                type="radio"
-                formControlName="mode"
-                value="color"
-                [attr.disabled]="gymsFor(climb.value.style).length === 0 ? true : null"
-              />
-              Couleur
-            </label>
-          </div>
-
-          @if (climb.value.mode === 'grade') {
-            <select formControlName="system" (change)="onSystemChange(climb)" aria-label="Système">
-              @for (s of systemsFor(climb.value.style); track s.system) {
-                <option [value]="s.system">{{ s.label }}</option>
-              }
-            </select>
-            <select formControlName="grade" aria-label="Cotation">
-              @for (g of gradesFor(climb.value.system); track g) {
-                <option [value]="g">{{ g }}</option>
-              }
-            </select>
-          } @else {
-            <select formControlName="gymId" (change)="onGymChange(climb)" aria-label="Salle">
-              @for (g of gymsFor(climb.value.style); track g.id) {
-                <option [value]="g.id">{{ g.name }}</option>
-              }
-            </select>
-            <select formControlName="color" aria-label="Couleur">
-              @for (c of colorsFor(climb.value.gymId); track c.color) {
-                <option [value]="c.color">{{ c.color }} ({{ c.min }}-{{ c.max }})</option>
-              }
-            </select>
+      <li [formGroupName]="i" class="climb">
+        <select formControlName="style" (change)="onStyleChange(climb)" aria-label="Style">
+          @for (s of styleOptions; track s[0]) {
+          <option [value]="s[0]">{{ s[1] }}</option>
           }
+        </select>
 
-          <label class="inline">
-            <input type="checkbox" formControlName="sent" /> Réussi
+        <div class="mode" role="radiogroup" aria-label="Saisie">
+          <label class="pill">
+            <input type="radio" formControlName="mode" value="grade" /> Cotation
           </label>
-          <label class="inline">
-            Essais
-            <input type="number" formControlName="attempts" min="1" max="50" class="small" />
+          <label class="pill" [class.disabled]="gymsFor(climb.value.style).length === 0">
+            <input
+              type="radio"
+              formControlName="mode"
+              value="color"
+              [attr.disabled]="gymsFor(climb.value.style).length === 0 ? true : null"
+            />
+            Couleur
           </label>
-          <button type="button" class="ghost" (click)="removeClimb(i)" aria-label="Supprimer">✕</button>
-        </li>
+        </div>
+
+        @if (climb.value.mode === 'grade') {
+        <select formControlName="system" (change)="onSystemChange(climb)" aria-label="Système">
+          @for (s of systemsFor(climb.value.style); track s.system) {
+          <option [value]="s.system">{{ s.label }}</option>
+          }
+        </select>
+        <select formControlName="grade" aria-label="Cotation">
+          @for (g of gradesFor(climb.value.system); track g) {
+          <option [value]="g">{{ g }}</option>
+          }
+        </select>
+        } @else {
+        <select formControlName="gymId" (change)="onGymChange(climb)" aria-label="Salle">
+          @for (g of gymsFor(climb.value.style); track g.id) {
+          <option [value]="g.id">{{ g.name }}</option>
+          }
+        </select>
+        <select formControlName="color" aria-label="Couleur">
+          @for (c of colorsFor(climb.value.gymId); track c.color) {
+          <option [value]="c.color">{{ c.color }} ({{ c.min }}-{{ c.max }})</option>
+          }
+        </select>
+        }
+
+        <label class="inline"> <input type="checkbox" formControlName="sent" /> Réussi </label>
+        <label class="inline">
+          Essais
+          <input type="number" formControlName="attempts" min="1" max="50" class="small" />
+        </label>
+        <button type="button" class="ghost" (click)="removeClimb(i)" aria-label="Supprimer">
+          ✕
+        </button>
+      </li>
       }
     </ol>
 
@@ -116,7 +122,7 @@
   </section>
 
   @if (error(); as e) {
-    <p class="error">{{ e }}</p>
+  <p class="error">{{ e }}</p>
   }
 
   <div>

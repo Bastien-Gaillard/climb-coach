@@ -27,7 +27,11 @@ describe('analyzeHistory', () => {
   const ctx = (history: ReturnType<typeof session>[]) => ({ availableMinutes: 90, now, history });
 
   it('sans historique : technique en bloc, niveau 5+', () => {
-    expect(analyzeHistory(ctx([]))).toMatchObject({ focus: 'technique', style: 'boulder', maxSent: 3 });
+    expect(analyzeHistory(ctx([]))).toMatchObject({
+      focus: 'technique',
+      style: 'boulder',
+      maxSent: 3,
+    });
   });
 
   it('alterne force -> endurance -> technique -> force', () => {
@@ -86,18 +90,28 @@ describe('analyzeHistory', () => {
 
   it('ignore les échecs pour le niveau max', () => {
     const a = analyzeHistory(
-      ctx([session(3, now, { climbList: [{ grade: '7A', value: 10, sent: false }, { grade: '6A', value: 4 }] })]),
+      ctx([
+        session(3, now, {
+          climbList: [
+            { grade: '7A', value: 10, sent: false },
+            { grade: '6A', value: 4 },
+          ],
+        }),
+      ]),
     );
     expect(a.maxSent).toBe(4);
   });
 });
 
 describe('RuleBasedGenerator', () => {
-  it.each([30, 45, 60, 90, 150])('produit un plan valide qui tient en %i min', async (available) => {
-    const plan = await generator.generate({ availableMinutes: available, now, history: [] });
-    expect(PlanSchema.safeParse(plan).success).toBe(true);
-    expect(planFitsTime(plan, available)).toBe(true);
-  });
+  it.each([30, 45, 60, 90, 150])(
+    'produit un plan valide qui tient en %i min',
+    async (available) => {
+      const plan = await generator.generate({ availableMinutes: available, now, history: [] });
+      expect(PlanSchema.safeParse(plan).success).toBe(true);
+      expect(planFitsTime(plan, available)).toBe(true);
+    },
+  );
 
   it('vise le niveau projet en séance de force', async () => {
     const history = [
@@ -116,7 +130,9 @@ describe('RuleBasedGenerator', () => {
   });
 
   it('fait de l’endurance en 4x4 bien en dessous du max', async () => {
-    const history = [session(2, now, { focus: 'strength', climbList: [{ grade: '6C', value: 8 }] })];
+    const history = [
+      session(2, now, { focus: 'strength', climbList: [{ grade: '6C', value: 8 }] }),
+    ];
     const plan = await generator.generate({ availableMinutes: 60, now, history });
     const main = plan.blocks.find((b) => b.kind === 'main');
     expect(main?.title).toContain('4x4');
@@ -125,7 +141,10 @@ describe('RuleBasedGenerator', () => {
 
   it('adapte le vocabulaire à la voie', async () => {
     const history = [
-      session(2, now, { focus: 'strength', climbList: [{ style: 'route', grade: '6b', value: 8 }] }),
+      session(2, now, {
+        focus: 'strength',
+        climbList: [{ style: 'route', grade: '6b', value: 8 }],
+      }),
     ];
     const plan = await generator.generate({ availableMinutes: 90, now, history });
     expect(plan.blocks.find((b) => b.kind === 'main')?.title).toBe('Endurance : continuité');

@@ -61,7 +61,14 @@ export class PlansService {
       .values({ availableMinutes, source, plan })
       .returning();
 
-    return { id: saved.id, source, fallbackReason, availableMinutes, plan, createdAt: saved.createdAt };
+    return {
+      id: saved.id,
+      source,
+      fallbackReason,
+      availableMinutes,
+      plan,
+      createdAt: saved.createdAt,
+    };
   }
 
   async recent(limit = 10) {

@@ -75,7 +75,8 @@ export function analyzeHistory(ctx: GeneratorContext): HistoryAnalysis {
     lastOfStyle?.climbs.filter((c) => c.style === style && c.sent && c.gradeValue >= maxSent)
       .length ?? 0;
   const project = sentAtMax >= 2 ? Math.min(MAX_LEVEL[style], Math.ceil(maxSent) + 1) : maxSent;
-  if (project > maxSent) reasons.push('2 réussites au niveau max la dernière fois : on monte d’un cran');
+  if (project > maxSent)
+    reasons.push('2 réussites au niveau max la dernière fois : on monte d’un cran');
 
   const daysSinceLast = Math.floor((ctx.now.getTime() - last.date.getTime()) / DAY_MS);
   let focus = ROTATION[last.focus];

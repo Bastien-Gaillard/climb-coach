@@ -158,7 +158,10 @@ export class RuleBasedGenerator implements PlanGenerator {
       kind: 'cooldown',
       title: 'Retour au calme',
       minutes,
-      instructions: ['Étirements doux des avant-bras, épaules et dos', 'Suspensions passives de 20 s'],
+      instructions: [
+        'Étirements doux des avant-bras, épaules et dos',
+        'Suspensions passives de 20 s',
+      ],
     };
   }
 }

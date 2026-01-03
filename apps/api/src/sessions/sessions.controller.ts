@@ -1,4 +1,14 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { CreateSessionDto, CreateSessionSchema, ListSessionsQuerySchema } from './session.dto';
 import { SessionsService } from './sessions.service';
