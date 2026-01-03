@@ -1,0 +1,5 @@
+dist
+coverage
+.angular
+pnpm-lock.yaml
+apps/api/drizzle

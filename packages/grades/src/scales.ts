@@ -16,6 +16,7 @@ export interface Scale {
   grades: ReadonlyArray<readonly [grade: string, value: number]>;
 }
 
+// prettier-ignore
 const FRENCH_GRADES = [
   '4a', '4b', '4c', '5a', '5b', '5c',
   '6a', '6a+', '6b', '6b+', '6c', '6c+',
@@ -31,6 +32,7 @@ export const FRENCH: Scale = {
   grades: FRENCH_GRADES.map((g, i) => [g, i] as const),
 };
 
+// prettier-ignore
 export const YDS: Scale = {
   system: 'yds',
   discipline: 'route',
@@ -46,6 +48,7 @@ export const YDS: Scale = {
   ],
 };
 
+// prettier-ignore
 const FONT_GRADES = [
   '3', '4', '5', '5+',
   '6A', '6A+', '6B', '6B+', '6C', '6C+',
@@ -62,6 +65,7 @@ export const FONT: Scale = {
 };
 
 /** Plusieurs cotations Font correspondent parfois à un seul V : on prend la valeur médiane. */
+// prettier-ignore
 export const VSCALE: Scale = {
   system: 'vscale',
   discipline: 'boulder',
