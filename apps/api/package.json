@@ -2,6 +2,10 @@
   "name": "@climb-coach/api",
   "version": "0.1.0",
   "private": true,
+  "files": [
+    "dist",
+    "drizzle"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/main.js",
