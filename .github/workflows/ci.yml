@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: climb
+          POSTGRES_PASSWORD: climb
+          POSTGRES_DB: climbcoach_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U climb"
+          --health-interval 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm format:check
+      - run: pnpm lint
+
+      # La lib doit être compilée avant l'API et le front qui l'importent
+      - run: pnpm --filter @climb-coach/grades build
+      - run: pnpm typecheck
+
+      - name: Tests unitaires
+        run: pnpm test
+
+      - name: Tests e2e de l'API
+        run: pnpm --filter @climb-coach/api test:e2e
+        env:
+          DATABASE_URL: postgresql://climb:climb@localhost:5432/climbcoach_test
+
+      - run: pnpm build
