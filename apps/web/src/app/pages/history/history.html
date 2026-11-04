@@ -27,12 +27,25 @@
     @if (s.climbs.length) {
     <p class="muted small">{{ sentCount(s) }}/{{ s.climbs.length }} réussis</p>
     <ul class="chips">
-      @for (c of s.climbs; track c.id) {
-      <li [class.sent]="c.sent" [title]="styleLabel[c.style]">
-        {{ c.grade }} @if (c.color) {
-        <span class="muted">({{ c.color }})</span>
+      @for (c of chips(s); track c.key) {
+      <li
+        [class.sent]="c.sent"
+        [class.colored]="c.hex"
+        [style.--chip]="c.hex"
+        [style.--chip-text]="c.hex ? textOn(c.hex) : null"
+        [title]="chipTitle(c)"
+      >
+        @if (c.sent) {
+        <span class="check" aria-hidden="true">✓</span>
+        } @if (c.color) {
+        <span class="name">{{ c.color }}</span>
+        <span class="grade">{{ c.grade }}</span>
+        } @else {
+        <span class="name">{{ c.grade }}</span>
+        } @if (c.count > 1) {
+        <span class="count">×{{ c.count }}</span>
         } @if (!c.sent) {
-        <span class="muted">· {{ c.attempts }} ess.</span>
+        <span class="tries">{{ c.attempts }} ess.</span>
         }
       </li>
       }

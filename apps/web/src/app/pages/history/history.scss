@@ -45,18 +45,53 @@
   gap: 0.35rem;
 
   li {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.3rem;
     font-size: 0.85rem;
-    padding: 0.15rem 0.55rem;
-    border-radius: 6px;
-    border: 1px dashed var(--line);
+    padding: 0.2rem 0.6rem;
+    border-radius: 8px;
+    border: 1.5px dashed var(--line);
+    color: var(--ink);
 
+    // Réussi, saisi par cotation
     &.sent {
-      border-style: solid;
+      border: 1.5px solid transparent;
       background: var(--ok-soft);
-      border-color: transparent;
       color: var(--ok);
-      font-weight: 600;
     }
+
+    // Saisi par couleur : contour de la couleur si raté, pastille pleine si réussi
+    &.colored {
+      border: 1.5px dashed var(--chip);
+      background: color-mix(in srgb, var(--chip) 10%, var(--surface));
+      color: var(--ink);
+
+      &.sent {
+        border: 1.5px solid rgb(0 0 0 / 0.1);
+        background: var(--chip);
+        color: var(--chip-text);
+      }
+    }
+  }
+
+  .name {
+    font-weight: 600;
+  }
+
+  .grade,
+  .tries {
+    font-size: 0.75rem;
+    opacity: 0.8;
+  }
+
+  .count {
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+
+  .check {
+    font-size: 0.75rem;
   }
 }
 
