@@ -18,6 +18,11 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/history/history').then((m) => m.HistoryPage),
   },
   {
+    path: 'salles',
+    title: 'Mes salles',
+    loadComponent: () => import('./pages/gyms/gyms').then((m) => m.GymsPage),
+  },
+  {
     path: 'convertisseur',
     title: 'Convertisseur',
     loadComponent: () => import('./pages/converter/converter').then((m) => m.ConverterPage),

@@ -1,0 +1,116 @@
+<form [formGroup]="form" (ngSubmit)="submit()" class="card stack editor" data-testid="gym-editor">
+  <h2>{{ gym() ? 'Modifier ' + gym()!.name : 'Nouvelle salle' }}</h2>
+
+  <div class="row">
+    <label class="grow">
+      Nom
+      <input formControlName="name" placeholder="Ex. Bloc Session Digne" maxlength="60" />
+    </label>
+    <label>
+      Discipline
+      <select formControlName="discipline" (change)="onDisciplineChange()">
+        @for (s of styleOptions; track s[0]) {
+        <option [value]="s[0]">{{ s[1] }}</option>
+        }
+      </select>
+    </label>
+    <label>
+      Cotations de la salle
+      <select formControlName="system" (change)="onSystemChange()">
+        @for (s of systems(); track s.system) {
+        <option [value]="s.system">{{ s.label }}</option>
+        }
+      </select>
+    </label>
+  </div>
+
+  <div>
+    <h3>Couleurs</h3>
+    <p class="muted hint">De la plus facile à la plus dure. Les plages peuvent se chevaucher.</p>
+  </div>
+
+  <ol class="colors" formArrayName="colors">
+    @for (c of colors.controls; track c; let i = $index; let first = $first; let last = $last) {
+    <li [formGroupName]="i" [class.invalid]="rangeError(c)">
+      <input type="color" formControlName="hex" aria-label="Couleur affichée" class="swatch" />
+      <input formControlName="color" placeholder="Nom (ex. jaune)" aria-label="Nom de la couleur" />
+      <select formControlName="min" aria-label="Cotation min">
+        @for (g of grades(); track g) {
+        <option [value]="g">{{ g }}</option>
+        }
+      </select>
+      <span class="muted">→</span>
+      <select formControlName="max" aria-label="Cotation max">
+        @for (g of grades(); track g) {
+        <option [value]="g">{{ g }}</option>
+        }
+      </select>
+      <div class="actions">
+        <button
+          type="button"
+          class="ghost"
+          (click)="moveColor(i, -1)"
+          [disabled]="first"
+          aria-label="Monter"
+        >
+          ↑
+        </button>
+        <button
+          type="button"
+          class="ghost"
+          (click)="moveColor(i, 1)"
+          [disabled]="last"
+          aria-label="Descendre"
+        >
+          ↓
+        </button>
+        <button
+          type="button"
+          class="ghost"
+          (click)="removeColor(i)"
+          [disabled]="colors.length === 1"
+          aria-label="Supprimer la couleur"
+        >
+          ✕
+        </button>
+      </div>
+      @if (rangeError(c); as e) {
+      <span class="error">{{ e }}</span>
+      }
+    </li>
+    }
+  </ol>
+  <button type="button" (click)="addColor()" [disabled]="colors.length >= 20">
+    + Ajouter une couleur
+  </button>
+
+  @if (preview().length) {
+  <div class="preview" aria-label="Aperçu des plages">
+    @for (p of preview(); track $index) {
+    <div class="lane">
+      <span
+        class="seg"
+        [style.left.%]="p.left"
+        [style.width.%]="p.width"
+        [style.background]="p.hex"
+        [title]="p.label"
+      ></span>
+    </div>
+    }
+    <div class="ticks">
+      @for (t of ticks(); track t.g) {
+      <span [style.left.%]="t.left">{{ t.g }}</span>
+      }
+    </div>
+  </div>
+  } @if (error(); as e) {
+  <p class="error">{{ e }}</p>
+  }
+
+  <div class="row">
+    <button type="submit" class="primary" [disabled]="form.invalid || hasRangeError() || saving()">
+      {{ saving() ? 'Enregistrement…' : gym() ? 'Enregistrer' : 'Créer la salle' }}
+    </button>
+    <button type="button" class="ghost" (click)="cancelled.emit()">Annuler</button>
+  </div>
+</form>

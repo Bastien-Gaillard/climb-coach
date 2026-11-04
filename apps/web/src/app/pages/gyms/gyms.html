@@ -1,0 +1,51 @@
+<div class="title">
+  <div>
+    <h1>Mes salles</h1>
+    <p class="muted">
+      Les couleurs de tes salles, pour saisir tes voies par couleur et les convertir.
+    </p>
+  </div>
+  @if (editing() === null) {
+  <button type="button" class="primary" (click)="startCreate()">+ Nouvelle salle</button>
+  }
+</div>
+
+@if (editing() !== null) {
+<app-gym-editor [gym]="editedGym()" (saved)="close()" (cancelled)="close()" />
+} @if (error(); as e) {
+<p class="error">{{ e }}</p>
+} @if (!store.loaded()) {
+<p class="muted">Chargement…</p>
+} @else {
+<ul class="gyms">
+  @for (g of store.gyms(); track g.id) {
+  <li class="card" [class.active]="editing() === g.id">
+    <div class="head">
+      <div>
+        <strong>{{ g.name }}</strong>
+        <span class="badge">{{ styleLabel[g.discipline] }}</span>
+        <span class="badge">{{ scales[g.system].label }}</span>
+      </div>
+      <div class="actions">
+        <button type="button" class="ghost" (click)="startEdit(g)">Modifier</button>
+        <button type="button" class="ghost danger" (click)="remove(g)">Supprimer</button>
+      </div>
+    </div>
+    <ul class="ladder">
+      @for (c of g.colors; track c.color) {
+      <li>
+        <span class="dot" [style.background]="c.hex || '#ccc'"></span>
+        {{ c.color }}
+        <span class="muted">{{ c.min === c.max ? c.min : c.min + ' → ' + c.max }}</span>
+      </li>
+      }
+    </ul>
+  </li>
+  } @empty { @if (editing() === null) {
+  <li class="card empty">
+    <p>Aucune salle pour l'instant.</p>
+    <button type="button" (click)="startCreate()">Ajouter ma salle</button>
+  </li>
+  } }
+</ul>
+}
