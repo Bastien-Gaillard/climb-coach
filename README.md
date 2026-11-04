@@ -12,12 +12,13 @@ Je grimpe plusieurs fois par semaine et je ne savais jamais quoi faire en arriva
   - le repos depuis la dernière séance et la fatigue (séance allégée si besoin, reprise en douceur après 2 semaines d'arrêt) ;
   - la progression (2 réussites au niveau max → on vise un cran au-dessus).
 - **Mistral + règles** : la séance est générée par **Mistral** quand une clé est configurée. Sa réponse est validée (schéma, temps, cotations) ; au moindre problème, un **générateur à règles** déterministe prend le relais.
+- **Mes salles** : chaque salle se configure depuis l'interface (nom, discipline, système de cotation, couleurs et leurs plages), avec un aperçu des plages pour repérer trous et chevauchements.
 - **Convertisseur** : cotations (française, YDS, Fontainebleau, V-scale) et **couleurs d'une salle à l'autre**.
 - **Historique** avec courbe de progression.
 
-| Historique               | Saisie par couleur   | Convertisseur               |
+| Historique               | Mes salles           | Convertisseur               |
 | ------------------------ | -------------------- | --------------------------- |
-| ![](docs/historique.png) | ![](docs/seance.png) | ![](docs/convertisseur.png) |
+| ![](docs/historique.png) | ![](docs/salles.png) | ![](docs/convertisseur.png) |
 
 ## Stack
 
@@ -38,10 +39,11 @@ climb-coach/
 ├── packages/grades/     Conversion de cotations et de couleurs (lib sans dépendance)
 ├── apps/api/            NestJS : séances, génération, conversions
 │   ├── src/sessions/      CRUD + normalisation des cotations à la saisie
+│   ├── src/gyms/          CRUD des salles et de leurs couleurs
 │   ├── src/plans/         analyse de l'historique, générateurs (règles, Mistral), fallback
 │   ├── src/db/            schéma Drizzle, migrations, seed
 │   └── test/              tests e2e
-└── apps/web/            Angular : génération, saisie, historique, convertisseur
+└── apps/web/            Angular : génération, saisie, historique, salles, convertisseur
 ```
 
 ```mermaid
@@ -63,7 +65,9 @@ flowchart LR
 - **Les règles préparent le prompt.** `analyzeHistory` calcule le focus, l'intensité, le niveau visé et explique ses choix ; Mistral reçoit ce résumé plutôt que l'historique brut. Les deux générateurs restent cohérents, et le prompt est court.
 - **Une échelle de référence par discipline.** Toutes les cotations sont stockées dans un seul système (française pour la voie, Font pour le bloc) avec une valeur numérique : la progression et les comparaisons deviennent triviales.
 - **Une couleur = une plage.** Convertir une couleur d'une salle à l'autre renvoie plusieurs couleurs avec leur taux de recouvrement, pas une réponse unique fausse.
-- **La lib de conversion est un package à part**, testée seule et importée par l'API et par le front (conversion instantanée côté navigateur).
+- **La lib de conversion est un package à part**, testée seule et importée par l'API et par le front (conversion instantanée côté navigateur, seules les salles viennent de l'API).
+- **Les mêmes règles de validation partout.** Une salle est validée par `defineGym` de la lib, côté API avant l'enregistrement ; le front reprend les mêmes contrôles pour bloquer le bouton avant même l'appel.
+- **Supprimer une salle ne casse pas l'historique.** Chaque voie est stockée avec sa cotation normalisée : la couleur n'est qu'une information de saisie.
 
 ## Lancer le projet
 
@@ -100,7 +104,7 @@ pnpm --filter @climb-coach/api test:e2e     # e2e (DATABASE_URL vers une base de
 pnpm lint && pnpm typecheck
 ```
 
-Une centaine de tests au total : conversions et configs de salles, règles de génération, validation et fallback Mistral (fetch mocké), endpoints de bout en bout sur Postgres, composants Angular.
+Plus de 120 tests : conversions et validation des salles, règles de génération, validation et fallback Mistral (fetch mocké), endpoints de bout en bout sur Postgres, composants Angular.
 
 ## API
 
@@ -115,12 +119,8 @@ Une centaine de tests au total : conversions et configs de salles, règles de g�
 | `GET`    | `/api/gyms`                         | Salles et leurs couleurs                            |
 | `GET`    | `/api/gyms/:id/convert?color&to`    | Couleur → couleurs d'une autre salle                |
 
-## Ajouter sa salle
-
-Créer un fichier dans `packages/grades/src/gyms/` (voir le [README de la lib](packages/grades/README.md)) et l'ajouter à `GYMS`. La config est validée au chargement.
-
 ## Pistes
 
-- Plusieurs grimpeurs (auth)
+- Plusieurs grimpeurs (auth) et salles partagées entre eux
 - Saisie rapide depuis le téléphone (PWA)
 - Ajuster les seuils de progression à partir des données réelles
