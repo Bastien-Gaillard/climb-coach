@@ -50,16 +50,6 @@
         }
       </select>
     </label>
-    <label>
-      Couleur
-      <select (change)="selectedColor.set($any($event.target).value)">
-        @for (c of from.colors; track c.color) {
-        <option [value]="c.color" [selected]="c.color === color()">
-          {{ c.color }} ({{ c.min }} → {{ c.max }})
-        </option>
-        }
-      </select>
-    </label>
     @if (toGym(); as to) {
     <span class="arrow" aria-hidden="true">→</span>
     <label>
@@ -71,6 +61,16 @@
       </select>
     </label>
     }
+  </div>
+
+  <div class="stack-sm">
+    <span class="muted label">Couleur chez {{ from.name }}</span>
+    <app-color-picker
+      [colors]="from.colors"
+      [ngModel]="color()"
+      (ngModelChange)="selectedColor.set($event)"
+      label="Couleur à convertir"
+    />
   </div>
 
   @if (toGym(); as to) { @if (sourceRange(); as range) {

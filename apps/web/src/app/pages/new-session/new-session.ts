@@ -4,6 +4,7 @@ import { Router, RouterLink } from '@angular/router';
 import { GradeSystem, SCALES } from '@climb-coach/grades';
 import { ApiService } from '../../core/api.service';
 import { GymsStore } from '../../core/gyms.store';
+import { ColorPicker } from '../../shared/color-picker';
 import { errorMessage, FOCUS_LABEL, STYLE_LABEL } from '../../core/labels';
 import { ClimbInput, CreateSession, Focus, Style } from '../../core/models';
 
@@ -18,7 +19,7 @@ function localNow(): string {
 
 @Component({
   selector: 'app-new-session',
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [ReactiveFormsModule, RouterLink, ColorPicker],
   templateUrl: './new-session.html',
   styleUrl: './new-session.scss',
 })

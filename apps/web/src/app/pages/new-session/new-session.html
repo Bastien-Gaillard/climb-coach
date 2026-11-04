@@ -99,11 +99,11 @@
           <option [value]="g.id">{{ g.name }}</option>
           }
         </select>
-        <select formControlName="color" aria-label="Couleur">
-          @for (c of colorsFor(climb.value.gymId); track c.color) {
-          <option [value]="c.color">{{ c.color }} ({{ c.min }}-{{ c.max }})</option>
-          }
-        </select>
+        <app-color-picker
+          class="full"
+          formControlName="color"
+          [colors]="colorsFor(climb.value.gymId)"
+        />
         }
 
         <label class="inline"> <input type="checkbox" formControlName="sent" /> Réussi </label>

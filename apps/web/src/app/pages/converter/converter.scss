@@ -71,3 +71,13 @@ p .dot {
 a {
   color: var(--accent);
 }
+
+.stack-sm {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+
+  .label {
+    font-size: 0.85rem;
+  }
+}

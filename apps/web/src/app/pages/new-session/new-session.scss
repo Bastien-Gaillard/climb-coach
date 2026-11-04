@@ -96,3 +96,8 @@
     color: var(--accent);
   }
 }
+
+app-color-picker.full {
+  order: 10;
+  flex-basis: 100%;
+}

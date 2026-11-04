@@ -1,4 +1,5 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import {
   colorRange,
@@ -9,6 +10,7 @@ import {
   SCALES,
 } from '@climb-coach/grades';
 import { GymsStore } from '../../core/gyms.store';
+import { ColorPicker } from '../../shared/color-picker';
 
 interface ConversionResult {
   ok: boolean;
@@ -21,7 +23,7 @@ interface ConversionResult {
  */
 @Component({
   selector: 'app-converter',
-  imports: [RouterLink],
+  imports: [RouterLink, FormsModule, ColorPicker],
   templateUrl: './converter.html',
   styleUrl: './converter.scss',
 })
