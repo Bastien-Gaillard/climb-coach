@@ -21,7 +21,7 @@ Chaque échelle associe ses cotations à une valeur sur une échelle de référe
 
 ## Couleurs de salles
 
-Une salle se décrit par un fichier JSON dans `src/gyms/` :
+Une salle est un simple objet (dans l'appli, elles sont créées depuis la page « Salles » et stockées en base). Les salles d'exemple de `src/gyms/` servent aux tests :
 
 ```json
 {
@@ -36,21 +36,18 @@ Une salle se décrit par un fichier JSON dans `src/gyms/` :
 Une couleur couvre une **plage** de cotations, donc une conversion entre salles renvoie une liste de couleurs avec leur taux de recouvrement :
 
 ```ts
-import { convertColor, colorsForGrade, findGym } from '@climb-coach/grades';
+import { convertColor, colorsForGrade, EXAMPLE_GYMS, findGym } from '@climb-coach/grades';
 
-convertColor('rouge', findGym('alpha-bloc'), findGym('beta-bloc'));
+const alpha = findGym('alpha-bloc', EXAMPLE_GYMS);
+const beta = findGym('beta-bloc', EXAMPLE_GYMS);
+
+convertColor('rouge', alpha, beta);
 // [{ color: 'bleu', overlap: 0.67 }, { color: 'vert', overlap: 0.33 }]
 
-colorsForGrade(findGym('beta-bloc'), '6C'); // ['bleu', 'rose'] (plages qui se chevauchent)
+colorsForGrade(beta, '6C'); // ['bleu', 'rose'] (plages qui se chevauchent)
 ```
 
-Les configs sont validées au chargement (`defineGym`) : système cohérent avec la discipline, min ≤ max, pas de couleur en double.
-
-## Ajouter une salle
-
-1. Créer `src/gyms/ma-salle.json`
-2. L'ajouter à `GYMS` dans `src/gyms.ts`
-3. `pnpm test`
+Une salle est validée par `defineGym` : système cohérent avec la discipline, min ≤ max, pas de couleur en double, codes couleur au format `#rrggbb`. L'API s'en sert avant chaque enregistrement.
 
 ## Scripts
 

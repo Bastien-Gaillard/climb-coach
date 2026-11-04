@@ -1,10 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { GradeError } from './convert';
-import { colorRange, colorsForGrade, convertColor, defineGym, findGym } from './gyms';
+import { colorRange, colorsForGrade, convertColor, defineGym, EXAMPLE_GYMS, findGym } from './gyms';
 
-const alpha = findGym('alpha-bloc');
-const beta = findGym('beta-bloc');
-const gamma = findGym('gamma-voie');
+const alpha = findGym('alpha-bloc', EXAMPLE_GYMS);
+const beta = findGym('beta-bloc', EXAMPLE_GYMS);
+const gamma = findGym('gamma-voie', EXAMPLE_GYMS);
+
+describe('findGym', () => {
+  it('refuse une salle absente de la liste', () => {
+    expect(() => findGym('inconnue', EXAMPLE_GYMS)).toThrow(/Salle inconnue/);
+  });
+});
 
 describe('colorRange', () => {
   it('renvoie la plage de la couleur', () => {
@@ -82,6 +88,18 @@ describe('defineGym', () => {
         ],
       }),
     ).toThrow(/en double/);
+  });
+
+  it('refuse un code couleur invalide', () => {
+    expect(() =>
+      defineGym({ ...base, colors: [{ color: 'vert', hex: 'green', min: '4', max: '5' }] }),
+    ).toThrow(/code couleur/);
+  });
+
+  it('refuse une couleur sans nom', () => {
+    expect(() => defineGym({ ...base, colors: [{ color: ' ', min: '4', max: '5' }] })).toThrow(
+      /pas de nom/,
+    );
   });
 
   it('refuse une config vide', () => {

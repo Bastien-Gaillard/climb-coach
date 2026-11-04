@@ -50,7 +50,11 @@ export function defineGym(raw: unknown): Gym {
   }
   const seen = new Set<string>();
   for (const c of gym.colors) {
-    const key = c.color.toLowerCase();
+    if (!c.color?.trim()) throw new GradeError(`Salle ${gym.id} : une couleur n'a pas de nom`);
+    if (c.hex && !/^#[0-9a-fA-F]{6}$/.test(c.hex)) {
+      throw new GradeError(`Salle ${gym.id} : code couleur invalide pour « ${c.color} »`);
+    }
+    const key = c.color.trim().toLowerCase();
     if (seen.has(key)) throw new GradeError(`Salle ${gym.id} : couleur « ${c.color} » en double`);
     seen.add(key);
     if (gradeValue(c.min, gym.system) > gradeValue(c.max, gym.system)) {
@@ -60,9 +64,10 @@ export function defineGym(raw: unknown): Gym {
   return gym;
 }
 
-export const GYMS: Gym[] = [alphaBloc, betaBloc, gammaVoie].map(defineGym);
+/** Salles fictives pour les tests et la doc. Les vraies salles sont gérées par l'appli. */
+export const EXAMPLE_GYMS: Gym[] = [alphaBloc, betaBloc, gammaVoie].map(defineGym);
 
-export function findGym(id: string, gyms: Gym[] = GYMS): Gym {
+export function findGym(id: string, gyms: Gym[]): Gym {
   const gym = gyms.find((g) => g.id === id);
   if (!gym) throw new GradeError(`Salle inconnue : ${id}`);
   return gym;
