@@ -52,7 +52,10 @@ describe('ConverterPage', () => {
   });
 
   it('affiche les couleurs équivalentes avec leur recouvrement', () => {
-    select('Couleur', 'rouge');
+    Array.from(el.querySelectorAll<HTMLButtonElement>('app-color-picker button'))
+      .find((b) => b.textContent?.includes('rouge'))!
+      .click();
+    fixture.detectChanges();
     const items = Array.from(el.querySelectorAll('[data-testid=color-matches] li')).map((li) =>
       li.textContent?.replace(/\s+/g, ' ').trim(),
     );
