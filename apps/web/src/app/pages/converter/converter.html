@@ -82,7 +82,7 @@
       <span class="dot" [style.background]="m.hex"></span>
       <strong>{{ m.color }}</strong>
       <span class="muted">{{ m.min }} → {{ m.max }}</span>
-      <span class="bar"><span [style.width]="percent(m.overlap)"></span></span>
+      <span class="bar"><span [style.width.%]="m.overlap * 100"></span></span>
       <span class="pct">{{ percent(m.overlap) }}</span>
     </li>
     } @empty {
