@@ -48,6 +48,24 @@ export const climbs = pgTable('climbs', {
   attempts: smallint('attempts').notNull().default(1),
 });
 
+export interface GymColorRow {
+  color: string;
+  hex?: string;
+  min: string;
+  max: string;
+}
+
+export const gyms = pgTable('gyms', {
+  /** Identifiant lisible dérivé du nom (ex. « bloc-session-digne »). */
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  discipline: climbStyle('discipline').notNull(),
+  system: text('system', { enum: ['french', 'yds', 'font', 'vscale'] }).notNull(),
+  colors: jsonb('colors').$type<GymColorRow[]>().notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const generatedPlans = pgTable('generated_plans', {
   id: uuid('id').primaryKey().defaultRandom(),
   availableMinutes: integer('available_minutes').notNull(),
