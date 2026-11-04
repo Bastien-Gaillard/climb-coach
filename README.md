@@ -81,7 +81,7 @@ Sans clé Mistral, tout fonctionne avec le générateur à règles. Une clé gra
 
 ### En local
 
-Prérequis : Node 22, pnpm, un Postgres (ou `docker compose up db`).
+Prérequis : Node 22, pnpm, et la base lancée avec `docker compose up -d db` (exposée sur le port **5433** pour ne pas gêner un Postgres déjà installé).
 
 ```bash
 pnpm install
