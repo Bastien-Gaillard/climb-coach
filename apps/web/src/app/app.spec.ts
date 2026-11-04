@@ -14,6 +14,6 @@ describe('App', () => {
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
     const links = (fixture.nativeElement as HTMLElement).querySelectorAll('nav a');
-    expect(links.length).toBe(4);
+    expect(links.length).toBe(5);
   });
 });

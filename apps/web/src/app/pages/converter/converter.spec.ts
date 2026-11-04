@@ -1,4 +1,8 @@
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
+import { EXAMPLE_GYMS } from '@climb-coach/grades';
 import { ConverterPage } from './converter';
 
 describe('ConverterPage', () => {
@@ -14,12 +18,19 @@ describe('ConverterPage', () => {
     fixture.detectChanges();
   };
 
-  beforeEach(() => {
-    TestBed.configureTestingModule({ imports: [ConverterPage] });
+  const setup = (gyms = EXAMPLE_GYMS) => {
+    TestBed.configureTestingModule({
+      imports: [ConverterPage],
+      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
+    });
     fixture = TestBed.createComponent(ConverterPage);
     el = fixture.nativeElement;
     fixture.detectChanges();
-  });
+    TestBed.inject(HttpTestingController).expectOne('/api/gyms').flush(gyms);
+    fixture.detectChanges();
+  };
+
+  beforeEach(() => setup());
 
   it('convertit la cotation par défaut (6B Font -> V4)', () => {
     expect(el.querySelector('[data-testid=grade-result]')?.textContent?.trim()).toBe('V4');
@@ -41,11 +52,18 @@ describe('ConverterPage', () => {
   });
 
   it('affiche les couleurs équivalentes avec leur recouvrement', () => {
+    select('Couleur', 'rouge');
     const items = Array.from(el.querySelectorAll('[data-testid=color-matches] li')).map((li) =>
       li.textContent?.replace(/\s+/g, ' ').trim(),
     );
     expect(items[0]).toContain('bleu');
     expect(items[0]).toContain('67 %');
     expect(items[1]).toContain('vert');
+  });
+
+  it('invite à ajouter une salle quand il n’y en a aucune', () => {
+    TestBed.resetTestingModule();
+    setup([]);
+    expect(el.querySelector('[data-testid=no-gym]')?.textContent).toContain('Aucune salle');
   });
 });
