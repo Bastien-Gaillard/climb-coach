@@ -2,6 +2,16 @@ export type Focus = 'strength' | 'endurance' | 'technique';
 export type Style = 'boulder' | 'route';
 export type GradeSystemId = 'french' | 'yds' | 'font' | 'vscale';
 
+export type { Gym, GymColor } from '@climb-coach/grades';
+
+/** Corps envoyé pour créer ou modifier une salle (l'id est calculé par l'API). */
+export interface GymInput {
+  name: string;
+  discipline: Style;
+  system: GradeSystemId;
+  colors: { color: string; hex?: string; min: string; max: string }[];
+}
+
 export interface Climb {
   id: string;
   style: Style;

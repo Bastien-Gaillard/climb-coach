@@ -1,7 +1,14 @@
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
-import { CreateSession, GeneratedPlan, ProgressionPoint, Session } from './models';
+import {
+  CreateSession,
+  GeneratedPlan,
+  Gym,
+  GymInput,
+  ProgressionPoint,
+  Session,
+} from './models';
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
@@ -26,5 +33,21 @@ export class ApiService {
 
   generatePlan(availableMinutes: number): Observable<GeneratedPlan> {
     return this.http.post<GeneratedPlan>(`${this.base}/plans/generate`, { availableMinutes });
+  }
+
+  listGyms(): Observable<Gym[]> {
+    return this.http.get<Gym[]>(`${this.base}/gyms`);
+  }
+
+  createGym(body: GymInput): Observable<Gym> {
+    return this.http.post<Gym>(`${this.base}/gyms`, body);
+  }
+
+  updateGym(id: string, body: GymInput): Observable<Gym> {
+    return this.http.put<Gym>(`${this.base}/gyms/${id}`, body);
+  }
+
+  deleteGym(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}/gyms/${id}`);
   }
 }
