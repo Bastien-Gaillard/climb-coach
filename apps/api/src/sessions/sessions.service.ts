@@ -1,6 +1,7 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { desc, eq } from 'drizzle-orm';
 import { Database, DB } from '../db/db.module';
+import { GymsService } from '../gyms/gyms.service';
 import { climbs, sessions } from '../db/schema';
 import { normalizeClimb } from './climb-normalizer';
 import { CreateSessionDto } from './session.dto';
@@ -19,10 +20,15 @@ export interface ProgressionPoint {
 
 @Injectable()
 export class SessionsService {
-  constructor(@Inject(DB) private readonly db: Database) {}
+  constructor(
+    @Inject(DB) private readonly db: Database,
+    private readonly gyms: GymsService,
+  ) {}
 
   async create(dto: CreateSessionDto): Promise<SessionWithClimbs> {
-    const normalized = dto.climbs.map(normalizeClimb);
+    const gymIds = [...new Set(dto.climbs.flatMap((c) => (c.gymId ? [c.gymId] : [])))];
+    const gyms = await this.gyms.findMany(gymIds);
+    const normalized = dto.climbs.map((c) => normalizeClimb(c, gyms));
 
     const id = await this.db.transaction(async (tx) => {
       const [session] = await tx

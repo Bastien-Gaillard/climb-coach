@@ -1,8 +1,10 @@
+import { EXAMPLE_GYMS } from '@climb-coach/grades';
 import { BadRequestException } from '@nestjs/common';
 import { normalizeClimb } from './climb-normalizer';
 import { ClimbInputSchema } from './session.dto';
 
-const climb = (raw: unknown) => normalizeClimb(ClimbInputSchema.parse(raw));
+const gyms = new Map(EXAMPLE_GYMS.map((g) => [g.id, g]));
+const climb = (raw: unknown) => normalizeClimb(ClimbInputSchema.parse(raw), gyms);
 
 describe('normalizeClimb', () => {
   it('garde une cotation déjà dans le système de référence', () => {
@@ -30,6 +32,12 @@ describe('normalizeClimb', () => {
     expect(() =>
       climb({ style: 'route', color: 'rouge', gymId: 'alpha-bloc', sent: true }),
     ).toThrow(BadRequestException);
+  });
+
+  it('refuse une salle qui n’existe pas', () => {
+    expect(() => climb({ style: 'boulder', color: 'rouge', gymId: 'fermee', sent: true })).toThrow(
+      'Salle inconnue : fermee',
+    );
   });
 
   it('refuse une cotation inconnue avec une 400', () => {

@@ -1,7 +1,7 @@
 import {
   colorRange,
   convertGrade,
-  findGym,
+  Gym,
   GradeError,
   gradeFromValue,
   GradeSystem,
@@ -32,12 +32,17 @@ export interface NormalizedClimb {
  * Convertit une voie saisie (cotation dans n'importe quel système, ou couleur de salle)
  * vers le système de référence du style.
  * Pour une couleur, on retient le milieu de sa plage de cotations.
+ * `gyms` contient les salles citées dans la séance, chargées depuis la base.
  */
-export function normalizeClimb(input: ClimbInput): NormalizedClimb {
+export function normalizeClimb(
+  input: ClimbInput,
+  gyms: Map<string, Gym> = new Map(),
+): NormalizedClimb {
   const target = REFERENCE_SYSTEM[input.style];
   try {
     if (input.color && input.gymId) {
-      const gym = findGym(input.gymId);
+      const gym = gyms.get(input.gymId);
+      if (!gym) throw new GradeError(`Salle inconnue : ${input.gymId}`);
       if (gym.discipline !== GYM_DISCIPLINE[input.style]) {
         throw new GradeError(`${gym.name} n'est pas une salle de ${input.style}`);
       }
