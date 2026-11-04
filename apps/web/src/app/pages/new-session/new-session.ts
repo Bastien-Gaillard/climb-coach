@@ -1,8 +1,9 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormArray, FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
-import { Router } from '@angular/router';
-import { GradeSystem, GYMS, SCALES } from '@climb-coach/grades';
+import { Router, RouterLink } from '@angular/router';
+import { GradeSystem, SCALES } from '@climb-coach/grades';
 import { ApiService } from '../../core/api.service';
+import { GymsStore } from '../../core/gyms.store';
 import { errorMessage, FOCUS_LABEL, STYLE_LABEL } from '../../core/labels';
 import { ClimbInput, CreateSession, Focus, Style } from '../../core/models';
 
@@ -17,19 +18,21 @@ function localNow(): string {
 
 @Component({
   selector: 'app-new-session',
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, RouterLink],
   templateUrl: './new-session.html',
   styleUrl: './new-session.scss',
 })
-export class NewSessionPage {
+export class NewSessionPage implements OnInit {
   private readonly fb = inject(FormBuilder).nonNullable;
   private readonly api = inject(ApiService);
   private readonly router = inject(Router);
+  private readonly gyms = inject(GymsStore);
 
   protected readonly focusOptions = Object.entries(FOCUS_LABEL) as [Focus, string][];
   protected readonly styleOptions = Object.entries(STYLE_LABEL) as [Style, string][];
   protected readonly saving = signal(false);
   protected readonly error = signal<string | null>(null);
+  protected readonly noGymHint = () => this.gyms.loaded() && this.gyms.count() === 0;
 
   protected readonly form = this.fb.group({
     date: [localNow(), Validators.required],
@@ -48,6 +51,19 @@ export class NewSessionPage {
     this.addClimb();
   }
 
+  ngOnInit(): void {
+    this.gyms.load();
+  }
+
+  /** Passage en saisie par couleur : on choisit la première salle si aucune n'est sélectionnée. */
+  protected onModeChange(group: FormGroup): void {
+    // getRawValue lit les contrôles : group.value n'est pas encore à jour pendant l'événement
+    const { mode, gymId, style } = group.getRawValue();
+    if (mode !== 'color' || this.gyms.find(gymId)) return;
+    const gym = this.gymsFor(style)[0];
+    group.patchValue({ gymId: gym?.id ?? '', color: gym?.colors[0]?.color ?? '' });
+  }
+
   protected addClimb(): void {
     // On reprend le style, le mode et la salle de la voie précédente : on enchaîne souvent les mêmes
     const previous = this.climbs.at(this.climbs.length - 1)?.getRawValue();
@@ -55,18 +71,19 @@ export class NewSessionPage {
     const system: GradeSystem = previous?.system ?? DEFAULT_SYSTEM[style];
     const gymId: string = previous?.gymId ?? this.gymsFor(style)[0]?.id ?? '';
 
-    this.climbs.push(
-      this.fb.group({
-        style: [style],
-        mode: [previous?.mode ?? 'grade'],
-        system: [system],
-        grade: [previous?.grade ?? SCALES[system].grades[6][0]],
-        gymId: [gymId],
-        color: [previous?.color ?? this.colorsFor(gymId)[0]?.color ?? ''],
-        sent: [true],
-        attempts: [1, [Validators.min(1), Validators.max(50)]],
-      }),
-    );
+    const group = this.fb.group({
+      style: [style],
+      mode: [previous?.mode ?? 'grade'],
+      system: [system],
+      grade: [previous?.grade ?? SCALES[system].grades[6][0]],
+      gymId: [gymId],
+      color: [previous?.color ?? this.colorsFor(gymId)[0]?.color ?? ''],
+      sent: [true],
+      attempts: [1, [Validators.min(1), Validators.max(50)]],
+    });
+    // Les salles arrivent de l'API : on complète la salle au passage en mode couleur
+    group.controls.mode.valueChanges.subscribe(() => this.onModeChange(group));
+    this.climbs.push(group);
   }
 
   protected removeClimb(index: number): void {
@@ -107,11 +124,11 @@ export class NewSessionPage {
   }
 
   protected gymsFor(style: Style) {
-    return GYMS.filter((g) => g.discipline === style);
+    return this.gyms.byDiscipline(style);
   }
 
   protected colorsFor(gymId: string) {
-    return GYMS.find((g) => g.id === gymId)?.colors ?? [];
+    return this.gyms.find(gymId)?.colors ?? [];
   }
 
   protected setFatigue(value: number): void {

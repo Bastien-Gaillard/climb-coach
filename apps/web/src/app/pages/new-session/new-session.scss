@@ -87,3 +87,12 @@
 .small {
   width: 4rem;
 }
+
+.hint {
+  margin: 0;
+  font-size: 0.85rem;
+
+  a {
+    color: var(--accent);
+  }
+}

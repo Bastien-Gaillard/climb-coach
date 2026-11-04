@@ -37,43 +37,47 @@
 
 <section class="card stack">
   <h2>Couleurs de salles</h2>
+
+  @if (!gymsLoaded()) {
+  <p class="muted">Chargement des salles…</p>
+  } @else if (fromGym(); as from) {
   <div class="row">
     <label>
       Ma salle
-      <select [value]="fromGymId()" (change)="setFromGym($any($event.target).value)">
-        @for (g of gyms; track g.id) {
-        <option [value]="g.id" [selected]="g.id === fromGymId()">{{ g.name }}</option>
+      <select (change)="setFromGym($any($event.target).value)">
+        @for (g of gyms(); track g.id) {
+        <option [value]="g.id" [selected]="g.id === from.id">{{ g.name }}</option>
         }
       </select>
     </label>
     <label>
       Couleur
-      <select [value]="color()" (change)="color.set($any($event.target).value)">
-        @for (c of fromGym().colors; track c.color) {
+      <select (change)="selectedColor.set($any($event.target).value)">
+        @for (c of from.colors; track c.color) {
         <option [value]="c.color" [selected]="c.color === color()">
           {{ c.color }} ({{ c.min }} → {{ c.max }})
         </option>
         }
       </select>
     </label>
+    @if (toGym(); as to) {
     <span class="arrow" aria-hidden="true">→</span>
     <label>
       Autre salle
-      <select [value]="toGymId()" (change)="toGymId.set($any($event.target).value)">
+      <select (change)="toGymId.set($any($event.target).value)">
         @for (g of compatibleGyms(); track g.id) {
-        <option [value]="g.id" [selected]="g.id === toGymId()">{{ g.name }}</option>
+        <option [value]="g.id" [selected]="g.id === to.id">{{ g.name }}</option>
         }
       </select>
     </label>
+    }
   </div>
 
-  @if (compatibleGyms().length === 0) {
-  <p class="muted">Aucune autre salle de cette discipline pour l'instant.</p>
-  } @else { @if (sourceRange(); as range) {
+  @if (toGym(); as to) { @if (sourceRange(); as range) {
   <p class="muted">
-    <span class="dot" [style.background]="hex(fromGym(), range.color)"></span>
-    <strong>{{ range.color }}</strong> chez {{ fromGym().name }} = {{ range.min }} à {{ range.max
-    }}. Chez {{ toGym().name }}, ça correspond à :
+    <span class="dot" [style.background]="hex(from, range.color)"></span>
+    <strong>{{ range.color }}</strong> chez {{ from.name }} = {{ range.min }} à {{ range.max }}.
+    Chez {{ to.name }}, ça correspond à :
   </p>
   }
   <ul class="matches" data-testid="color-matches">
@@ -89,5 +93,14 @@
     <li class="muted">Aucune couleur équivalente.</li>
     }
   </ul>
+  } @else {
+  <p class="muted">
+    Ajoute une autre salle de {{ from.discipline === 'boulder' ? 'bloc' : 'voie' }} pour comparer
+    les couleurs. <a routerLink="/salles">Gérer mes salles →</a>
+  </p>
+  } } @else {
+  <p class="muted" data-testid="no-gym">
+    Aucune salle enregistrée. <a routerLink="/salles">Ajoute tes salles →</a>
+  </p>
   }
 </section>

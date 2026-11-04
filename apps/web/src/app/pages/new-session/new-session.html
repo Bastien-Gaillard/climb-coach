@@ -119,6 +119,11 @@
     </ol>
 
     <button type="button" (click)="addClimb()">+ Ajouter une voie</button>
+    @if (noGymHint()) {
+    <p class="muted hint">
+      Pour saisir tes voies par couleur, <a routerLink="/salles">ajoute d'abord ta salle</a>.
+    </p>
+    }
   </section>
 
   @if (error(); as e) {

@@ -1,29 +1,39 @@
-import { Component, computed, signal } from '@angular/core';
+import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import {
   colorRange,
   convertColor,
   convertGrade,
-  findGym,
   Gym,
   GradeSystem,
-  GYMS,
   SCALES,
 } from '@climb-coach/grades';
+import { GymsStore } from '../../core/gyms.store';
 
 interface ConversionResult {
   ok: boolean;
   text: string;
 }
 
-/** Conversion côté navigateur : la lib est partagée avec l'API, pas besoin d'appel réseau. */
+/**
+ * Conversion côté navigateur : la lib est partagée avec l'API.
+ * Seule la liste des salles vient du serveur.
+ */
 @Component({
   selector: 'app-converter',
+  imports: [RouterLink],
   templateUrl: './converter.html',
   styleUrl: './converter.scss',
 })
-export class ConverterPage {
+export class ConverterPage implements OnInit {
+  private readonly store = inject(GymsStore);
   protected readonly scales = Object.values(SCALES);
-  protected readonly gyms = GYMS;
+  protected readonly gyms = this.store.gyms;
+  protected readonly gymsLoaded = this.store.loaded;
+
+  ngOnInit(): void {
+    this.store.load();
+  }
 
   // --- Cotations
   protected readonly from = signal<GradeSystem>('font');
@@ -44,31 +54,48 @@ export class ConverterPage {
     }
   });
 
-  // --- Couleurs
-  protected readonly fromGymId = signal(GYMS[0].id);
-  protected readonly toGymId = signal(GYMS[1].id);
-  protected readonly color = signal(GYMS[0].colors[3].color);
+  // --- Couleurs (les choix vides retombent sur la première salle / couleur compatible)
+  protected readonly fromGymId = signal('');
+  protected readonly toGymId = signal('');
+  protected readonly selectedColor = signal('');
 
-  protected readonly fromGym = computed(() => findGym(this.fromGymId()));
-  protected readonly toGym = computed(() => findGym(this.toGymId()));
-  protected readonly compatibleGyms = computed(() =>
-    this.gyms.filter(
-      (g) => g.discipline === this.fromGym().discipline && g.id !== this.fromGymId(),
-    ),
+  protected readonly fromGym = computed<Gym | null>(
+    () => this.gyms().find((g) => g.id === this.fromGymId()) ?? this.gyms()[0] ?? null,
   );
+  protected readonly compatibleGyms = computed(() => {
+    const from = this.fromGym();
+    return from
+      ? this.gyms().filter((g) => g.discipline === from.discipline && g.id !== from.id)
+      : [];
+  });
+  protected readonly toGym = computed<Gym | null>(
+    () =>
+      this.compatibleGyms().find((g) => g.id === this.toGymId()) ??
+      this.compatibleGyms()[0] ??
+      null,
+  );
+  protected readonly color = computed(() => {
+    const colors = this.fromGym()?.colors ?? [];
+    return colors.find((c) => c.color === this.selectedColor())?.color ?? colors[0]?.color ?? '';
+  });
+
   protected readonly sourceRange = computed(() => {
+    const from = this.fromGym();
     try {
-      return colorRange(this.fromGym(), this.color());
+      return from ? colorRange(from, this.color()) : null;
     } catch {
       return null;
     }
   });
   protected readonly matches = computed(() => {
+    const from = this.fromGym();
+    const to = this.toGym();
+    if (!from || !to) return [];
     try {
-      return convertColor(this.color(), this.fromGym(), this.toGym()).map((m) => ({
+      return convertColor(this.color(), from, to).map((m) => ({
         ...m,
-        ...colorRange(this.toGym(), m.color),
-        hex: this.hex(this.toGym(), m.color),
+        ...colorRange(to, m.color),
+        hex: this.hex(to, m.color),
       }));
     } catch {
       return [];
@@ -83,9 +110,8 @@ export class ConverterPage {
 
   protected setFromGym(id: string) {
     this.fromGymId.set(id);
-    this.color.set(this.fromGym().colors[0].color);
-    const target = this.compatibleGyms()[0];
-    if (target) this.toGymId.set(target.id);
+    this.selectedColor.set('');
+    this.toGymId.set('');
   }
 
   protected hex(gym: Gym, color: string): string {
