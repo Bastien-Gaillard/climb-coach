@@ -1,6 +1,7 @@
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { sql } from 'drizzle-orm';
+import { EXAMPLE_GYMS } from '@climb-coach/grades';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { Database, DB } from '../src/db/db.module';
@@ -31,7 +32,7 @@ describe('API (e2e)', () => {
   });
 
   beforeEach(async () => {
-    await db.execute(sql`TRUNCATE sessions, climbs, generated_plans CASCADE`);
+    await db.execute(sql`TRUNCATE sessions, climbs, generated_plans, gyms CASCADE`);
   });
 
   afterAll(async () => {
@@ -40,9 +41,93 @@ describe('API (e2e)', () => {
 
   const http = () => request(app.getHttpServer());
 
+  /** Crée une salle d'exemple via l'API et renvoie son id. */
+  const createGym = async (exampleId: string) => {
+    const { id: _id, ...body } = EXAMPLE_GYMS.find((g) => g.id === exampleId)!;
+    const res = await http().post('/api/gyms').send(body).expect(201);
+    return res.body.id as string;
+  };
+
   it('GET /api/health', () => http().get('/api/health').expect(200, { status: 'ok' }));
 
+  describe('salles', () => {
+    const body = {
+      name: 'Bloc Session Digne',
+      discipline: 'boulder',
+      system: 'font',
+      colors: [
+        { color: 'jaune', hex: '#facc15', min: '4', max: '5' },
+        { color: 'vert', hex: '#22c55e', min: '5+', max: '6A+' },
+      ],
+    };
+
+    it('crée une salle avec un id lisible, puis un id unique pour un homonyme', async () => {
+      const first = await http().post('/api/gyms').send(body).expect(201);
+      expect(first.body.id).toBe('bloc-session-digne');
+      const second = await http().post('/api/gyms').send(body).expect(201);
+      expect(second.body.id).toBe('bloc-session-digne-2');
+    });
+
+    it('liste, lit, modifie et supprime', async () => {
+      const { body: gym } = await http().post('/api/gyms').send(body).expect(201);
+
+      expect((await http().get('/api/gyms').expect(200)).body).toHaveLength(1);
+
+      const updated = await http()
+        .put(`/api/gyms/${gym.id}`)
+        .send({
+          ...body,
+          name: 'Bloc Session',
+          colors: [...body.colors, { color: 'bleu', min: '6B', max: '6C' }],
+        })
+        .expect(200);
+      expect(updated.body.colors).toHaveLength(3);
+      expect((await http().get(`/api/gyms/${gym.id}`).expect(200)).body.name).toBe('Bloc Session');
+
+      await http().delete(`/api/gyms/${gym.id}`).expect(204);
+      await http().get(`/api/gyms/${gym.id}`).expect(404);
+    });
+
+    it('refuse une plage incohérente avec un message clair', async () => {
+      const res = await http()
+        .post('/api/gyms')
+        .send({ ...body, colors: [{ color: 'vert', min: '7A', max: '6A' }] })
+        .expect(400);
+      expect(res.body.message).toContain('min supérieur au max');
+    });
+
+    it('refuse une cotation qui n’est pas du système choisi', async () => {
+      await http()
+        .post('/api/gyms')
+        .send({ ...body, system: 'french', colors: [{ color: 'vert', min: '6A', max: '6B' }] })
+        .expect(400);
+    });
+
+    it('garde les voies déjà saisies quand on supprime la salle', async () => {
+      const gymId = await createGym('alpha-bloc');
+      const session = await http()
+        .post('/api/sessions')
+        .send({
+          date: '2025-11-27T19:00:00Z',
+          durationMinutes: 60,
+          focus: 'technique',
+          fatigue: 2,
+          climbs: [{ style: 'boulder', color: 'rouge', gymId, sent: true }],
+        })
+        .expect(201);
+
+      await http().delete(`/api/gyms/${gymId}`).expect(204);
+      const res = await http().get(`/api/sessions/${session.body.id}`).expect(200);
+      expect(res.body.climbs[0]).toMatchObject({ grade: '6B', color: 'rouge' });
+    });
+  });
+
   describe('séances', () => {
+    let alphaId: string;
+    beforeEach(async () => {
+      alphaId = await createGym('alpha-bloc');
+    });
+
     const body = {
       date: '2025-11-27T19:00:00Z',
       durationMinutes: 90,
@@ -50,7 +135,7 @@ describe('API (e2e)', () => {
       fatigue: 3,
       climbs: [
         { style: 'boulder', grade: 'V4', system: 'vscale', sent: true },
-        { style: 'boulder', color: 'noir', gymId: 'alpha-bloc', sent: false, attempts: 4 },
+        { style: 'boulder', color: 'noir', gymId: 'salle-alpha-bloc', sent: false, attempts: 4 },
       ],
     };
 
@@ -62,7 +147,7 @@ describe('API (e2e)', () => {
           expect.objectContaining({
             grade: '6C+',
             color: 'noir',
-            gymId: 'alpha-bloc',
+            gymId: alphaId,
             attempts: 4,
           }),
         ]),
@@ -93,7 +178,7 @@ describe('API (e2e)', () => {
         .post('/api/sessions')
         .send({
           ...body,
-          climbs: [{ style: 'boulder', color: 'turquoise', gymId: 'alpha-bloc', sent: true }],
+          climbs: [{ style: 'boulder', color: 'turquoise', gymId: alphaId, sent: true }],
         })
         .expect(400);
     });
@@ -147,9 +232,11 @@ describe('API (e2e)', () => {
         .expect((res) => expect(res.body.result).toBe('5.11d')));
 
     it('convertit une couleur entre deux salles', async () => {
+      const alpha = await createGym('alpha-bloc');
+      const beta = await createGym('beta-bloc');
       const res = await http()
-        .get('/api/gyms/alpha-bloc/convert')
-        .query({ color: 'rouge', to: 'beta-bloc' })
+        .get(`/api/gyms/${alpha}/convert`)
+        .query({ color: 'rouge', to: beta })
         .expect(200);
       expect(res.body.matches[0]).toEqual({ color: 'bleu', overlap: 0.67 });
     });
