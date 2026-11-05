@@ -81,6 +81,11 @@ docker compose up --build
 - Appli : http://localhost:8080
 - API : http://localhost:3000/api
 
+### En production
+
+Docker Compose sur un VPS, accessible uniquement depuis tes appareils via Tailscale :
+voir [docs/deploiement.md](docs/deploiement.md).
+
 Sans clé Mistral, tout fonctionne avec le générateur à règles. Une clé gratuite s'obtient sur la console Mistral (offre Experiment).
 
 ### En local

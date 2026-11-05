@@ -1,0 +1,68 @@
+# Production : docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+#
+# Aucun port n'est publié sur le VPS : l'appli n'est joignable que depuis
+# tes appareils Tailscale, en HTTPS sur https://climb-coach.<ton-tailnet>.ts.net.
+# Les autres sites du VPS ne sont pas touchés. Voir docs/deploiement.md.
+
+name: climb-coach
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: climb
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD manquant dans .env.prod}
+      POSTGRES_DB: climbcoach
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U climb -d climbcoach']
+      interval: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    restart: always
+    environment:
+      DATABASE_URL: postgresql://climb:${POSTGRES_PASSWORD}@db:5432/climbcoach
+      MISTRAL_API_KEY: ${MISTRAL_API_KEY:-}
+      MISTRAL_MODEL: ${MISTRAL_MODEL:-mistral-small-latest}
+      MISTRAL_TIMEOUT_MS: ${MISTRAL_TIMEOUT_MS:-30000}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    restart: always
+    depends_on:
+      - api
+
+  # Nœud Tailscale dédié : sert le front en HTTPS sur le réseau privé (tailnet) uniquement.
+  # Mode userspace : ni /dev/net/tun ni droits réseau sur l'hôte.
+  tailscale:
+    image: tailscale/tailscale:stable
+    hostname: climb-coach
+    restart: always
+    environment:
+      TS_AUTHKEY: ${TS_AUTHKEY:?TS_AUTHKEY manquant dans .env.prod}
+      TS_HOSTNAME: climb-coach
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_SERVE_CONFIG: /config/serve.json
+      TS_USERSPACE: 'true'
+      # La clé ne sert qu'au premier démarrage, l'identité est ensuite gardée dans le volume
+      TS_AUTH_ONCE: 'true'
+    volumes:
+      - tailscale-state:/var/lib/tailscale
+      - ./deploy/tailscale-serve.json:/config/serve.json:ro
+    depends_on:
+      - web
+
+volumes:
+  pgdata:
+  tailscale-state:
