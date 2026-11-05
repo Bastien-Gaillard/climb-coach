@@ -1,8 +1,14 @@
 {
   "TCP": {
+    "80": { "HTTP": true },
     "443": { "HTTPS": true }
   },
   "Web": {
+    "${TS_CERT_DOMAIN}:80": {
+      "Handlers": {
+        "/": { "Proxy": "http://web:80" }
+      }
+    },
     "${TS_CERT_DOMAIN}:443": {
       "Handlers": {
         "/": { "Proxy": "http://web:80" }

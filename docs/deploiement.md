@@ -33,7 +33,7 @@ git clone https://github.com/Bastien-Gaillard/climb-coach.git /opt/climb-coach
 cd /opt/climb-coach
 
 cp .env.prod.example .env.prod
-nano .env.prod   # mot de passe Postgres (openssl rand -base64 24), clé Tailscale, clé Mistral
+nano .env.prod   # mot de passe Postgres (openssl rand -hex 24), clé Tailscale, clé Mistral
 chmod 600 .env.prod
 
 docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
