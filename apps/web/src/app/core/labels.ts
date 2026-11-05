@@ -11,12 +11,14 @@ export const STYLE_LABEL: Record<Style, string> = {
   route: 'Voie',
 };
 
-export const BLOCK_ICON: Record<PlanBlock['kind'], string> = {
-  warmup: '🔥',
-  main: '🧗',
-  core: '💪',
-  cooldown: '🧘',
+export const BLOCK_LABEL: Record<PlanBlock['kind'], string> = {
+  warmup: 'Échauffement',
+  main: 'Cœur',
+  core: 'Gainage',
+  cooldown: 'Retour au calme',
 };
+
+export const FATIGUE_LABEL = ['frais', 'léger', 'moyen', 'entamé', 'épuisé'];
 
 /** Message lisible à partir d'une erreur HTTP de l'API. */
 export function errorMessage(err: unknown): string {

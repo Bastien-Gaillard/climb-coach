@@ -32,7 +32,9 @@ describe('ColorPicker', () => {
     const text = (b: HTMLElement) =>
       `${b.querySelector('.name')?.textContent?.trim()} ${b.querySelector('.range')?.textContent?.trim()}`;
     expect(buttons.map(text)).toEqual(['jaune 4 – 5', 'vert 5+', 'noir 6C – 7A']);
-    expect(buttons[0].style.background).toContain('250, 204, 21');
+    const dot = buttons[0].querySelector<HTMLElement>('.hold')!;
+    expect(dot.style.getPropertyValue('--hold')).toBe('#facc15');
+    expect(dot.style.getPropertyValue('--on-hold')).toBe('#17181B');
   });
 
   it('reflète la valeur du formulaire et la met à jour au clic', () => {
@@ -61,7 +63,9 @@ describe('helpers', () => {
   });
 
   it('textOn choisit un texte lisible', () => {
-    expect(textOn('#111827')).toBe('#ffffff');
-    expect(textOn('#facc15')).toBe('#1f2328');
+    expect(textOn('#111827')).toBe('#FFFFFF');
+    expect(textOn('#facc15')).toBe('#17181B');
+    expect(textOn('#2f6fd6')).toBe('#FFFFFF');
+    expect(textOn('#2e9e5b')).toBe('#17181B');
   });
 });

@@ -46,6 +46,25 @@ describe('analyzeHistory', () => {
     expect(a.focus).toBe('technique');
   });
 
+  it('allège et évite la force quand une douleur est notée cette semaine', () => {
+    const a = analyzeHistory(
+      ctx([
+        session(3, now, { focus: 'technique', fatigue: 2 }),
+        session(5, now, { notes: 'Mal au majeur droit' }),
+      ]),
+    );
+    expect(a).toMatchObject({ intensity: 'light', focus: 'technique' });
+    expect(a.pain).toEqual({ daysAgo: 5, notes: 'Mal au majeur droit' });
+    expect(a.reasons.join(' ')).toContain('Mal au majeur droit');
+  });
+
+  it('ignore une douleur notée il y a plus d’une semaine', () => {
+    const a = analyzeHistory(
+      ctx([session(3, now, { focus: 'technique' }), session(9, now, { notes: 'Mal au doigt' })]),
+    );
+    expect(a).toMatchObject({ intensity: 'normal', focus: 'strength', pain: null });
+  });
+
   it('reprise en douceur après 2 semaines sans grimper', () => {
     const a = analyzeHistory(ctx([session(20, now, { focus: 'endurance' })]));
     expect(a).toMatchObject({ focus: 'technique', intensity: 'light' });
@@ -112,6 +131,17 @@ describe('RuleBasedGenerator', () => {
       expect(planFitsTime(plan, available)).toBe(true);
     },
   );
+
+  it('ajoute une consigne de prudence quand une douleur est signalée', async () => {
+    const plan = await generator.generate({
+      availableMinutes: 90,
+      now,
+      history: [session(2, now, { focus: 'endurance', notes: 'Gêne à l’épaule droite' })],
+    });
+    const main = plan.blocks.find((b) => b.kind === 'main')!;
+    expect(plan.intensity).toBe('light');
+    expect(main.instructions.some((i) => i.includes('Douleur signalée'))).toBe(true);
+  });
 
   it('vise le niveau projet en séance de force', async () => {
     const history = [

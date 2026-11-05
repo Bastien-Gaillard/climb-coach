@@ -1,4 +1,34 @@
-<h1>Historique</h1>
+<header class="page-head">
+  <h1>Historique</h1>
+  @if (summary(); as s) {
+  <span class="sub">{{ s.count }} séance{{ s.count > 1 ? 's' : '' }}</span>
+  }
+</header>
+
+@if (summary(); as s) {
+<section class="tiles">
+  <div class="tile">
+    <span class="overline">{{ s.bestLabel }}</span>
+    <span class="num big">{{ s.best }}</span>
+    <span class="muted small">meilleure réussite</span>
+  </div>
+  <div class="tile">
+    <span class="overline">Séances</span>
+    <span class="num big">{{ s.count }}</span>
+    <span class="muted small">soit {{ s.perWeek | number: '1.0-1' }} par semaine</span>
+  </div>
+  <div class="tile">
+    <span class="overline">Voies réussies</span>
+    <span class="num big">{{ s.sent }}</span>
+    <span class="muted small">sur {{ s.total }} tentées</span>
+  </div>
+  <div class="tile">
+    <span class="overline">Fatigue moyenne</span>
+    <span class="num big">{{ s.fatigue | number: '1.0-1' }}<small>/5</small></span>
+    <span class="muted small">en fin de séance</span>
+  </div>
+</section>
+}
 
 @if (progression().length) {
 <section class="card">
@@ -13,51 +43,53 @@
   @for (s of sessions(); track s.id) {
   <li class="card">
     <div class="head">
-      <div>
-        <strong>{{ s.date | date: 'EEEE d MMMM' }}</strong>
-        <span class="muted"> · {{ s.durationMinutes }} min</span>
+      <div class="who">
+        <strong>{{ s.date | date: 'EEE d MMM' }} · {{ focusLabel[s.focus] }}</strong>
+        <span class="muted small">
+          @if (gymNames(s); as g) { {{ g }} · } {{ s.durationMinutes }} min · fatigue {{ s.fatigue }}/5
+        </span>
       </div>
-      <div class="meta">
-        <span class="badge accent">{{ focusLabel[s.focus] }}</span>
-        <span class="badge" [title]="'Fatigue ' + s.fatigue + '/5'">Fatigue {{ s.fatigue }}/5</span>
-        <button type="button" class="ghost" (click)="remove(s)" aria-label="Supprimer">✕</button>
-      </div>
+      @if (bestGrade(s); as g) {
+      <span class="num best" title="Meilleure réussite">{{ g }}</span>
+      }
+      <button type="button" class="ghost icon del" (click)="remove(s)" aria-label="Supprimer la séance">
+        <app-icon name="trash" [size]="18" />
+      </button>
     </div>
 
     @if (s.climbs.length) {
-    <p class="muted small">{{ sentCount(s) }}/{{ s.climbs.length }} réussis</p>
+    <span class="sr-only">{{ sentCount(s) }}/{{ s.climbs.length }} réussis</span>
     <ul class="chips">
       @for (c of chips(s); track c.key) {
       <li
-        [class.sent]="c.sent"
-        [class.colored]="c.hex"
-        [style.--chip]="c.hex"
-        [style.--chip-text]="c.hex ? textOn(c.hex) : null"
+        class="hold-chip"
+        [class.ko]="!c.sent"
+        [class.neutral]="!c.hex"
+        [style]="holdVars(c.hex)"
         [title]="chipTitle(c)"
       >
-        @if (c.sent) {
-        <span class="check" aria-hidden="true">✓</span>
-        } @if (c.color) {
-        <span class="name">{{ c.color }}</span>
-        <span class="grade">{{ c.grade }}</span>
+        @if (c.color) {
+        <span class="name">{{ c.color }}</span> {{ c.grade }}
         } @else {
         <span class="name">{{ c.grade }}</span>
-        } @if (c.count > 1) {
-        <span class="count">×{{ c.count }}</span>
-        } @if (!c.sent) {
+        }
+        <b>×{{ c.count }}</b>
+        @if (!c.sent) {
         <span class="tries">{{ c.attempts }} ess.</span>
         }
       </li>
       }
     </ul>
     } @if (s.notes) {
-    <p class="notes">{{ s.notes }}</p>
+    <p class="notes">« {{ s.notes }} »</p>
     }
   </li>
   } @empty {
-  <li class="card empty">
-    <p>Aucune séance pour l'instant.</p>
-    <a routerLink="/seance">Enregistrer ma première séance →</a>
+  <li class="card empty dots">
+    <div class="inner">
+      <strong>Aucune séance pour l'instant.</strong>
+      <a routerLink="/seance" class="btn primary">Enregistrer ma première séance</a>
+    </div>
   </li>
   }
 </ul>

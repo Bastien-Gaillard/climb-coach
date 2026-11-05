@@ -1,3 +1,4 @@
+import { Gym } from '@climb-coach/grades';
 import { SessionWithClimbs } from '../sessions/sessions.service';
 import { Plan } from './plan.schema';
 
@@ -6,6 +7,8 @@ export interface GeneratorContext {
   now: Date;
   /** Séances passées, les plus récentes d'abord. */
   history: SessionWithClimbs[];
+  /** Salle du jour : impose le style (bloc ou voie) et permet de parler en couleurs. */
+  gym?: Gym;
 }
 
 export interface PlanGenerator {

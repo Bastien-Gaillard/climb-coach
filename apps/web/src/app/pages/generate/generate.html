@@ -1,85 +1,165 @@
-<h1>Générer ma séance</h1>
-<p class="muted">
-  Combien de temps tu as devant toi ? La séance tient compte de ta dernière séance et de ta
-  progression.
-</p>
-
-<section class="card stack">
-  <div class="row">
-    <div class="presets" role="group" aria-label="Durées rapides">
-      @for (p of presets; track p) {
-      <button type="button" [class.selected]="minutes() === p" (click)="minutes.set(p)">
-        {{ p }} min
-      </button>
-      }
-    </div>
-    <label>
-      Autre durée
-      <input
-        type="number"
-        min="30"
-        max="300"
-        step="5"
-        [value]="minutes()"
-        (change)="setMinutes($any($event.target).valueAsNumber)"
-      />
-    </label>
-    <button type="button" class="primary" (click)="generate()" [disabled]="loading()">
-      {{ loading() ? 'Génération…' : 'Générer' }}
-    </button>
-  </div>
-  @if (error(); as e) {
-  <p class="error">{{ e }}</p>
-  }
-</section>
-
 @if (result(); as r) {
-<section class="card stack plan" data-testid="plan">
-  <div class="plan-head">
-    <h2>
-      {{ focusLabel[r.plan.focus] }} @if (r.plan.intensity === 'light') {
-      <span class="badge warn">légère</span>
-      }
-    </h2>
+<!-- Séance proposée -->
+<section class="result stack" data-testid="plan">
+  <header class="bar-head">
+    <button type="button" class="ghost icon" (click)="back()" aria-label="Changer la durée">
+      <app-icon name="back" [stroke]="2.4" />
+    </button>
+    <h1>
+      Séance · {{ r.availableMinutes }} min @if (r.gym) {<small class="gym-name"
+        >{{ r.gym.name }}</small
+      >}
+    </h1>
     @if (r.source === 'mistral') {
-    <span class="badge accent" title="Générée par Mistral, validée par l'API">✦ Mistral</span>
+    <span class="badge accent" title="Générée par Mistral, validée par l'API">
+      <app-icon name="generate" [size]="14" [stroke]="2.6" />IA · Mistral
+    </span>
     } @else {
-    <span class="badge" [title]="r.fallbackReason ?? 'Générée par les règles'">⚙ Règles</span>
+    <span class="badge line" [title]="r.fallbackReason ?? 'Générée par les règles'">
+      <app-icon name="rules" [size]="14" [stroke]="2.6" />Règles
+    </span>
     }
-  </div>
+  </header>
 
-  <p>{{ r.plan.summary }}</p>
+  <p class="summary">
+    @if (r.plan.intensity === 'light') {
+    <span class="badge">Séance légère</span>
+    } {{ r.plan.summary }}
+  </p>
   @if (r.fallbackReason) {
   <p class="muted small">
     Mistral n'a pas pu répondre ({{ r.fallbackReason }}), les règles ont pris le relais.
   </p>
   }
 
-  <div class="timeline" aria-hidden="true">
+  <div class="timeline" aria-label="Répartition du temps">
     @for (b of r.plan.blocks; track $index) {
-    <span [class]="b.kind" [style.width]="share(b.minutes)" [title]="b.title"></span>
+    <span [class]="b.kind" [style.flex-grow]="b.minutes" [title]="b.title">
+      {{ b.minutes }}@if (b.kind === 'main') {<span class="tl-focus"
+        >&nbsp;· {{ focusLabel[r.plan.focus].toLowerCase() }}</span
+      >}
+    </span>
     }
   </div>
 
   <ol class="blocks">
-    @for (b of r.plan.blocks; track $index) {
-    <li [class]="b.kind">
+    @for (b of r.plan.blocks; track $index; let i = $index) {
+    <li [class.main]="b.kind === 'main'">
       <div class="block-head">
-        <span class="icon">{{ icon[b.kind] }}</span>
-        <strong>{{ b.title }}</strong>
-        <span class="muted">{{ b.minutes }} min</span>
-        @if (b.target) {
-        <span class="badge ok">{{ styleLabel[b.target.style] }} · {{ b.target.grade }}</span>
-        }
+        <div>
+          <span class="overline">{{ overline(i) }}</span>
+          <strong>{{ b.title }}</strong>
+        </div>
+        <span class="num mins">{{ b.minutes }}<small> min</small></span>
       </div>
+      @if (b.target) { @if (b.target.colors?.length) {
+      <div class="target-colors" data-testid="target-colors">
+        @for (c of b.target.colors; track c.color) {
+        <span class="hold-chip" [style]="holdVars(c.hex)">{{ c.color }}</span>
+        }
+        <span class="muted small">
+          {{ styleLabel[b.target.style] }} · @if (b.target.range; as r) { {{ r.min }} → {{ r.max }}
+          } @else { {{ b.target.grade }} }
+        </span>
+      </div>
+      } @else {
+      <span class="badge line target"
+        >Niveau visé · {{ styleLabel[b.target.style] }} · {{ b.target.grade }}</span
+      >
+      } } @if (b.instructions.length) {
       <ul>
         @for (step of b.instructions; track $index) {
         <li>{{ step }}</li>
         }
       </ul>
+      }
     </li>
     }
   </ol>
   <p class="muted small">Total : {{ total() }} min sur {{ r.availableMinutes }} min dispo.</p>
+
+  <div class="action-bar">
+    <button
+      type="button"
+      class="icon big regen"
+      (click)="generate()"
+      [disabled]="loading()"
+      aria-label="Regénérer"
+      title="Regénérer"
+    >
+      <app-icon name="redo" [size]="26" />
+    </button>
+    <button type="button" class="primary big grow" (click)="startSession()">
+      <app-icon name="play" [size]="22" />Démarrer la séance
+    </button>
+  </div>
+  @if (error(); as e) {
+  <p class="error">{{ e }}</p>
+  }
 </section>
+} @else {
+<!-- Choix de la durée -->
+<header class="hero dots">
+  <span class="overline">{{ today | date: 'EEEE d MMMM' }}</span>
+  <h1>Générer ma séance</h1>
+</header>
+
+<section class="stack">
+  <h2 class="overline">Temps disponible</h2>
+  <div class="durations" role="radiogroup" aria-label="Temps disponible">
+    @for (p of presets; track p) {
+    <button
+      type="button"
+      role="radio"
+      [attr.aria-checked]="minutes() === p"
+      [attr.aria-label]="p + ' min'"
+      (click)="pick(p)"
+    >
+      <span class="num">{{ p }}</span><span class="unit">min</span>
+    </button>
+    }
+  </div>
+  <div class="custom" [class.on]="!presets.includes(minutes())">
+    <span>Autre durée</span>
+    <button type="button" class="icon" (click)="step(-5)" aria-label="Moins 5 minutes">−</button>
+    <output class="num" aria-live="polite">{{ custom() }}</output>
+    <button type="button" class="icon" (click)="step(5)" aria-label="Plus 5 minutes">+</button>
+  </div>
+</section>
+
+@if (gyms().length) {
+<section class="stack">
+  <h2 class="overline">Salle</h2>
+  <select
+    class="gym-select"
+    aria-label="Salle du jour"
+    (change)="pickGym($any($event.target).value)"
+  >
+    <option value="" [selected]="!gymId()">Sans salle · cotations</option>
+    @for (g of gyms(); track g.id) {
+    <option [value]="g.id" [selected]="g.id === gymId()">
+      {{ g.name }} · {{ styleLabel[g.discipline] }}
+    </option>
+    }
+  </select>
+</section>
+} @if (context(); as c) {
+<section class="card context">
+  <span class="overline">Pris en compte</span>
+  <p>
+    Dernière séance : <strong>{{ c.focus }}</strong>, {{ c.when }} · fatigue
+    <strong>{{ c.fatigue }}/5</strong>
+    @if (c.best) { · meilleure réussite <strong>{{ c.best }}</strong> }
+  </p>
+</section>
+} @if (error(); as e) {
+<p class="error">{{ e }}</p>
+}
+
+<div class="action-bar">
+  <button type="button" class="primary big grow" (click)="generate()" [disabled]="loading()">
+    <app-icon name="generate" [size]="22" [stroke]="2.4" />
+    {{ loading() ? 'Génération…' : 'Générer · ' + minutes() + ' min' }}
+  </button>
+</div>
 }

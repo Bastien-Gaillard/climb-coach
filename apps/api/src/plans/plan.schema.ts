@@ -12,6 +12,12 @@ export const PlanBlockSchema = z.object({
     .object({
       style: z.enum(['boulder', 'route']),
       grade: z.string().min(1),
+      /** Cotations demandées dans les consignes, de la plus facile à la plus dure (ajoutées par l'API). */
+      range: z.object({ min: z.string().min(1), max: z.string().min(1) }).optional(),
+      /** Couleurs de la salle choisie qui couvrent la cotation (ajoutées par l'API). */
+      colors: z
+        .array(z.object({ color: z.string().min(1), hex: z.string().optional() }))
+        .optional(),
     })
     .optional(),
 });

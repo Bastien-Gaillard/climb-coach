@@ -37,8 +37,17 @@ describe('ConverterPage', () => {
   });
 
   it('suit les changements de cotation', () => {
-    select('Cotation', '7A');
+    Array.from(el.querySelectorAll<HTMLButtonElement>('[aria-label=Cotation] button'))
+      .find((b) => b.textContent?.trim() === '7A')!
+      .click();
+    fixture.detectChanges();
     expect(el.querySelector('[data-testid=grade-result]')?.textContent?.trim()).toBe('V6');
+  });
+
+  it('inverse les systèmes en gardant la cotation convertie', () => {
+    el.querySelector<HTMLButtonElement>('button[aria-label="Inverser les systèmes"]')!.click();
+    fixture.detectChanges();
+    expect(el.querySelector('[data-testid=grade-result]')?.textContent?.trim()).toBe('6B');
   });
 
   it('ne propose que des systèmes de la même discipline', () => {

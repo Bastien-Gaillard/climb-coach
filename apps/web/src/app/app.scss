@@ -1,53 +1,214 @@
-.top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  padding: 0.9rem 1.5rem;
-  background: var(--surface);
-  border-bottom: 1px solid var(--line);
-}
+// Mobile : barre d'onglets en bas, « Séance » au centre, « Générer » sous le pouce gauche.
+// Desktop (≥ 960 px) : barre latérale, « Nouvelle séance » en tête.
 
 .brand {
-  display: flex;
+  display: none;
   align-items: center;
-  gap: 0.5rem;
+  gap: 10px;
+  padding: 0 10px 22px;
+  font-family: var(--font-num);
   font-weight: 700;
-  font-size: 1.05rem;
+  font-size: 24px;
   color: var(--ink);
   text-decoration: none;
 }
 
 .logo {
-  color: var(--accent);
-}
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: var(--ink);
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 3px;
+  padding: 8px;
 
-nav {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.25rem;
+  span {
+    border-radius: 999px;
+    background: var(--bg);
 
-  a {
-    padding: 0.4rem 0.75rem;
-    border-radius: 8px;
-    color: var(--muted);
-    text-decoration: none;
-
-    &:hover {
-      color: var(--ink);
-    }
-
-    &.active {
-      background: var(--accent-soft);
-      color: var(--accent);
-      font-weight: 600;
+    &.dim {
+      opacity: 0.35;
     }
   }
 }
 
 main {
-  max-width: 880px;
+  padding: 20px 16px calc(110px + env(safe-area-inset-bottom));
+  max-width: 720px;
   margin: 0 auto;
-  padding: 1.5rem 1rem 3rem;
+}
+
+nav {
+  position: fixed;
+  z-index: 10;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  align-items: start;
+  height: calc(84px + env(safe-area-inset-bottom));
+  padding: 8px 6px env(safe-area-inset-bottom);
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+
+  a {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    height: 56px;
+    text-decoration: none;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 600;
+
+    &.active {
+      color: var(--ink);
+      font-weight: 700;
+    }
+  }
+
+  .fab {
+    justify-content: flex-start;
+    gap: 4px;
+    margin-top: -22px;
+    height: auto;
+    color: var(--ink);
+    font-weight: 700;
+  }
+
+  .fab-btn {
+    width: 60px;
+    height: 60px;
+    border-radius: 18px;
+    background: var(--accent);
+    color: var(--on-accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: var(--shadow-2);
+  }
+
+  .lbl-d {
+    display: none;
+  }
+}
+
+// Saisie et séance en cours : l'écran prend toute la hauteur
+.immersive {
+  nav {
+    display: none;
+  }
+
+  main {
+    padding-bottom: 0;
+  }
+}
+
+@media (min-width: 960px) {
+  .shell,
+  .shell.immersive {
+    display: flex;
+    min-height: 100vh;
+  }
+
+  .side {
+    flex: 0 0 232px;
+    padding: 28px 16px;
+    background: var(--surface);
+    border-right: 1px solid var(--line);
+    position: sticky;
+    top: 0;
+    height: 100vh;
+  }
+
+  .brand {
+    display: flex;
+  }
+
+  nav,
+  .immersive nav {
+    position: static;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    height: auto;
+    padding: 0;
+    background: none;
+    border: 0;
+
+    a,
+    .fab {
+      flex-direction: row;
+      justify-content: flex-start;
+      gap: 10px;
+      height: 44px;
+      margin: 0;
+      padding: 0 14px;
+      border-radius: 12px;
+      font-size: 16px;
+      color: var(--ink-2);
+
+      &:hover {
+        background: var(--surface-2);
+      }
+
+      &.active {
+        background: var(--surface-2);
+        color: var(--ink);
+      }
+    }
+
+    .fab {
+      order: -1;
+      height: 48px;
+      margin-bottom: 10px;
+      background: var(--accent);
+      color: var(--on-accent);
+
+      &:hover,
+      &.active {
+        background: var(--accent);
+        color: var(--on-accent);
+      }
+    }
+
+    .fab-btn {
+      width: auto;
+      height: auto;
+      background: none;
+      box-shadow: none;
+      color: inherit;
+
+      ::ng-deep svg {
+        width: 20px;
+        height: 20px;
+      }
+    }
+
+    .lbl-m {
+      display: none;
+    }
+
+    .lbl-d {
+      display: inline;
+    }
+
+    ::ng-deep svg {
+      width: 20px;
+      height: 20px;
+    }
+  }
+
+  main,
+  .immersive main {
+    flex: 1;
+    min-width: 0;
+    max-width: 1180px;
+    margin: 0;
+    padding: 32px clamp(16px, 3vw, 48px) 48px;
+  }
 }

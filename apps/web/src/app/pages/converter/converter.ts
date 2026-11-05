@@ -11,6 +11,8 @@ import {
 } from '@climb-coach/grades';
 import { GymsStore } from '../../core/gyms.store';
 import { ColorPicker } from '../../shared/color-picker';
+import { holdVars } from '../../shared/hold';
+import { Icon } from '../../shared/icon';
 
 interface ConversionResult {
   ok: boolean;
@@ -23,7 +25,7 @@ interface ConversionResult {
  */
 @Component({
   selector: 'app-converter',
-  imports: [RouterLink, FormsModule, ColorPicker],
+  imports: [RouterLink, FormsModule, ColorPicker, Icon],
   templateUrl: './converter.html',
   styleUrl: './converter.scss',
 })
@@ -32,6 +34,7 @@ export class ConverterPage implements OnInit {
   protected readonly scales = Object.values(SCALES);
   protected readonly gyms = this.store.gyms;
   protected readonly gymsLoaded = this.store.loaded;
+  protected readonly holdVars = holdVars;
 
   ngOnInit(): void {
     this.store.load();
@@ -110,14 +113,24 @@ export class ConverterPage implements OnInit {
     this.grade.set(this.fromGrades()[Math.floor(this.fromGrades().length / 3)]);
   }
 
+  /** Inverse les deux systèmes en gardant la cotation convertie. */
+  protected swap() {
+    const result = this.gradeResult();
+    const from = this.from();
+    this.from.set(this.to());
+    this.to.set(from);
+    if (result.ok && this.fromGrades().includes(result.text)) this.grade.set(result.text);
+    else this.grade.set(this.fromGrades()[Math.floor(this.fromGrades().length / 3)]);
+  }
+
   protected setFromGym(id: string) {
     this.fromGymId.set(id);
     this.selectedColor.set('');
     this.toGymId.set('');
   }
 
-  protected hex(gym: Gym, color: string): string {
-    return gym.colors.find((c) => c.color === color)?.hex ?? '#ccc';
+  protected hex(gym: Gym, color: string): string | undefined {
+    return gym.colors.find((c) => c.color === color)?.hex;
   }
 
   protected percent(overlap: number): string {

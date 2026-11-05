@@ -15,5 +15,12 @@ describe('App', () => {
     fixture.detectChanges();
     const links = (fixture.nativeElement as HTMLElement).querySelectorAll('nav a');
     expect(links.length).toBe(5);
+    expect(Array.from(links).map((a) => a.getAttribute('href'))).toEqual([
+      '/generer',
+      '/historique',
+      '/seance',
+      '/salles',
+      '/convertisseur',
+    ]);
   });
 });

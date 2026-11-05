@@ -1,5 +1,5 @@
 import { ConfigService } from '@nestjs/config';
-import { MistralError, MistralGenerator } from './mistral.generator';
+import { bracketGrades, MistralError, MistralGenerator } from './mistral.generator';
 import { Plan } from './plan.schema';
 import { session } from './test-helpers';
 
@@ -45,11 +45,33 @@ function mockFetch(response: { ok?: boolean; status?: number; content?: string |
 
 afterEach(() => jest.restoreAllMocks());
 
+describe('bracketGrades', () => {
+  it('encadre les cotations oubliées sans toucher aux nombres', () => {
+    expect(bracketGrades('4 blocs en 6A+ avec 2 essais max, 3 min de repos')).toBe(
+      '4 blocs en [6A+] avec 2 essais max, 3 min de repos',
+    );
+    expect(bracketGrades('2 voies en 6b puis [6c]')).toBe('2 voies en [6b] puis [6c]');
+    expect(bracketGrades('4 blocs en 6B-')).toBe('4 blocs en [6B]');
+  });
+});
+
 describe('MistralGenerator.parse', () => {
   const gen = makeGenerator();
 
   it('accepte un plan valide', () => {
     expect(gen.parse(JSON.stringify(validPlan), 60)).toEqual(validPlan);
+  });
+
+  it('accepte un plan entouré de balises Markdown ou de texte', () => {
+    const wrapped = 'Voici ta séance :\n```json\n' + JSON.stringify(validPlan) + '\n```';
+    expect(gen.parse(wrapped, 60)).toEqual(validPlan);
+  });
+
+  it('complète un titre manquant à partir du type de bloc', () => {
+    const plan = structuredClone(validPlan) as unknown as { blocks: Record<string, unknown>[] };
+    delete plan.blocks[0].title;
+    plan.blocks[1].minutes = '45';
+    expect(gen.parse(JSON.stringify(plan), 60)).toEqual(validPlan);
   });
 
   it('rejette du texte non JSON', () => {
@@ -70,6 +92,12 @@ describe('MistralGenerator.parse', () => {
 
   it('rejette un plan qui gaspille le temps dispo', () => {
     expect(() => gen.parse(JSON.stringify(validPlan), 90)).toThrow(/60 min pour 90/);
+  });
+
+  it('garde la première cotation d’une fourchette', () => {
+    const plan = structuredClone(validPlan);
+    plan.blocks[1].target = { style: 'boulder', grade: '6A+/6B' };
+    expect(gen.parse(JSON.stringify(plan), 60).blocks[1].target?.grade).toBe('6A+');
   });
 
   it('rejette une cotation inventée', () => {
@@ -93,6 +121,32 @@ describe('MistralGenerator.generate', () => {
       model: 'mistral-small-latest',
       response_format: { type: 'json_object' },
     });
+  });
+
+  it('relance une fois Mistral avec l’erreur si la réponse est invalide', async () => {
+    const fetchMock = jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ choices: [{ message: { content: 'pas du JSON' } }] }),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ choices: [{ message: { content: JSON.stringify(validPlan) } }] }),
+      } as Response);
+
+    await expect(makeGenerator().generate(ctx)).resolves.toEqual(validPlan);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const body = JSON.parse((fetchMock.mock.calls[1][1] as RequestInit).body as string);
+    expect(body.messages.at(-1).content).toContain('Réponse non JSON');
+  });
+
+  it('abandonne après une relance invalide', async () => {
+    const fetchMock = mockFetch({ content: 'pas du JSON' });
+    await expect(makeGenerator().generate(ctx)).rejects.toThrow('Réponse non JSON');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it('remonte une erreur HTTP', async () => {
@@ -133,5 +187,15 @@ describe('MistralGenerator.buildUserPrompt', () => {
     expect(prompt).toContain('focus endurance');
     expect(prompt).toContain('7A (échec, 1 essai)');
     expect(prompt).toContain('doigts un peu tendus');
+  });
+
+  it('signale une douleur notée récemment dans la proposition', () => {
+    const prompt = makeGenerator().buildUserPrompt({
+      availableMinutes: 90,
+      now,
+      history: [session(2, now, { focus: 'endurance', notes: 'Mal au majeur gauche' })],
+    });
+    expect(prompt).toContain('intensité light');
+    expect(prompt).toContain('Douleur signalée il y a 2 j');
   });
 });

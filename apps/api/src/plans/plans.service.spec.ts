@@ -1,3 +1,5 @@
+import { EXAMPLE_GYMS } from '@climb-coach/grades';
+import { GymsService } from '../gyms/gyms.service';
 import { SessionsService } from '../sessions/sessions.service';
 import { MistralError, MistralGenerator } from './mistral.generator';
 import { Plan } from './plan.schema';
@@ -34,7 +36,11 @@ function setup({ enabled, mistral }: { enabled: boolean; mistral?: () => Promise
   const rules = new RuleBasedGenerator();
   const rulesSpy = jest.spyOn(rules, 'generate');
 
-  const service = new PlansService(db as never, () => now, sessions, mistralGen, rules);
+  const gyms = {
+    findOne: jest.fn(async (id: string) => EXAMPLE_GYMS.find((g) => g.id === id)!),
+  } as unknown as GymsService;
+
+  const service = new PlansService(db as never, () => now, sessions, mistralGen, rules, gyms);
   return { service, inserted, mistralGen, rulesSpy };
 }
 
@@ -76,5 +82,23 @@ describe('PlansService.generate', () => {
     const { service, mistralGen } = setup({ enabled: true });
     await service.generate(90);
     expect(mistralGen.generate).toHaveBeenCalledWith({ availableMinutes: 90, now, history: [] });
+  });
+
+  it('ajoute les couleurs de la salle choisie aux niveaux visés', async () => {
+    const withTarget: Plan = {
+      ...mistralPlan,
+      blocks: [
+        mistralPlan.blocks[0],
+        { ...mistralPlan.blocks[1], target: { style: 'boulder', grade: '6B' } },
+      ],
+    };
+    const { service, mistralGen } = setup({ enabled: true, mistral: async () => withTarget });
+    const result = await service.generate(60, 'alpha-bloc');
+
+    expect(mistralGen.generate).toHaveBeenCalledWith(
+      expect.objectContaining({ gym: expect.objectContaining({ id: 'alpha-bloc' }) }),
+    );
+    expect(result.gym).toEqual({ id: 'alpha-bloc', name: 'Salle Alpha (bloc)' });
+    expect(result.plan.blocks[1].target?.colors).toEqual([{ color: 'rouge', hex: '#ef4444' }]);
   });
 });

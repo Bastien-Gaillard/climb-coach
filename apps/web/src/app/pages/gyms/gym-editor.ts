@@ -12,35 +12,38 @@ import { GradeSystem, gradeValue, SCALES } from '@climb-coach/grades';
 import { GymsStore } from '../../core/gyms.store';
 import { errorMessage, STYLE_LABEL } from '../../core/labels';
 import { Gym, GymInput, Style } from '../../core/models';
+import { holdVars } from '../../shared/hold';
+import { Icon } from '../../shared/icon';
 
 const DEFAULT_SYSTEM: Record<Style, GradeSystem> = { boulder: 'font', route: 'french' };
+// Teintes de prises de la refonte (les seules couleurs vives de l'interface)
 const PALETTE = [
-  '#facc15',
-  '#22c55e',
-  '#3b82f6',
-  '#ef4444',
-  '#111827',
-  '#8b5cf6',
-  '#f97316',
-  '#ec4899',
-  '#f9fafb',
-  '#14b8a6',
+  '#f2c230',
+  '#2e9e5b',
+  '#2f6fd6',
+  '#c62f2f',
+  '#1a1a1a',
+  '#7b4bc4',
+  '#f07a1e',
+  '#e05c9a',
+  '#f7f7f4',
+  '#1fa3a0',
 ];
 
 /** Code couleur proposé d'après le nom tapé (tant qu'on n'a pas choisi la couleur soi-même). */
 const HEX_BY_NAME: Record<string, string> = {
-  jaune: '#facc15',
-  vert: '#22c55e',
-  bleu: '#3b82f6',
-  rouge: '#ef4444',
-  noir: '#111827',
-  violet: '#8b5cf6',
-  orange: '#f97316',
-  rose: '#ec4899',
-  blanc: '#f9fafb',
-  gris: '#9ca3af',
-  marron: '#92400e',
-  turquoise: '#14b8a6',
+  jaune: '#f2c230',
+  vert: '#2e9e5b',
+  bleu: '#2f6fd6',
+  rouge: '#c62f2f',
+  noir: '#1a1a1a',
+  violet: '#7b4bc4',
+  orange: '#f07a1e',
+  rose: '#e05c9a',
+  blanc: '#f7f7f4',
+  gris: '#8e8e8a',
+  marron: '#8a5a2b',
+  turquoise: '#1fa3a0',
 };
 
 export function hexForName(name: string): string | undefined {
@@ -62,7 +65,7 @@ type ColorGroup = FormGroup<{
 /** Création ou modification d'une salle : nom, discipline, système et grille de couleurs. */
 @Component({
   selector: 'app-gym-editor',
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, Icon],
   templateUrl: './gym-editor.html',
   styleUrl: './gym-editor.scss',
 })
@@ -74,8 +77,11 @@ export class GymEditor {
   readonly gym = input<Gym | null>(null);
   readonly saved = output<Gym>();
   readonly cancelled = output<void>();
+  /** Demande de suppression (la page gère la confirmation). */
+  readonly removeRequested = output<void>();
 
   protected readonly styleOptions = Object.entries(STYLE_LABEL) as [Style, string][];
+  protected readonly holdVars = holdVars;
   protected readonly saving = signal(false);
   protected readonly error = signal<string | null>(null);
 
@@ -86,7 +92,7 @@ export class GymEditor {
     colors: this.fb.array<ColorGroup>([]),
   });
 
-  private readonly value = toSignal(this.form.valueChanges, { initialValue: this.form.value });
+  protected readonly value = toSignal(this.form.valueChanges, { initialValue: this.form.value });
 
   get colors(): FormArray<ColorGroup> {
     return this.form.controls.colors;
@@ -163,6 +169,12 @@ export class GymEditor {
     const ctrl = this.colors.at(index);
     this.colors.removeAt(index);
     this.colors.insert(target, ctrl);
+  }
+
+  protected setDiscipline(style: Style): void {
+    if (this.form.controls.discipline.value === style) return;
+    this.form.controls.discipline.setValue(style);
+    this.onDisciplineChange();
   }
 
   /** Nouvelle discipline : système par défaut et plages remises dans la nouvelle échelle. */

@@ -24,8 +24,11 @@ export class ApiService {
     return this.http.get<ProgressionPoint[]>(`${this.base}/sessions/stats/progression`);
   }
 
-  generatePlan(availableMinutes: number): Observable<GeneratedPlan> {
-    return this.http.post<GeneratedPlan>(`${this.base}/plans/generate`, { availableMinutes });
+  generatePlan(availableMinutes: number, gymId?: string | null): Observable<GeneratedPlan> {
+    return this.http.post<GeneratedPlan>(`${this.base}/plans/generate`, {
+      availableMinutes,
+      ...(gymId && { gymId }),
+    });
   }
 
   listGyms(): Observable<Gym[]> {

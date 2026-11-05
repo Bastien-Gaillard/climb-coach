@@ -8,6 +8,11 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/generate/generate').then((m) => m.GeneratePage),
   },
   {
+    path: 'seance-en-cours',
+    title: 'Séance en cours',
+    loadComponent: () => import('./pages/live/live').then((m) => m.LivePage),
+  },
+  {
     path: 'seance',
     title: 'Nouvelle séance',
     loadComponent: () => import('./pages/new-session/new-session').then((m) => m.NewSessionPage),

@@ -1,17 +1,35 @@
-<header class="top">
-  <a routerLink="/" class="brand">
-    <span class="logo" aria-hidden="true">▲</span>
-    climb-coach
-  </a>
-  <nav>
-    <a routerLink="/generer" routerLinkActive="active">Générer</a>
-    <a routerLink="/seance" routerLinkActive="active">Nouvelle séance</a>
-    <a routerLink="/historique" routerLinkActive="active">Historique</a>
-    <a routerLink="/salles" routerLinkActive="active">Salles</a>
-    <a routerLink="/convertisseur" routerLinkActive="active">Convertisseur</a>
-  </nav>
-</header>
+<div class="shell" [class.immersive]="immersive()">
+  <aside class="side">
+    <a routerLink="/" class="brand" aria-label="climb-coach, accueil">
+      <span class="logo" aria-hidden="true">
+        @for (i of [0, 1, 2, 3, 4, 5, 6, 7, 8]; track i) {
+        <span [class.dim]="i % 2"></span>
+        }
+      </span>
+      climb-coach
+    </a>
 
-<main>
-  <router-outlet />
-</main>
+    <nav aria-label="Navigation principale">
+      <a routerLink="/generer" routerLinkActive="active" ariaCurrentWhenActive="page" class="gen">
+        <app-icon name="generate" />Générer
+      </a>
+      <a routerLink="/historique" routerLinkActive="active" ariaCurrentWhenActive="page" class="hist">
+        <app-icon name="history" />Historique
+      </a>
+      <a routerLink="/seance" routerLinkActive="active" ariaCurrentWhenActive="page" class="fab">
+        <span class="fab-btn"><app-icon name="plus" [size]="28" [stroke]="2.6" /></span>
+        <span class="lbl-m">Séance</span><span class="lbl-d">Nouvelle séance</span>
+      </a>
+      <a routerLink="/salles" routerLinkActive="active" ariaCurrentWhenActive="page" class="gyms">
+        <app-icon name="gym" />Salles
+      </a>
+      <a routerLink="/convertisseur" routerLinkActive="active" ariaCurrentWhenActive="page" class="conv">
+        <app-icon name="convert" />Convertir
+      </a>
+    </nav>
+  </aside>
+
+  <main>
+    <router-outlet />
+  </main>
+</div>

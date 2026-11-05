@@ -1,138 +1,247 @@
-<h1>Nouvelle séance</h1>
-<p class="muted">
-  À remplir en sortant de la salle : c'est ce qui nourrit la génération de la prochaine séance.
-</p>
+<header class="head">
+  @if (step() === 'finish') {
+  <button type="button" class="ghost icon m-only" (click)="step.set('log')" aria-label="Revenir à la saisie">
+    <app-icon name="back" [stroke]="2.4" />
+  </button>
+  } @else {
+  <a routerLink="/generer" class="btn ghost icon m-only" aria-label="Retour">
+    <app-icon name="back" [stroke]="2.4" />
+  </a>
+  }
+  <div class="titles">
+    <h1>
+      <span class="m-only">{{ step() === 'finish' ? 'Terminer la séance' : 'Nouvelle séance' }}</span>
+      <span class="d-only">Nouvelle séance</span>
+    </h1>
+    <span class="sub">
+      @if (colorMode()) { {{ gym()!.name }} · {{ styleLabel[gym()!.discipline].toLowerCase() }} } @else {
+      Saisie par cotation } · après coup ou en direct
+    </span>
+  </div>
+  @if (step() === 'log') {
+  <button type="button" class="m-only" (click)="step.set('finish')">Terminer</button>
+  }
+  <button type="button" class="primary d-only" (click)="submit()" [disabled]="!valid() || saving()">
+    {{ saving() ? 'Enregistrement…' : 'Enregistrer la séance' }}
+  </button>
+</header>
 
-<form [formGroup]="form" (ngSubmit)="submit()" class="stack">
-  <section class="card stack">
-    <div class="row">
+<ng-template #statsTpl>
+  <div class="stats">
+    <div><span class="num">{{ stats().count }}</span><span>voies</span></div>
+    <div><span class="num">{{ stats().sent }}</span><span>réussies</span></div>
+    <div><span class="num">{{ stats().tries }}</span><span>essais</span></div>
+  </div>
+</ng-template>
+
+<div class="layout" [class.finishing]="step() === 'finish'">
+  <!-- Infos de séance (mobile : écran « Terminer ») -->
+  <section class="infos card stack" aria-label="Informations de séance">
+    <div class="pair">
       <label>
         Date
-        <input type="datetime-local" formControlName="date" />
+        <input type="datetime-local" [(ngModel)]="date" name="date" required />
       </label>
       <label>
         Durée (min)
-        <input type="number" formControlName="durationMinutes" min="10" max="600" step="5" />
-      </label>
-      <label>
-        Type de séance
-        <select formControlName="focus">
-          @for (f of focusOptions; track f[0]) {
-          <option [value]="f[0]">{{ f[1] }}</option>
-          }
-        </select>
+        <input type="number" [(ngModel)]="duration" name="duration" min="10" max="600" step="5" />
       </label>
     </div>
 
-    <div class="fatigue">
-      <span class="muted">Fatigue en fin de séance</span>
-      <div class="scale" role="radiogroup" aria-label="Fatigue de 1 à 5">
+    <div class="field">
+      <span class="overline">Type</span>
+      <div class="seg" role="radiogroup" aria-label="Type de séance">
+        @for (f of focusOptions; track f[0]) {
+        <button type="button" role="radio" [attr.aria-checked]="focus() === f[0]" (click)="focus.set(f[0])">
+          {{ f[1] }}
+        </button>
+        }
+      </div>
+    </div>
+
+    <div class="field">
+      <span class="overline">Fatigue en fin de séance</span>
+      <div class="fatigue" role="radiogroup" aria-label="Fatigue de 1 à 5">
         @for (n of [1, 2, 3, 4, 5]; track n) {
         <button
           type="button"
           role="radio"
-          [attr.aria-checked]="form.value.fatigue === n"
-          [class.selected]="form.value.fatigue === n"
-          (click)="setFatigue(n)"
+          [attr.aria-checked]="fatigue() === n"
+          [attr.aria-label]="n + ', ' + fatigueLabel[n - 1]"
+          (click)="fatigue.set(n)"
         >
-          {{ n }}
+          <span class="bar" [style.height.px]="2 + n * 7"></span><span class="num">{{ n }}</span>
         </button>
         }
       </div>
-      <span class="muted hint">1 = frais · 5 = cramé</span>
+      <div class="scale-ends"><span>Frais</span><span>Épuisé</span></div>
     </div>
 
     <label>
       Notes
       <textarea
-        formControlName="notes"
-        rows="2"
-        placeholder="Doigts tendus, super projet en 7A…"
+        [(ngModel)]="notes"
+        name="notes"
+        rows="3"
+        placeholder="Ressenti, prises qui font mal, objectif suivant…"
       ></textarea>
     </label>
   </section>
 
-  <section class="card stack">
-    <div class="head">
-      <h2>Voies et blocs</h2>
-      <span class="muted">{{ climbs.length }}</span>
+  <!-- Saisie des voies -->
+  <section class="entry" aria-label="Ajouter des voies">
+    <div class="m-only"><ng-container [ngTemplateOutlet]="statsTpl" /></div>
+
+    @if (current(); as cur) {
+    <div class="current card" aria-label="Voie sélectionnée">
+      <div class="cur-head">
+        <span class="hold big" [class.ko]="!cur.sent" [class.neutral]="!cur.hex" [style]="holdVars(cur.hex)">
+          <app-icon [name]="cur.sent ? 'check' : 'close'" [size]="26" [stroke]="3" />
+        </span>
+        <div class="cur-txt">
+          <span class="overline">Voie n° {{ sel() + 1 }} · {{ cur.sent ? 'réussie' : 'ratée' }}</span>
+          <strong>{{ cur.name }}</strong>
+          <span class="muted">{{ cur.range }}</span>
+        </div>
+        <div class="tries">
+          <span class="num">{{ cur.attempts }}</span>
+          <span class="muted">{{ cur.attempts > 1 ? 'essais' : 'essai' }}</span>
+        </div>
+      </div>
+      <div class="cur-actions">
+        <button type="button" (click)="toggleSent()">
+          <app-icon [name]="cur.sent ? 'close' : 'check'" [size]="20" [stroke]="2.8" />
+          {{ cur.sent ? 'Ratée' : 'Réussie' }}
+        </button>
+        <button type="button" (click)="plusOne()"><span class="num">+1</span>essai</button>
+        <button type="button" class="primary" (click)="again()">
+          <app-icon name="again" [size]="20" [stroke]="2.6" />Encore
+        </button>
+        <button type="button" class="outline" (click)="removeCurrent()">
+          <app-icon name="undo" [size]="20" [stroke]="2.4" />Retirer
+        </button>
+      </div>
+    </div>
+    }
+
+    <div class="feed">
+      <span class="overline">
+        @if (log().length) { Fil de la séance — touche une pastille pour la corriger } @else { Aucune
+        voie pour l'instant }
+      </span>
+      @if (log().length) {
+      <div class="feed-list">
+        @for (e of log(); track $index; let i = $index) {
+        <button
+          type="button"
+          class="hold dot"
+          [class.ko]="!e.sent"
+          [class.neutral]="!e.hex"
+          [class.sel]="i === sel()"
+          [style]="holdVars(e.hex)"
+          [attr.aria-label]="entryLabel(e, i)"
+          (click)="sel.set(i)"
+        >
+          {{ e.hex ? '' : e.short }}
+        </button>
+        }
+      </div>
+      }
     </div>
 
-    <ol class="climbs" formArrayName="climbs">
-      @for (climb of climbs.controls; track climb; let i = $index) {
-      <li [formGroupName]="i" class="climb">
-        <select formControlName="style" (change)="onStyleChange(climb)" aria-label="Style">
-          @for (s of styleOptions; track s[0]) {
-          <option [value]="s[0]">{{ s[1] }}</option>
-          }
-        </select>
-
-        <div class="mode" role="radiogroup" aria-label="Saisie">
-          <label class="pill">
-            <input type="radio" formControlName="mode" value="grade" /> Cotation
-          </label>
-          <label class="pill" [class.disabled]="gymsFor(climb.value.style).length === 0">
-            <input
-              type="radio"
-              formControlName="mode"
-              value="color"
-              [attr.disabled]="gymsFor(climb.value.style).length === 0 ? true : null"
-            />
-            Couleur
-          </label>
+    <div class="adder">
+      <div class="adder-head">
+        <div class="seg" role="radiogroup" aria-label="Mode de saisie">
+          <button
+            type="button"
+            role="radio"
+            [attr.aria-checked]="colorMode()"
+            [disabled]="!gym()"
+            (click)="mode.set('color')"
+          >
+            Couleurs
+          </button>
+          <button type="button" role="radio" [attr.aria-checked]="!colorMode()" (click)="mode.set('grade')">
+            Cotation
+          </button>
         </div>
-
-        @if (climb.value.mode === 'grade') {
-        <select formControlName="system" (change)="onSystemChange(climb)" aria-label="Système">
-          @for (s of systemsFor(climb.value.style); track s.system) {
-          <option [value]="s.system">{{ s.label }}</option>
-          }
-        </select>
-        <select formControlName="grade" aria-label="Cotation">
-          @for (g of gradesFor(climb.value.system); track g) {
-          <option [value]="g">{{ g }}</option>
-          }
-        </select>
-        } @else {
-        <select formControlName="gymId" (change)="onGymChange(climb)" aria-label="Salle">
-          @for (g of gymsFor(climb.value.style); track g.id) {
+        @if (colorMode()) {
+        <select [ngModel]="gym()!.id" (ngModelChange)="setGym($event)" aria-label="Salle" name="gym">
+          @for (g of allGyms(); track g.id) {
           <option [value]="g.id">{{ g.name }}</option>
           }
         </select>
-        <app-color-picker
-          class="full"
-          formControlName="color"
-          [colors]="colorsFor(climb.value.gymId)"
-        />
+        } @else {
+        <select [ngModel]="system()" (ngModelChange)="system.set($event)" aria-label="Système" name="system">
+          @for (s of systems; track s.system) {
+          <option [value]="s.system">{{ styleLabel[s.discipline] }} · {{ s.label }}</option>
+          }
+        </select>
         }
+      </div>
+      <p class="hint muted">
+        1 touche = réussie du 1<sup>er</sup> coup
+        <span class="d-only">· clavier : <b>1–9</b> couleur, <b>R</b> ratée, <b>+</b> essai, <b>Entrée</b> encore</span>
+      </p>
 
-        <label class="inline"> <input type="checkbox" formControlName="sent" /> Réussi </label>
-        <label class="inline">
-          Essais
-          <input type="number" formControlName="attempts" min="1" max="50" class="small" />
-        </label>
-        <button type="button" class="ghost" (click)="removeClimb(i)" aria-label="Supprimer">
-          ✕
+      @if (colorMode()) {
+      <div class="holds">
+        @for (c of gym()!.colors; track c.color; let i = $index) {
+        <button
+          type="button"
+          class="hold-btn"
+          (click)="addColor(c)"
+          [attr.aria-label]="'Ajouter ' + c.color + ', ' + c.min + ' à ' + c.max"
+        >
+          <span class="hold" [style]="holdVars(c.hex)">{{ c.min }}</span>
+          <span class="name">{{ c.color }}</span>
+          <span class="range">{{ c.min === c.max ? c.min : c.min + ' → ' + c.max }}</span>
         </button>
-      </li>
+        }
+      </div>
+      } @else {
+      <div class="grades">
+        @for (g of grades(); track g) {
+        <button type="button" class="num" (click)="addGrade(g)">{{ g }}</button>
+        }
+      </div>
+      } @if (gymsLoaded() && !gym()) {
+      <p class="hint muted">
+        Pour saisir tes voies par couleur, <a routerLink="/salles">ajoute d'abord ta salle</a>.
+      </p>
       }
-    </ol>
-
-    <button type="button" (click)="addClimb()">+ Ajouter une voie</button>
-    @if (noGymHint()) {
-    <p class="muted hint">
-      Pour saisir tes voies par couleur, <a routerLink="/salles">ajoute d'abord ta salle</a>.
-    </p>
-    }
+    </div>
   </section>
 
-  @if (error(); as e) {
-  <p class="error">{{ e }}</p>
-  }
+  <!-- Récapitulatif -->
+  <section class="recap card stack" aria-label="Récapitulatif">
+    <div class="d-only"><ng-container [ngTemplateOutlet]="statsTpl" /></div>
+    <div class="m-only recap-head">
+      <span class="overline">{{ stats().count }} voies · {{ stats().sent }} réussies</span>
+    </div>
+    <span class="overline d-only">Regroupées</span>
+    <div class="chips">
+      @for (c of groups(); track c.key) {
+      <span class="hold-chip" [class.ko]="!c.sent" [class.neutral]="!c.hex" [style]="holdVars(c.hex)">
+        <span class="name">{{ c.color ?? c.grade }}</span> <b>×{{ c.count }}</b>
+        @if (!c.sent) {<span class="tries">{{ c.attempts }} ess.</span>}
+      </span>
+      } @empty {
+      <span class="muted small">Les voies saisies apparaîtront ici.</span>
+      }
+    </div>
+  </section>
+</div>
 
-  <div>
-    <button type="submit" class="primary" [disabled]="form.invalid || saving()">
-      {{ saving() ? 'Enregistrement…' : 'Enregistrer la séance' }}
-    </button>
-  </div>
-</form>
+@if (error(); as e) {
+<p class="error">{{ e }}</p>
+}
+
+@if (step() === 'finish') {
+<div class="save-bar m-only">
+  <button type="button" class="primary big" (click)="submit()" [disabled]="!valid() || saving()">
+    <app-icon name="check" [size]="22" [stroke]="3" />
+    {{ saving() ? 'Enregistrement…' : 'Enregistrer la séance' }}
+  </button>
+</div>
+}

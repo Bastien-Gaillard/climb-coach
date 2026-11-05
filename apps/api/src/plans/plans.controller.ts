@@ -5,6 +5,8 @@ import { PlansService } from './plans.service';
 
 const GeneratePlanSchema = z.object({
   availableMinutes: z.number().int().min(30).max(300),
+  /** Salle du jour (optionnelle) : la séance parle alors en couleurs. */
+  gymId: z.string().min(1).optional(),
 });
 
 @Controller('plans')
@@ -15,7 +17,7 @@ export class PlansController {
   generate(
     @Body(new ZodValidationPipe(GeneratePlanSchema)) body: z.infer<typeof GeneratePlanSchema>,
   ) {
-    return this.plans.generate(body.availableMinutes);
+    return this.plans.generate(body.availableMinutes, body.gymId);
   }
 
   @Get()

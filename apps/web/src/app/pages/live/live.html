@@ -1,0 +1,77 @@
+@if (block(); as b) {
+<header class="top">
+  <div class="bar">
+    <a routerLink="/generer" class="btn icon close" aria-label="Fermer la séance">
+      <app-icon name="close" [size]="22" [stroke]="2.4" />
+    </a>
+    <span class="overline">Bloc {{ index() + 1 }} / {{ blocks().length }} · total {{ elapsed() }} min</span>
+    <span class="badge accent">{{ generated()!.source === 'mistral' ? 'IA' : 'Règles' }}</span>
+  </div>
+  <div class="segs" aria-hidden="true">
+    @for (x of blocks(); track $index; let k = $index) {
+    <span [style.flex-grow]="x.minutes" [class.done]="k < index()" [class.cur]="k === index()"></span>
+    }
+  </div>
+</header>
+
+<section class="body">
+  <div class="title">
+    <span class="overline kind">{{ kind() }}</span>
+    <h1>{{ b.title }}</h1>
+    @if (b.target) { @if (b.target.colors?.length) {
+    <div class="level-colors">
+      @for (c of b.target.colors; track c.color) {
+      <span class="hold-chip big" [style]="holdVars(c.hex)">{{ c.color }}</span>
+      }
+      <span class="muted">{{ b.target.grade }}</span>
+    </div>
+    } @else {
+    <span class="badge line level">Niveau visé <b class="num">{{ b.target.grade }}</b></span>
+    } }
+  </div>
+
+  <div class="timer" role="timer" aria-live="off">
+    <span class="num clock">{{ clock() }}</span>
+    <div class="progress"><span [style.width.%]="progress()"></span></div>
+    <span class="muted">{{ running() ? 'restant sur ' + b.minutes + ' min' : 'En pause' }}</span>
+  </div>
+
+  <ol class="steps">
+    @for (st of b.instructions; track $index; let n = $index) {
+    <li><span class="num">{{ n + 1 }}</span><span>{{ st }}</span></li>
+    }
+  </ol>
+
+  <div class="then">
+    <span class="overline">Ensuite</span>
+    <span class="grow">
+      @if (next(); as nx) { {{ nx.title }} · {{ nx.minutes }} min } @else { Fin de séance }
+    </span>
+    <a routerLink="/seance" class="btn add"><app-icon name="plus" [size]="18" [stroke]="2.6" />Voie</a>
+  </div>
+</section>
+
+<div class="controls">
+  <button type="button" (click)="go(index() - 1)" [disabled]="index() === 0" aria-label="Bloc précédent">
+    <app-icon name="prev" [size]="28" />
+  </button>
+  @if (isLast() && left() === 0) {
+  <button type="button" class="primary" (click)="finish()">
+    <app-icon name="check" [size]="24" [stroke]="3" />Terminer
+  </button>
+  } @else {
+  <button type="button" class="primary" (click)="toggle()">
+    <app-icon [name]="running() ? 'pause' : 'play'" [size]="26" />
+    {{ running() ? 'Pause' : 'Reprendre' }}
+  </button>
+  } @if (isLast()) {
+  <button type="button" (click)="finish()" aria-label="Terminer et saisir mes voies">
+    <app-icon name="check" [size]="26" [stroke]="3" />
+  </button>
+  } @else {
+  <button type="button" (click)="go(index() + 1)" aria-label="Bloc suivant">
+    <app-icon name="next" [size]="28" />
+  </button>
+  }
+</div>
+}

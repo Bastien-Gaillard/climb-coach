@@ -57,7 +57,14 @@ export interface PlanBlock {
   title: string;
   minutes: number;
   instructions: string[];
-  target?: { style: Style; grade: string };
+  target?: {
+    style: Style;
+    grade: string;
+    /** Cotations demandées dans les consignes, de la plus facile à la plus dure. */
+    range?: { min: string; max: string };
+    /** Couleurs de la salle choisie qui couvrent la cotation. */
+    colors?: { color: string; hex?: string }[];
+  };
 }
 
 export interface Plan {
@@ -72,6 +79,7 @@ export interface GeneratedPlan {
   source: 'mistral' | 'rules';
   fallbackReason?: string;
   availableMinutes: number;
+  gym?: { id: string; name: string };
   plan: Plan;
   createdAt: string;
 }

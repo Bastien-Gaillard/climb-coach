@@ -1,51 +1,55 @@
-<div class="title">
-  <div>
-    <h1>Mes salles</h1>
-    <p class="muted">
-      Les couleurs de tes salles, pour saisir tes voies par couleur et les convertir.
-    </p>
-  </div>
-  @if (editing() === null) {
-  <button type="button" class="primary" (click)="startCreate()">+ Nouvelle salle</button>
-  }
-</div>
-
 @if (editing() !== null) {
-<app-gym-editor [gym]="editedGym()" (saved)="close()" (cancelled)="close()" />
-} @if (error(); as e) {
+<app-gym-editor
+  [gym]="editedGym()"
+  (saved)="close()"
+  (cancelled)="close()"
+  (removeRequested)="remove(editedGym()!)"
+/>
+@if (error(); as e) {
+<p class="error">{{ e }}</p>
+} } @else {
+<header class="page-head">
+  <h1>Mes salles</h1>
+  <button type="button" class="primary" (click)="startCreate()">
+    <app-icon name="plus" [size]="20" [stroke]="2.6" />Ajouter
+  </button>
+</header>
+
+@if (error(); as e) {
 <p class="error">{{ e }}</p>
 } @if (!store.loaded()) {
 <p class="muted">Chargement…</p>
 } @else {
 <ul class="gyms">
   @for (g of store.gyms(); track g.id) {
-  <li class="card" [class.active]="editing() === g.id">
-    <div class="head">
-      <div>
+  <li>
+    <button type="button" class="gym card" (click)="startEdit(g)" [attr.aria-label]="'Modifier ' + g.name">
+      <span class="who">
         <strong>{{ g.name }}</strong>
-        <span class="badge">{{ styleLabel[g.discipline] }}</span>
-        <span class="badge">{{ scales[g.system].label }}</span>
-      </div>
-      <div class="actions">
-        <button type="button" class="ghost" (click)="startEdit(g)">Modifier</button>
-        <button type="button" class="ghost danger" (click)="remove(g)">Supprimer</button>
-      </div>
+        <span class="muted small">
+          {{ styleLabel[g.discipline] }} · {{ scales[g.system].label }} · {{ g.colors.length }}
+          couleur{{ g.colors.length > 1 ? 's' : '' }}
+        </span>
+      </span>
+      <span class="ladder">
+        @for (c of g.colors; track c.color) {
+        <span class="hold" [style]="holdVars(c.hex)" [title]="c.color + ' : ' + c.min + ' → ' + c.max"></span>
+        }
+        <span class="num range">{{ range(g) }}</span>
+      </span>
+    </button>
+  </li>
+  } @empty {
+  <li class="muted">Aucune salle pour l'instant.</li>
+  }
+  <li class="tip dots">
+    <div>
+      <strong>Nouvelle salle ?</strong>
+      <span>
+        Recopie ses couleurs dans l'ordre, du plus facile au plus dur : le convertisseur fera le
+        reste.
+      </span>
     </div>
-    <ul class="ladder">
-      @for (c of g.colors; track c.color) {
-      <li>
-        <span class="dot" [style.background]="c.hex || '#ccc'"></span>
-        {{ c.color }}
-        <span class="muted">{{ c.min === c.max ? c.min : c.min + ' → ' + c.max }}</span>
-      </li>
-      }
-    </ul>
   </li>
-  } @empty { @if (editing() === null) {
-  <li class="card empty">
-    <p>Aucune salle pour l'instant.</p>
-    <button type="button" (click)="startCreate()">Ajouter ma salle</button>
-  </li>
-  } }
 </ul>
-}
+} }

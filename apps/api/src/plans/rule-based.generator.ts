@@ -2,6 +2,7 @@ import { gradeFromValue } from '@climb-coach/grades';
 import { Injectable } from '@nestjs/common';
 import { REFERENCE_SYSTEM } from '../sessions/climb-normalizer';
 import { GeneratorContext, PlanGenerator, splitTime } from './generator';
+import { gradeLabel } from './gym-colors';
 import { analyzeHistory, FOCUS_LABEL, HistoryAnalysis, Style } from './history-analysis';
 import { Plan, PlanBlock } from './plan.schema';
 
@@ -24,8 +25,14 @@ export class RuleBasedGenerator implements PlanGenerator {
     const time = splitTime(ctx.availableMinutes);
     const light = a.intensity === 'light' ? 1 : 0;
 
-    const blocks: PlanBlock[] = [this.warmup(a, time.warmup, light)];
-    blocks.push(this.main(a, time.main, light));
+    const blocks: PlanBlock[] = [this.warmup(ctx, a, time.warmup, light)];
+    const main = this.main(ctx, a, time.main, light);
+    if (a.pain) {
+      main.instructions.push(
+        'Douleur signalée récemment : éviter les prises et mouvements qui sollicitent la zone, arrêter au moindre signal',
+      );
+    }
+    blocks.push(main);
     if (time.core > 0) blocks.push(this.core(time.core, light));
     if (time.cooldown > 0) blocks.push(this.cooldown(time.cooldown));
 
@@ -42,12 +49,24 @@ export class RuleBasedGenerator implements PlanGenerator {
     return gradeFromValue(Math.max(0, value), REFERENCE_SYSTEM[style]);
   }
 
+  /** Cotation à afficher dans une consigne : avec la couleur de la salle si on la connaît. */
+  private label(ctx: GeneratorContext, style: Style, grade: string): string {
+    return gradeLabel(ctx.gym, style, grade);
+  }
+
   private unit(style: Style, plural = true): string {
     if (style === 'boulder') return plural ? 'blocs' : 'bloc';
     return plural ? 'voies' : 'voie';
   }
 
-  private warmup(a: HistoryAnalysis, minutes: number, light: number): PlanBlock {
+  private warmup(
+    ctx: GeneratorContext,
+    a: HistoryAnalysis,
+    minutes: number,
+    light: number,
+  ): PlanBlock {
+    const easy = this.label(ctx, a.style, this.grade(a.style, a.maxSent - 4 - light));
+    const medium = this.label(ctx, a.style, this.grade(a.style, a.maxSent - 2 - light));
     return {
       kind: 'warmup',
       title: 'Échauffement',
@@ -55,14 +74,20 @@ export class RuleBasedGenerator implements PlanGenerator {
       instructions: [
         '5 min de mobilité : poignets, doigts, épaules, hanches',
         'Traversée facile en continu pendant 3-4 min',
-        `3-4 ${this.unit(a.style)} faciles en ${this.grade(a.style, a.maxSent - 4 - light)}, puis 2 en ${this.grade(a.style, a.maxSent - 2 - light)}`,
+        `3-4 ${this.unit(a.style)} faciles en ${easy}, puis 2 en ${medium}`,
       ],
     };
   }
 
-  private main(a: HistoryAnalysis, minutes: number, light: number): PlanBlock {
+  private main(
+    ctx: GeneratorContext,
+    a: HistoryAnalysis,
+    minutes: number,
+    light: number,
+  ): PlanBlock {
     const { style } = a;
     const u = this.unit(style);
+    const label = (grade: string) => this.label(ctx, style, grade);
 
     switch (a.focus) {
       case 'strength': {
@@ -76,12 +101,12 @@ export class RuleBasedGenerator implements PlanGenerator {
           instructions:
             style === 'boulder'
               ? [
-                  `${count} blocs en ${target}, 3-4 essais chacun`,
-                  '3 min de repos complet entre les essais',
+                  `${count} blocs en ${label(target)}, 4 essais max par bloc`,
+                  'Repos 3 min complet entre chaque essai',
                   'Arrêter un bloc dès que les essais n’avancent plus',
                 ]
               : [
-                  `${count} voies courtes et dures en ${target}`,
+                  `${count} voies courtes et dures en ${label(target)}`,
                   'Travailler les sections clés, 5 min de repos entre les montées',
                 ],
         };
@@ -96,9 +121,9 @@ export class RuleBasedGenerator implements PlanGenerator {
             minutes,
             target: { style, grade: target },
             instructions: [
-              `Choisir 4 blocs en ${target}`,
+              `Choisir 4 blocs en ${label(target)}`,
               `${sets} série${sets > 1 ? 's' : ''} : enchaîner les 4 blocs 4 fois sans pause`,
-              '4 min de repos entre les séries',
+              'Repos 4 min entre les séries',
             ],
           };
         }
@@ -109,7 +134,7 @@ export class RuleBasedGenerator implements PlanGenerator {
           minutes,
           target: { style, grade: target },
           instructions: [
-            `${count} voies en ${target}`,
+            `${count} voies en ${label(target)}`,
             'Monter, redescendre en désescalade quand c’est possible',
             '3 min de repos entre les voies',
           ],
@@ -129,7 +154,7 @@ export class RuleBasedGenerator implements PlanGenerator {
           minutes,
           target: { style, grade: target },
           instructions: [
-            `${Math.max(3, Math.floor(minutes / 6))} ${u} en ${target}, chaque exercice sur plusieurs ${u}`,
+            `${Math.max(3, Math.floor(minutes / 6))} ${u} en ${label(target)}, chaque exercice sur plusieurs ${u}`,
             ...drills,
           ],
         };

@@ -1,47 +1,52 @@
-<h1>Convertisseur</h1>
-<p class="muted">Cotations entre systèmes, et couleurs d'une salle à l'autre.</p>
+<header class="page-head">
+  <h1>Convertir</h1>
+  <span class="sub">Cotations entre systèmes, couleurs d'une salle à l'autre</span>
+</header>
 
-<section class="card stack">
-  <h2>Cotation</h2>
-  <div class="row">
-    <label>
-      Système
-      <select [value]="from()" (change)="setFrom($any($event.target).value)">
-        @for (s of scales; track s.system) {
-        <option [value]="s.system" [selected]="s.system === from()">{{ s.label }}</option>
-        }
-      </select>
-    </label>
-    <label>
-      Cotation
-      <select [value]="grade()" (change)="grade.set($any($event.target).value)">
-        @for (g of fromGrades(); track g) {
-        <option [value]="g" [selected]="g === grade()">{{ g }}</option>
-        }
-      </select>
-    </label>
-    <span class="arrow" aria-hidden="true">→</span>
-    <label>
-      Vers
-      <select [value]="to()" (change)="to.set($any($event.target).value)">
-        @for (s of targets(); track s.system) {
-        <option [value]="s.system" [selected]="s.system === to()">{{ s.label }}</option>
-        }
-      </select>
-    </label>
-    <output class="result" [class.error]="!gradeResult().ok" data-testid="grade-result">
-      {{ gradeResult().text }}
-    </output>
-  </div>
-</section>
+<div class="cols">
+  <section class="card stack" aria-label="Cotation">
+    <span class="overline">Une cotation</span>
+    <div class="pair">
+      <label>
+        <span class="sr-only">Système</span>
+        <select (change)="setFrom($any($event.target).value)">
+          @for (s of scales; track s.system) {
+          <option [value]="s.system" [selected]="s.system === from()">{{ s.label }}</option>
+          }
+        </select>
+      </label>
+      <button type="button" class="icon swap" (click)="swap()" aria-label="Inverser les systèmes">
+        <app-icon name="convert" [size]="22" />
+      </button>
+      <label>
+        <span class="sr-only">Vers</span>
+        <select (change)="to.set($any($event.target).value)">
+          @for (s of targets(); track s.system) {
+          <option [value]="s.system" [selected]="s.system === to()">{{ s.label }}</option>
+          }
+        </select>
+      </label>
+      <span class="num big">{{ grade() }}</span>
+      <span class="eq" aria-hidden="true">=</span>
+      <output class="num big" [class.error]="!gradeResult().ok" data-testid="grade-result">
+        {{ gradeResult().text }}
+      </output>
+    </div>
+    <div class="grades" role="radiogroup" aria-label="Cotation">
+      @for (g of fromGrades(); track g) {
+      <button type="button" role="radio" class="num" [attr.aria-checked]="g === grade()" (click)="grade.set(g)">
+        {{ g }}
+      </button>
+      }
+    </div>
+  </section>
 
-<section class="card stack">
-  <h2>Couleurs de salles</h2>
+  <section class="card stack" aria-label="Couleur">
+    <span class="overline">Une couleur d'une salle à l'autre</span>
 
-  @if (!gymsLoaded()) {
-  <p class="muted">Chargement des salles…</p>
-  } @else if (fromGym(); as from) {
-  <div class="row">
+    @if (!gymsLoaded()) {
+    <p class="muted">Chargement des salles…</p>
+    } @else if (fromGym(); as from) {
     <label>
       Ma salle
       <select (change)="setFromGym($any($event.target).value)">
@@ -50,57 +55,57 @@
         }
       </select>
     </label>
-    @if (toGym(); as to) {
-    <span class="arrow" aria-hidden="true">→</span>
-    <label>
-      Autre salle
-      <select (change)="toGymId.set($any($event.target).value)">
-        @for (g of compatibleGyms(); track g.id) {
-        <option [value]="g.id" [selected]="g.id === to.id">{{ g.name }}</option>
-        }
-      </select>
-    </label>
-    }
-  </div>
 
-  <div class="stack-sm">
-    <span class="muted label">Couleur chez {{ from.name }}</span>
     <app-color-picker
       [colors]="from.colors"
       [ngModel]="color()"
       (ngModelChange)="selectedColor.set($event)"
       label="Couleur à convertir"
+      [size]="52"
     />
-  </div>
 
-  @if (toGym(); as to) { @if (sourceRange(); as range) {
-  <p class="muted">
-    <span class="dot" [style.background]="hex(from, range.color)"></span>
-    <strong>{{ range.color }}</strong> chez {{ from.name }} = {{ range.min }} à {{ range.max }}.
-    Chez {{ to.name }}, ça correspond à :
-  </p>
-  }
-  <ul class="matches" data-testid="color-matches">
-    @for (m of matches(); track m.color) {
-    <li>
-      <span class="dot" [style.background]="m.hex"></span>
-      <strong>{{ m.color }}</strong>
-      <span class="muted">{{ m.min }} → {{ m.max }}</span>
-      <span class="bar"><span [style.width.%]="m.overlap * 100"></span></span>
-      <span class="pct">{{ percent(m.overlap) }}</span>
-    </li>
-    } @empty {
-    <li class="muted">Aucune couleur équivalente.</li>
+    @if (toGym(); as to) { @if (sourceRange(); as range) {
+    <div class="source">
+      <span class="hold" [style]="holdVars(hex(from, range.color))">{{ range.min }}</span>
+      <div>
+        <span class="muted small">{{ from.name }}</span>
+        <strong>{{ range.color }} · {{ range.min }} → {{ range.max }}</strong>
+      </div>
+    </div>
     }
-  </ul>
-  } @else {
-  <p class="muted">
-    Ajoute une autre salle de {{ from.discipline === 'boulder' ? 'bloc' : 'voie' }} pour comparer
-    les couleurs. <a routerLink="/salles">Gérer mes salles →</a>
-  </p>
-  } } @else {
-  <p class="muted" data-testid="no-gym">
-    Aucune salle enregistrée. <a routerLink="/salles">Ajoute tes salles →</a>
-  </p>
-  }
-</section>
+    <label class="to">
+      <span class="eqv"><app-icon name="down" [size]="18" />équivaut à</span>
+      <select (change)="toGymId.set($any($event.target).value)" aria-label="Autre salle">
+        @for (g of compatibleGyms(); track g.id) {
+        <option [value]="g.id" [selected]="g.id === to.id">{{ g.name }}</option>
+        }
+      </select>
+    </label>
+    <ul class="matches" data-testid="color-matches">
+      @for (m of matches(); track m.color) {
+      <li>
+        <span class="hold" [style]="holdVars(m.hex)"></span>
+        <div class="m-body">
+          <div class="m-head">
+            <strong>{{ m.color }} · {{ m.min }}–{{ m.max }}</strong>
+            <span class="num pct">{{ percent(m.overlap) }}</span>
+          </div>
+          <span class="bar"><span [style.width.%]="m.overlap * 100"></span></span>
+        </div>
+      </li>
+      } @empty {
+      <li class="muted">Aucune couleur équivalente.</li>
+      }
+    </ul>
+    } @else {
+    <p class="muted">
+      Ajoute une autre salle de {{ from.discipline === 'boulder' ? 'bloc' : 'voie' }} pour comparer
+      les couleurs. <a routerLink="/salles">Gérer mes salles →</a>
+    </p>
+    } } @else {
+    <p class="muted" data-testid="no-gym">
+      Aucune salle enregistrée. <a routerLink="/salles">Ajoute tes salles →</a>
+    </p>
+    }
+  </section>
+</div>

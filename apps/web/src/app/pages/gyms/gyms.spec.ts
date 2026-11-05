@@ -43,7 +43,7 @@ describe('GymsPage', () => {
     fixture.detectChanges();
     expect(el.textContent).toContain('Aucune salle');
 
-    click('+ Nouvelle salle');
+    click('Ajouter');
     type(el.querySelector('input[formcontrolname=name]')!, 'Bloc Session Digne');
     type(el.querySelector('input[aria-label="Nom de la couleur"]')!, 'jaune');
     click('Créer la salle');
@@ -54,7 +54,7 @@ describe('GymsPage', () => {
       name: 'Bloc Session Digne',
       discipline: 'boulder',
       system: 'font',
-      colors: [{ color: 'jaune', hex: '#facc15', min: '4', max: '5+' }],
+      colors: [{ color: 'jaune', hex: '#f2c230', min: '4', max: '5+' }],
     });
     req.flush({ id: 'bloc-session-digne', ...req.request.body });
     fixture.detectChanges();
@@ -67,7 +67,10 @@ describe('GymsPage', () => {
     http.expectOne('/api/gyms').flush(EXAMPLE_GYMS);
     fixture.detectChanges();
 
-    click('Modifier');
+    el.querySelector<HTMLButtonElement>(
+      'button[aria-label="Modifier Salle Alpha (bloc)"]',
+    )!.click();
+    fixture.detectChanges();
     const name = el.querySelector<HTMLInputElement>('input[formcontrolname=name]')!;
     expect(name.value).toBe('Salle Alpha (bloc)');
     expect(el.querySelectorAll('input[aria-label="Nom de la couleur"]').length).toBe(6);
@@ -83,7 +86,7 @@ describe('GymsPage', () => {
 
   it('bloque l’enregistrement quand une plage est à l’envers', () => {
     http.expectOne('/api/gyms').flush([]);
-    click('+ Nouvelle salle');
+    click('Ajouter');
     type(el.querySelector('input[formcontrolname=name]')!, 'Test');
     type(el.querySelector('input[aria-label="Nom de la couleur"]')!, 'vert');
     const min = el.querySelector<HTMLSelectElement>('select[aria-label="Cotation min"]')!;
@@ -97,7 +100,7 @@ describe('GymsPage', () => {
 
   it('affiche l’erreur renvoyée par l’API', () => {
     http.expectOne('/api/gyms').flush([]);
-    click('+ Nouvelle salle');
+    click('Ajouter');
     type(el.querySelector('input[formcontrolname=name]')!, 'Test');
     type(el.querySelector('input[aria-label="Nom de la couleur"]')!, 'vert');
     click('Créer la salle');
@@ -114,8 +117,8 @@ describe('GymsPage', () => {
 
 describe('hexForName', () => {
   it('propose une couleur d’après le nom', () => {
-    expect(hexForName('Noir')).toBe('#111827');
-    expect(hexForName('vert clair')).toBe('#22c55e');
+    expect(hexForName('Noir')).toBe('#1a1a1a');
+    expect(hexForName('vert clair')).toBe('#2e9e5b');
     expect(hexForName('fluo')).toBeUndefined();
   });
 });

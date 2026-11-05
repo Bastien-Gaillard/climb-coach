@@ -1,24 +1,32 @@
-import { DatePipe } from '@angular/common';
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { DatePipe, DecimalPipe } from '@angular/common';
+import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { ApiService } from '../../core/api.service';
 import { GymsStore } from '../../core/gyms.store';
 import { errorMessage, FOCUS_LABEL, STYLE_LABEL } from '../../core/labels';
-import { ProgressionPoint, Session } from '../../core/models';
-import { textOn } from '../../shared/color-picker';
+import { Climb, ProgressionPoint, Session, Style } from '../../core/models';
+import { holdVars } from '../../shared/hold';
+import { Icon } from '../../shared/icon';
 import { ClimbChip, groupClimbs } from './climb-chips';
 import { ProgressionChart } from './progression-chart';
 
+/** Meilleure voie réussie d'une liste (valeur sur l'échelle de référence). */
+function best(climbs: Climb[], style?: Style): Climb | null {
+  return climbs
+    .filter((c) => c.sent && (!style || c.style === style))
+    .reduce<Climb | null>((acc, c) => (!acc || c.gradeValue > acc.gradeValue ? c : acc), null);
+}
+
 @Component({
   selector: 'app-history',
-  imports: [DatePipe, RouterLink, ProgressionChart],
+  imports: [DatePipe, DecimalPipe, RouterLink, ProgressionChart, Icon],
   templateUrl: './history.html',
   styleUrl: './history.scss',
 })
 export class HistoryPage implements OnInit {
   private readonly api = inject(ApiService);
   private readonly gyms = inject(GymsStore);
-  protected readonly textOn = textOn;
+  protected readonly holdVars = holdVars;
 
   protected readonly focusLabel = FOCUS_LABEL;
   protected readonly styleLabel = STYLE_LABEL;
@@ -26,6 +34,26 @@ export class HistoryPage implements OnInit {
   protected readonly progression = signal<ProgressionPoint[]>([]);
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
+
+  /** Chiffres clés sur les séances chargées. */
+  protected readonly summary = computed(() => {
+    const list = this.sessions();
+    if (!list.length) return null;
+    const climbs = list.flatMap((s) => s.climbs);
+    const boulders = climbs.filter((c) => c.style === 'boulder').length;
+    const style: Style = boulders >= climbs.length - boulders ? 'boulder' : 'route';
+    const times = list.map((s) => new Date(s.date).getTime());
+    const weeks = Math.max(1, (Math.max(...times) - Math.min(...times)) / (7 * 86400000));
+    return {
+      bestLabel: style === 'boulder' ? 'Meilleur bloc' : 'Meilleure voie',
+      best: best(climbs, style)?.grade ?? '—',
+      count: list.length,
+      perWeek: list.length / weeks,
+      sent: climbs.filter((c) => c.sent).length,
+      total: climbs.length,
+      fatigue: list.reduce((a, s) => a + s.fatigue, 0) / list.length,
+    };
+  });
 
   ngOnInit(): void {
     this.gyms.load();
@@ -62,6 +90,19 @@ export class HistoryPage implements OnInit {
   protected chips(session: Session): ClimbChip[] {
     this.gyms.gyms();
     return groupClimbs(session.climbs, (id) => this.gyms.find(id));
+  }
+
+  protected gymNames(session: Session): string {
+    this.gyms.gyms();
+    const ids = [...new Set(session.climbs.map((c) => c.gymId).filter((id) => !!id))];
+    return ids
+      .map((id) => this.gyms.find(id!)?.name)
+      .filter(Boolean)
+      .join(', ');
+  }
+
+  protected bestGrade(session: Session): string | null {
+    return best(session.climbs)?.grade ?? null;
   }
 
   protected chipTitle(c: ClimbChip): string {

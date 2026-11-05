@@ -4,9 +4,10 @@ import { FONT, FRENCH } from '@climb-coach/grades';
 import { STYLE_LABEL } from '../../core/labels';
 import { ProgressionPoint, Style } from '../../core/models';
 
-const W = 640;
+/** Largeur logique : plus large sur ordinateur pour garder un texte et une hauteur raisonnables. */
+const W = typeof matchMedia === 'function' && matchMedia('(min-width: 960px)').matches ? 1100 : 640;
 const H = 220;
-const PAD = { top: 16, right: 16, bottom: 28, left: 44 };
+const PAD = { top: 16, right: 16, bottom: 32, left: 52 };
 const SCALE_BY_STYLE = { boulder: FONT, route: FRENCH } as const;
 
 /** Meilleure réussite par séance, en SVG simple (pas besoin d'une lib de graphiques). */
@@ -15,11 +16,16 @@ const SCALE_BY_STYLE = { boulder: FONT, route: FRENCH } as const;
   imports: [DatePipe],
   template: `
     <div class="head">
-      <h2>Progression</h2>
+      <h2>Meilleure cotation réussie par séance</h2>
       @if (styles().length > 1) {
-        <div class="toggle" role="group" aria-label="Style">
+        <div class="seg" role="radiogroup" aria-label="Style">
           @for (s of styles(); track s) {
-            <button type="button" [class.selected]="style() === s" (click)="selected.set(s)">
+            <button
+              type="button"
+              role="radio"
+              [attr.aria-checked]="style() === s"
+              (click)="selected.set(s)"
+            >
               {{ styleLabel[s] }}
             </button>
           }
@@ -46,8 +52,14 @@ const SCALE_BY_STYLE = { boulder: FONT, route: FRENCH } as const;
           <text [attr.x]="pad.left - 8" [attr.y]="t.y + 4" text-anchor="end">{{ t.label }}</text>
         }
         <polyline [attr.points]="line()" class="line" />
-        @for (p of series(); track p.sessionId) {
-          <circle [attr.cx]="p.x" [attr.cy]="p.y" r="4" class="dot">
+        @for (p of series(); track p.sessionId; let last = $last) {
+          <circle
+            [attr.cx]="p.x"
+            [attr.cy]="p.y"
+            [attr.r]="last ? 6 : 4"
+            class="dot"
+            [class.last]="last"
+          >
             <title>{{ p.date | date: 'd MMM' }} : {{ p.grade }}</title>
           </circle>
         }
@@ -63,19 +75,16 @@ const SCALE_BY_STYLE = { boulder: FONT, route: FRENCH } as const;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 0.5rem;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 8px;
     }
     .head h2 {
-      margin: 0;
+      font-size: 18px;
     }
-    .toggle {
-      display: flex;
-      gap: 0.25rem;
-    }
-    .toggle button.selected {
-      background: var(--accent-soft);
-      border-color: var(--accent);
-      color: var(--accent);
+    .seg button {
+      min-height: 36px;
+      padding: 0 14px;
     }
     svg {
       width: 100%;
@@ -83,23 +92,28 @@ const SCALE_BY_STYLE = { boulder: FONT, route: FRENCH } as const;
       display: block;
     }
     text {
-      font-size: 11px;
+      font-family: var(--font-num);
+      font-size: 17px;
+      font-weight: 600;
       fill: var(--muted);
     }
     .grid {
-      stroke: var(--line);
-      stroke-dasharray: 3 3;
+      stroke: var(--surface-2);
     }
     .line {
       fill: none;
-      stroke: var(--accent);
+      stroke: var(--ink);
       stroke-width: 2.5;
       stroke-linejoin: round;
+      stroke-linecap: round;
     }
     .dot {
       fill: var(--surface);
-      stroke: var(--accent);
-      stroke-width: 2;
+      stroke: var(--ink);
+      stroke-width: 2.5;
+    }
+    .dot.last {
+      fill: var(--ink);
     }
   `,
 })
