@@ -1,0 +1,47 @@
+:host {
+  display: flex;
+  min-height: 100dvh;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+}
+
+.login {
+  width: 100%;
+  max-width: 360px;
+  padding: 28px 24px;
+  align-items: stretch;
+}
+
+h1 {
+  margin: 0 0 8px;
+  text-align: center;
+  font-family: var(--font-num);
+  font-size: 30px;
+}
+
+.logo {
+  align-self: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  background: var(--ink);
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  padding: 12px;
+
+  span {
+    border-radius: 999px;
+    background: var(--bg);
+
+    &.dim {
+      opacity: 0.35;
+    }
+  }
+}
+
+.error {
+  min-height: 1.4em;
+  margin: 0;
+}

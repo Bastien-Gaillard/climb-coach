@@ -119,7 +119,7 @@ export function gradeLabel(gym: Gym | undefined, style: Style, grade: string): s
 }
 
 /** Cotations écrites « [6B+] » par le modèle : remplacées par le niveau de la salle. */
-const BRACKETED_GRADE = /\[([^\[\]]{1,6})\]/g;
+const BRACKETED_GRADE = /\[([^[\]]{1,6})\]/g;
 
 /** « 4 blocs en [6A] » → « 4 blocs en bleu (6A) », ou « 4 blocs en 6A » sans salle. */
 export function labelGrades(text: string, gym: Gym | undefined): string {

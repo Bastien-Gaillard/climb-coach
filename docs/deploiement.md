@@ -99,3 +99,28 @@ Restaurer une sauvegarde :
 gunzip -c backups/climbcoach-AAAAMMJJ-HHMM.sql.gz | \
   docker compose -f docker-compose.prod.yml --env-file .env.prod exec -T db psql -U climb -d climbcoach
 ```
+
+## 6. Comptes
+
+Chaque compte a ses propres séances, son historique et ses séances générées. Les salles
+sont partagées entre tous les comptes. Connexion par simple identifiant, sans mot de passe :
+c'est Tailscale qui limite l'accès à l'appli.
+
+Les comptes `kuzimu` et `tophe` sont créés par la migration `0002_users`, et toutes les
+données qui existaient avant sont rattachées à `kuzimu`. Pour en ajouter un :
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env.prod exec api node dist/db/create-user.js <nom>
+```
+
+### Donner l'accès à quelqu'un
+
+1. La personne installe Tailscale sur son téléphone et crée **son propre** compte Tailscale.
+2. Dans ta console Tailscale, page **Machines** : menu « … » de `climb-coach` → **Share** →
+   invitation par email.
+3. Elle accepte l'invitation : elle ne voit que la machine `climb-coach`, rien d'autre de ton réseau.
+4. Elle ouvre `https://climb-coach.<ton-tailnet>.ts.net` (l'adresse complète, comme toi) et se
+   connecte avec son identifiant.
+
+Si internet ne marche plus sur son téléphone avec Tailscale activé : Paramètres Android →
+**DNS privé** → **Automatique**.

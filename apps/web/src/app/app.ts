@@ -1,7 +1,8 @@
-import { Component, inject } from '@angular/core';
+import { Component, computed, inject } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { filter, map } from 'rxjs';
+import { AuthService } from './core/auth.service';
 import { Icon } from './shared/icon';
 
 /** Écrans plein écran sur mobile : ils ont leur propre barre d'actions en bas. */
@@ -15,12 +16,18 @@ const IMMERSIVE = ['/seance', '/seance-en-cours'];
 })
 export class App {
   private readonly router = inject(Router);
+  protected readonly auth = inject(AuthService);
 
-  protected readonly immersive = toSignal(
+  private readonly path = toSignal(
     this.router.events.pipe(
       filter((e) => e instanceof NavigationEnd),
-      map((e) => IMMERSIVE.some((p) => e.urlAfterRedirects.split('?')[0] === p)),
+      map((e) => e.urlAfterRedirects.split('?')[0]),
     ),
-    { initialValue: false },
+    { initialValue: '' },
   );
+
+  /** Écran de connexion : ni navigation ni compte affichés. */
+  protected readonly bare = computed(() => this.path() === '/connexion');
+
+  protected readonly immersive = computed(() => IMMERSIVE.includes(this.path()));
 }

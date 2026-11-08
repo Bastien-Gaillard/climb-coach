@@ -19,6 +19,7 @@ export function session(
     focus: 'endurance',
     fatigue: 3,
     notes: null,
+    userId: 'u1',
     createdAt: now,
     climbs: climbList.map((c, i) => ({
       id: `${id}-c${i}`,

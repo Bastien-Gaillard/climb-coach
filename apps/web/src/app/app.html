@@ -1,3 +1,6 @@
+@if (bare()) {
+<router-outlet />
+} @else {
 <div class="shell" [class.immersive]="immersive()">
   <aside class="side">
     <a routerLink="/" class="brand" aria-label="climb-coach, accueil">
@@ -13,7 +16,12 @@
       <a routerLink="/generer" routerLinkActive="active" ariaCurrentWhenActive="page" class="gen">
         <app-icon name="generate" />Générer
       </a>
-      <a routerLink="/historique" routerLinkActive="active" ariaCurrentWhenActive="page" class="hist">
+      <a
+        routerLink="/historique"
+        routerLinkActive="active"
+        ariaCurrentWhenActive="page"
+        class="hist"
+      >
         <app-icon name="history" />Historique
       </a>
       <a routerLink="/seance" routerLinkActive="active" ariaCurrentWhenActive="page" class="fab">
@@ -23,13 +31,30 @@
       <a routerLink="/salles" routerLinkActive="active" ariaCurrentWhenActive="page" class="gyms">
         <app-icon name="gym" />Salles
       </a>
-      <a routerLink="/convertisseur" routerLinkActive="active" ariaCurrentWhenActive="page" class="conv">
+      <a
+        routerLink="/convertisseur"
+        routerLinkActive="active"
+        ariaCurrentWhenActive="page"
+        class="conv"
+      >
         <app-icon name="convert" />Convertir
       </a>
     </nav>
+
+    <div class="account side-account">
+      <app-icon name="user" [size]="20" />
+      <span class="who">{{ auth.username() }}</span>
+      <button type="button" class="ghost switch" (click)="auth.logout()">Changer</button>
+    </div>
   </aside>
 
   <main>
+    <div class="account top-account">
+      <app-icon name="user" [size]="16" />
+      <span class="who">{{ auth.username() }}</span>
+      <button type="button" class="ghost switch" (click)="auth.logout()">Changer de compte</button>
+    </div>
     <router-outlet />
   </main>
 </div>
+}

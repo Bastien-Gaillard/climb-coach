@@ -1,5 +1,7 @@
 import { Body, Controller, Get, Post } from '@nestjs/common';
 import { z } from 'zod';
+import { CurrentUser } from '../auth/auth.decorators';
+import type { User } from '../auth/users.service';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { PlansService } from './plans.service';
 
@@ -15,13 +17,14 @@ export class PlansController {
 
   @Post('generate')
   generate(
+    @CurrentUser() user: User,
     @Body(new ZodValidationPipe(GeneratePlanSchema)) body: z.infer<typeof GeneratePlanSchema>,
   ) {
-    return this.plans.generate(body.availableMinutes, body.gymId);
+    return this.plans.generate(user.id, body.availableMinutes, body.gymId);
   }
 
   @Get()
-  recent() {
-    return this.plans.recent();
+  recent(@CurrentUser() user: User) {
+    return this.plans.recent(user.id);
   }
 }

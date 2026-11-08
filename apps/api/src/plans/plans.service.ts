@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { desc } from 'drizzle-orm';
+import { desc, eq } from 'drizzle-orm';
 import { Database, DB } from '../db/db.module';
 import { generatedPlans } from '../db/schema';
 import { GymsService } from '../gyms/gyms.service';
@@ -39,9 +39,13 @@ export class PlansService {
   ) {}
 
   /** Essaie Mistral, retombe sur les règles si l'appel ou la réponse pose problème. */
-  async generate(availableMinutes: number, gymId?: string): Promise<GeneratedPlanResult> {
+  async generate(
+    userId: string,
+    availableMinutes: number,
+    gymId?: string,
+  ): Promise<GeneratedPlanResult> {
     const [history, gym] = await Promise.all([
-      this.sessions.findRecent(10),
+      this.sessions.findRecent(userId, 10),
       gymId ? this.gyms.findOne(gymId) : undefined,
     ]);
     const ctx: GeneratorContext = { availableMinutes, now: this.clock(), history };
@@ -65,7 +69,7 @@ export class PlansService {
 
     const [saved] = await this.db
       .insert(generatedPlans)
-      .values({ availableMinutes, source, plan })
+      .values({ userId, availableMinutes, source, plan })
       .returning();
 
     return {
@@ -79,8 +83,9 @@ export class PlansService {
     };
   }
 
-  async recent(limit = 10) {
+  async recent(userId: string, limit = 10) {
     return this.db.query.generatedPlans.findMany({
+      where: eq(generatedPlans.userId, userId),
       orderBy: [desc(generatedPlans.createdAt)],
       limit,
     });

@@ -13,6 +13,13 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 
+/** Comptes de l'appli : identification par nom, sans mot de passe (accès déjà limité par Tailscale). */
+export const users = pgTable('users', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  username: text('username').notNull().unique(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const sessionFocus = pgEnum('session_focus', ['strength', 'endurance', 'technique']);
 export const climbStyle = pgEnum('climb_style', ['boulder', 'route']);
 
@@ -20,6 +27,9 @@ export const sessions = pgTable(
   'sessions',
   {
     id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
     date: timestamp('date', { withTimezone: true }).notNull(),
     durationMinutes: integer('duration_minutes').notNull(),
     focus: sessionFocus('focus').notNull(),
@@ -28,7 +38,10 @@ export const sessions = pgTable(
     notes: text('notes'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index('sessions_date_idx').on(t.date)],
+  (t) => [
+    index('sessions_date_idx').on(t.date),
+    index('sessions_user_date_idx').on(t.userId, t.date),
+  ],
 );
 
 export const climbs = pgTable('climbs', {
@@ -68,6 +81,9 @@ export const gyms = pgTable('gyms', {
 
 export const generatedPlans = pgTable('generated_plans', {
   id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
   availableMinutes: integer('available_minutes').notNull(),
   source: text('source', { enum: ['mistral', 'rules'] }).notNull(),
   plan: jsonb('plan').notNull(),

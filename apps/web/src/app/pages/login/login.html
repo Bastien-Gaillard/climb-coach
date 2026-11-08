@@ -1,0 +1,29 @@
+<form class="card stack login" (ngSubmit)="submit()" novalidate>
+  <span class="logo" aria-hidden="true">
+    @for (i of [0, 1, 2, 3, 4, 5, 6, 7, 8]; track i) {
+    <span [class.dim]="i % 2"></span>
+    }
+  </span>
+  <h1>climb-coach</h1>
+
+  <label>
+    Identifiant
+    <input
+      name="username"
+      [(ngModel)]="username"
+      (ngModelChange)="error.set(null)"
+      autocomplete="username"
+      autocapitalize="none"
+      autocorrect="off"
+      spellcheck="false"
+      enterkeyhint="go"
+      [attr.aria-invalid]="error() ? true : null"
+      aria-describedby="login-error"
+    />
+  </label>
+  <p id="login-error" class="error small" role="alert">{{ error() }}</p>
+
+  <button type="submit" class="primary big" [disabled]="loading()">
+    {{ loading() ? 'Connexion…' : 'Se connecter' }}
+  </button>
+</form>

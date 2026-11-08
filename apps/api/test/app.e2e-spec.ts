@@ -39,7 +39,9 @@ describe('API (e2e)', () => {
     await app.close();
   });
 
-  const http = () => request(app.getHttpServer());
+  /** Requêtes au nom d'un compte (kuzimu par défaut), via l'en-tête X-User. */
+  const http = (user = 'kuzimu') => request.agent(app.getHttpServer()).set('X-User', user);
+  const anonymous = () => request(app.getHttpServer());
 
   /** Crée une salle d'exemple via l'API et renvoie son id. */
   const createGym = async (exampleId: string) => {
@@ -48,7 +50,55 @@ describe('API (e2e)', () => {
     return res.body.id as string;
   };
 
-  it('GET /api/health', () => http().get('/api/health').expect(200, { status: 'ok' }));
+  it('GET /api/health', () => anonymous().get('/api/health').expect(200, { status: 'ok' }));
+
+  describe('comptes', () => {
+    const session = {
+      date: '2025-11-27T19:00:00Z',
+      durationMinutes: 60,
+      focus: 'technique',
+      fatigue: 2,
+      climbs: [{ style: 'boulder', grade: '6A', sent: true }],
+    };
+
+    it('connecte un compte existant, sans tenir compte de la casse', async () => {
+      const res = await anonymous()
+        .post('/api/auth/login')
+        .send({ username: ' Kuzimu ' })
+        .expect(200);
+      expect(res.body).toEqual({ id: expect.any(String), username: 'kuzimu' });
+      const me = await http('tophe').get('/api/auth/me').expect(200);
+      expect(me.body.username).toBe('tophe');
+    });
+
+    it('refuse un compte inconnu', async () => {
+      await anonymous().post('/api/auth/login').send({ username: 'inconnu' }).expect(401);
+      await http('inconnu').get('/api/sessions').expect(401);
+    });
+
+    it('refuse les requêtes sans compte', async () => {
+      await anonymous().get('/api/sessions').expect(401);
+      await anonymous().get('/api/gyms').expect(401);
+    });
+
+    it('sépare les séances de chaque compte', async () => {
+      const { body: mine } = await http('kuzimu').post('/api/sessions').send(session).expect(201);
+
+      expect((await http('kuzimu').get('/api/sessions').expect(200)).body).toHaveLength(1);
+      expect((await http('tophe').get('/api/sessions').expect(200)).body).toHaveLength(0);
+      expect((await http('tophe').get('/api/sessions/stats/progression').expect(200)).body).toEqual(
+        [],
+      );
+      await http('tophe').get(`/api/sessions/${mine.id}`).expect(404);
+      await http('tophe').delete(`/api/sessions/${mine.id}`).expect(404);
+      await http('kuzimu').get(`/api/sessions/${mine.id}`).expect(200);
+    });
+
+    it('partage les salles entre les comptes', async () => {
+      await createGym('alpha-bloc');
+      expect((await http('tophe').get('/api/gyms').expect(200)).body).toHaveLength(1);
+    });
+  });
 
   describe('salles', () => {
     const body = {

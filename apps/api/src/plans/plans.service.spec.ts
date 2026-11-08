@@ -41,18 +41,20 @@ function setup({ enabled, mistral }: { enabled: boolean; mistral?: () => Promise
   } as unknown as GymsService;
 
   const service = new PlansService(db as never, () => now, sessions, mistralGen, rules, gyms);
-  return { service, inserted, mistralGen, rulesSpy };
+  return { service, inserted, mistralGen, rulesSpy, sessions };
 }
 
 describe('PlansService.generate', () => {
   it('utilise Mistral quand il répond correctement', async () => {
     const { service, rulesSpy, inserted } = setup({ enabled: true });
-    const result = await service.generate(60);
+    const result = await service.generate('u1', 60);
 
     expect(result).toMatchObject({ source: 'mistral', plan: mistralPlan });
     expect(result.fallbackReason).toBeUndefined();
     expect(rulesSpy).not.toHaveBeenCalled();
-    expect(inserted).toEqual([{ availableMinutes: 60, source: 'mistral', plan: mistralPlan }]);
+    expect(inserted).toEqual([
+      { userId: 'u1', availableMinutes: 60, source: 'mistral', plan: mistralPlan },
+    ]);
   });
 
   it('retombe sur les règles si Mistral échoue, en gardant la raison', async () => {
@@ -62,7 +64,7 @@ describe('PlansService.generate', () => {
         throw new MistralError('Timeout');
       },
     });
-    const result = await service.generate(60);
+    const result = await service.generate('u1', 60);
 
     expect(result.source).toBe('rules');
     expect(result.fallbackReason).toBe('Timeout');
@@ -71,16 +73,17 @@ describe('PlansService.generate', () => {
 
   it('n’appelle pas Mistral sans clé', async () => {
     const { service, mistralGen } = setup({ enabled: false });
-    const result = await service.generate(45);
+    const result = await service.generate('u1', 45);
 
     expect(result.source).toBe('rules');
     expect(result.fallbackReason).toBeUndefined();
     expect(mistralGen.generate).not.toHaveBeenCalled();
   });
 
-  it('passe l’historique et l’heure au générateur', async () => {
-    const { service, mistralGen } = setup({ enabled: true });
-    await service.generate(90);
+  it('passe l’historique du compte et l’heure au générateur', async () => {
+    const { service, mistralGen, sessions } = setup({ enabled: true });
+    await service.generate('u1', 90);
+    expect(sessions.findRecent).toHaveBeenCalledWith('u1', 10);
     expect(mistralGen.generate).toHaveBeenCalledWith({ availableMinutes: 90, now, history: [] });
   });
 
@@ -93,7 +96,7 @@ describe('PlansService.generate', () => {
       ],
     };
     const { service, mistralGen } = setup({ enabled: true, mistral: async () => withTarget });
-    const result = await service.generate(60, 'alpha-bloc');
+    const result = await service.generate('u1', 60, 'alpha-bloc');
 
     expect(mistralGen.generate).toHaveBeenCalledWith(
       expect.objectContaining({ gym: expect.objectContaining({ id: 'alpha-bloc' }) }),

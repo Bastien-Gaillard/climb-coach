@@ -97,6 +97,38 @@ nav {
   }
 }
 
+// Compte connecté : petite ligne en haut sur mobile, bas de la barre latérale sur desktop
+.account {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 14px;
+
+  .who {
+    font-weight: 600;
+    color: var(--ink-2);
+  }
+
+  .switch {
+    min-height: 0;
+    height: auto;
+    padding: 4px 8px;
+    font-size: 13px;
+    color: var(--muted);
+    text-decoration: underline;
+  }
+}
+
+.top-account {
+  justify-content: flex-end;
+  margin: -8px 0 8px;
+}
+
+.side-account {
+  display: none;
+}
+
 // Saisie et séance en cours : l'écran prend toute la hauteur
 .immersive {
   nav {
@@ -105,6 +137,10 @@ nav {
 
   main {
     padding-bottom: 0;
+  }
+
+  .top-account {
+    display: none;
   }
 }
 
@@ -127,6 +163,22 @@ nav {
 
   .brand {
     display: flex;
+  }
+
+  .side {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .side-account {
+    display: flex;
+    margin-top: auto;
+    padding: 12px 10px 0;
+    border-top: 1px solid var(--line);
+  }
+
+  .top-account {
+    display: none;
   }
 
   nav,

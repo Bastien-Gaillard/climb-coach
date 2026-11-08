@@ -9,6 +9,8 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
+import { CurrentUser } from '../auth/auth.decorators';
+import type { User } from '../auth/users.service';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { CreateSessionDto, CreateSessionSchema, ListSessionsQuerySchema } from './session.dto';
 import { SessionsService } from './sessions.service';
@@ -18,28 +20,34 @@ export class SessionsController {
   constructor(private readonly sessions: SessionsService) {}
 
   @Get()
-  list(@Query(new ZodValidationPipe(ListSessionsQuerySchema)) query: { limit: number }) {
-    return this.sessions.findRecent(query.limit);
+  list(
+    @CurrentUser() user: User,
+    @Query(new ZodValidationPipe(ListSessionsQuerySchema)) query: { limit: number },
+  ) {
+    return this.sessions.findRecent(user.id, query.limit);
   }
 
   @Get('stats/progression')
-  progression() {
-    return this.sessions.progression();
+  progression(@CurrentUser() user: User) {
+    return this.sessions.progression(user.id);
   }
 
   @Get(':id')
-  get(@Param('id', ParseUUIDPipe) id: string) {
-    return this.sessions.findOne(id);
+  get(@CurrentUser() user: User, @Param('id', ParseUUIDPipe) id: string) {
+    return this.sessions.findOne(user.id, id);
   }
 
   @Post()
-  create(@Body(new ZodValidationPipe(CreateSessionSchema)) dto: CreateSessionDto) {
-    return this.sessions.create(dto);
+  create(
+    @CurrentUser() user: User,
+    @Body(new ZodValidationPipe(CreateSessionSchema)) dto: CreateSessionDto,
+  ) {
+    return this.sessions.create(user.id, dto);
   }
 
   @Delete(':id')
   @HttpCode(204)
-  remove(@Param('id', ParseUUIDPipe) id: string) {
-    return this.sessions.remove(id);
+  remove(@CurrentUser() user: User, @Param('id', ParseUUIDPipe) id: string) {
+    return this.sessions.remove(user.id, id);
   }
 }

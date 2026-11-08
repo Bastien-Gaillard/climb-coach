@@ -3,11 +3,12 @@
  * Usage : pnpm --filter @climb-coach/api seed
  */
 import 'dotenv/config';
+import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import { normalizeClimb } from '../sessions/climb-normalizer';
 import { ClimbInputSchema } from '../sessions/session.dto';
-import { climbs, generatedPlans, sessions } from './schema';
+import { climbs, generatedPlans, sessions, users } from './schema';
 
 type Focus = 'strength' | 'endurance' | 'technique';
 
@@ -173,8 +174,16 @@ async function main() {
   const pool = new Pool({ connectionString: process.env.DATABASE_URL });
   const db = drizzle(pool);
 
-  await db.delete(generatedPlans);
-  await db.delete(sessions);
+  // Le jeu de démo remplace les séances d'un seul compte (kuzimu par défaut)
+  const username = process.env.SEED_USER ?? 'kuzimu';
+  const [user] = await db
+    .insert(users)
+    .values({ username })
+    .onConflictDoUpdate({ target: users.username, set: { username } })
+    .returning({ id: users.id });
+
+  await db.delete(generatedPlans).where(eq(generatedPlans.userId, user.id));
+  await db.delete(sessions).where(eq(sessions.userId, user.id));
 
   for (const s of PLAN) {
     const date = new Date();
@@ -183,6 +192,7 @@ async function main() {
     const [row] = await db
       .insert(sessions)
       .values({
+        userId: user.id,
         date,
         durationMinutes: 90,
         focus: s.focus,

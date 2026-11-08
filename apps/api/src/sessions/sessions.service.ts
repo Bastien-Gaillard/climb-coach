@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { desc, eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import { Database, DB } from '../db/db.module';
 import { GymsService } from '../gyms/gyms.service';
 import { climbs, sessions } from '../db/schema';
@@ -25,7 +25,7 @@ export class SessionsService {
     private readonly gyms: GymsService,
   ) {}
 
-  async create(dto: CreateSessionDto): Promise<SessionWithClimbs> {
+  async create(userId: string, dto: CreateSessionDto): Promise<SessionWithClimbs> {
     const gymIds = [...new Set(dto.climbs.flatMap((c) => (c.gymId ? [c.gymId] : [])))];
     const gyms = await this.gyms.findMany(gymIds);
     const normalized = dto.climbs.map((c) => normalizeClimb(c, gyms));
@@ -34,6 +34,7 @@ export class SessionsService {
       const [session] = await tx
         .insert(sessions)
         .values({
+          userId,
           date: dto.date,
           durationMinutes: dto.durationMinutes,
           focus: dto.focus,
@@ -48,21 +49,23 @@ export class SessionsService {
       return session.id;
     });
 
-    return this.findOne(id);
+    return this.findOne(userId, id);
   }
 
-  /** Séances les plus récentes d'abord. */
-  findRecent(limit = 20): Promise<SessionWithClimbs[]> {
+  /** Séances du compte, les plus récentes d'abord. */
+  findRecent(userId: string, limit = 20): Promise<SessionWithClimbs[]> {
     return this.db.query.sessions.findMany({
+      where: eq(sessions.userId, userId),
       with: { climbs: true },
       orderBy: [desc(sessions.date)],
       limit,
     });
   }
 
-  async findOne(id: string): Promise<SessionWithClimbs> {
+  /** Une séance d'un autre compte est traitée comme introuvable. */
+  async findOne(userId: string, id: string): Promise<SessionWithClimbs> {
     const session = await this.db.query.sessions.findFirst({
-      where: eq(sessions.id, id),
+      where: and(eq(sessions.id, id), eq(sessions.userId, userId)),
       with: { climbs: true },
     });
     if (!session) throw new NotFoundException(`Séance ${id} introuvable`);
@@ -70,8 +73,8 @@ export class SessionsService {
   }
 
   /** Meilleure réussite par séance et par style, du plus ancien au plus récent (pour le graphique). */
-  async progression(limit = 50): Promise<ProgressionPoint[]> {
-    const recent = await this.findRecent(limit);
+  async progression(userId: string, limit = 50): Promise<ProgressionPoint[]> {
+    const recent = await this.findRecent(userId, limit);
     return recent
       .slice()
       .reverse()
@@ -87,8 +90,11 @@ export class SessionsService {
       );
   }
 
-  async remove(id: string): Promise<void> {
-    const deleted = await this.db.delete(sessions).where(eq(sessions.id, id)).returning();
+  async remove(userId: string, id: string): Promise<void> {
+    const deleted = await this.db
+      .delete(sessions)
+      .where(and(eq(sessions.id, id), eq(sessions.userId, userId)))
+      .returning();
     if (deleted.length === 0) throw new NotFoundException(`Séance ${id} introuvable`);
   }
 }
