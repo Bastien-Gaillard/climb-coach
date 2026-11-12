@@ -44,6 +44,11 @@ export class ApiService {
     return this.http.get<Schedule>(`${this.base}/plans/schedule`, { params: { days } });
   }
 
+  /** Réglages du compte connecté. */
+  updateSettings(body: { sessionsPerWeek: number }): Observable<unknown> {
+    return this.http.patch(`${this.base}/auth/me`, body);
+  }
+
   listGyms(): Observable<Gym[]> {
     return this.http.get<Gym[]>(`${this.base}/gyms`);
   }

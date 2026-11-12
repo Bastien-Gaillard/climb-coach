@@ -7,9 +7,10 @@ import { SessionsService } from '../sessions/sessions.service';
 import { GeneratorContext } from './generator';
 import { withGymColors } from './gym-colors';
 import { MistralGenerator } from './mistral.generator';
+import { MistralScheduleAdvisor } from './mistral.schedule';
 import { Plan } from './plan.schema';
 import { RuleBasedGenerator } from './rule-based.generator';
-import { buildSchedule, Schedule } from './schedule';
+import { buildSchedule, localDay, NextSessionOverride, Schedule } from './schedule';
 
 export const CLOCK = Symbol('CLOCK');
 export type Clock = () => Date;
@@ -26,9 +27,21 @@ export interface GeneratedPlanResult {
   createdAt: Date;
 }
 
+/** Un échec de Mistral n'est retenté qu'au bout de ce délai (évite d'attendre le timeout à chaque page). */
+const FAILURE_RETRY_MS = 10 * 60 * 1000;
+
+interface CachedAdvice {
+  key: string;
+  override?: NextSessionOverride;
+  fallbackReason?: string;
+  at: number;
+}
+
 @Injectable()
 export class PlansService {
   private readonly logger = new Logger(PlansService.name);
+  /** Dernier avis de Mistral sur le planning, par compte. */
+  private readonly adviceCache = new Map<string, CachedAdvice>();
 
   constructor(
     @Inject(DB) private readonly db: Database,
@@ -37,6 +50,7 @@ export class PlansService {
     private readonly mistral: MistralGenerator,
     private readonly rules: RuleBasedGenerator,
     private readonly gyms: GymsService,
+    private readonly advisor: MistralScheduleAdvisor,
   ) {}
 
   /** Essaie Mistral, retombe sur les règles si l'appel ou la réponse pose problème. */
@@ -84,10 +98,46 @@ export class PlansService {
     };
   }
 
-  /** Prochaines séances conseillées (jour, type, durée), recalculées depuis la dernière séance. */
-  async schedule(userId: string, horizonDays = 7): Promise<Schedule> {
+  /**
+   * Prochaines séances conseillées. Les règles proposent, puis Mistral relit les notes et
+   * l'historique pour décider de la prochaine séance (ex : blessure → repos plus long) ;
+   * la suite du cycle vient des règles. L'avis est gardé tant qu'aucune séance ne change,
+   * que le rythme est le même et que le jour n'a pas changé.
+   */
+  async schedule(userId: string, horizonDays = 7, sessionsPerWeek?: number): Promise<Schedule> {
+    const now = this.clock();
     const history = await this.sessions.findRecent(userId, 5);
-    return buildSchedule(history, this.clock(), horizonDays);
+    const base = buildSchedule(history, now, { horizonDays, sessionsPerWeek });
+    if (!this.advisor.enabled || history.length === 0) return base;
+
+    const key = [
+      localDay(now),
+      base.sessionsPerWeek,
+      ...history.map((s) => `${s.id}:${s.fatigue}:${s.durationMinutes}:${s.notes ?? ''}`),
+    ].join('|');
+    let advice = this.adviceCache.get(userId);
+    const stale =
+      !advice ||
+      advice.key !== key ||
+      (!advice.override && now.getTime() - advice.at > FAILURE_RETRY_MS);
+
+    if (stale) {
+      try {
+        advice = { key, at: now.getTime(), override: await this.advisor.adviseNext(history, base) };
+      } catch (e) {
+        const reason = (e as Error).message;
+        this.logger.warn(`Mistral indisponible pour le planning, règles seules : ${reason}`);
+        advice = { key, at: now.getTime(), fallbackReason: reason };
+      }
+      this.adviceCache.set(userId, advice);
+    }
+
+    if (!advice!.override) return { ...base, fallbackReason: advice!.fallbackReason };
+    return buildSchedule(history, now, {
+      horizonDays,
+      sessionsPerWeek,
+      override: advice!.override,
+    });
   }
 
   async recent(userId: string, limit = 10) {

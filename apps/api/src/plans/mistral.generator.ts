@@ -25,7 +25,7 @@ export function extractJson(content: string): string {
   return start !== -1 && end > start ? content.slice(start, end + 1) : content;
 }
 
-interface ChatMessage {
+export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
 }
@@ -196,13 +196,13 @@ export class MistralGenerator implements PlanGenerator {
       { role: 'system', content: SYSTEM_PROMPT },
       { role: 'user', content: this.buildUserPrompt(ctx) },
     ];
-    const content = await this.call(messages);
+    const content = await this.chat(messages);
     try {
       return this.parse(content, ctx.availableMinutes);
     } catch (e) {
       if (!(e instanceof MistralError)) throw e;
       // Une seule relance : on renvoie l'erreur au modèle pour qu'il corrige sa réponse.
-      const retry = await this.call([
+      const retry = await this.chat([
         ...messages,
         { role: 'assistant', content },
         {
@@ -280,7 +280,8 @@ export class MistralGenerator implements PlanGenerator {
     return plan;
   }
 
-  private async call(messages: ChatMessage[]): Promise<string> {
+  /** Appel brut à l'API de chat de Mistral (réponse JSON attendue). Partagé avec le planning. */
+  async chat(messages: ChatMessage[]): Promise<string> {
     const baseUrl = this.config.get('MISTRAL_BASE_URL', { infer: true });
     const controller = new AbortController();
     const timeout = setTimeout(

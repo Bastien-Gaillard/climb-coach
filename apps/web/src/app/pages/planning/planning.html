@@ -1,5 +1,5 @@
 <header class="hero dots">
-  <span class="overline">7 prochains jours</span>
+  <span class="overline">{{ days().length || 7 }} prochains jours</span>
   <h1>Planning</h1>
 </header>
 
@@ -7,11 +7,34 @@
 <p class="error">{{ e }}</p>
 } @else if (!schedule()) {
 <p class="muted">Chargement…</p>
-} @else { @if (schedule()!.basedOn; as b) {
+} @else {
+<section class="rhythm">
+  <h2 class="overline" id="rhythm-label">Séances par semaine</h2>
+  <div class="seg" role="radiogroup" aria-labelledby="rhythm-label">
+    @for (n of rhythms; track n) {
+    <button
+      type="button"
+      role="radio"
+      class="num"
+      [attr.aria-checked]="schedule()!.sessionsPerWeek === n"
+      [disabled]="saving()"
+      (click)="setRhythm(n)"
+    >
+      {{ n }}
+    </button>
+    }
+  </div>
+</section>
+
+@if (schedule()!.basedOn; as b) {
 <p class="muted small based-on">
   Calculé depuis ta dernière séance : {{ focusLabel[b.focus].toLowerCase() }}, {{
   duration(b.durationMinutes) }}, le {{ dayDate(b.date) | date: 'EEEE d MMMM' }} · fatigue {{
   b.fatigue }}/5. Il se met à jour à chaque séance enregistrée.
+</p>
+} @if (schedule()!.fallbackReason; as r) {
+<p class="muted small">
+  Mistral n'a pas pu relire tes notes ({{ r }}) : planning calculé par les règles seules.
 </p>
 }
 
@@ -29,6 +52,13 @@
         <strong>{{ focusLabel[s.focus] }}</strong>
         @if (s.intensity === 'light') {
         <span class="badge">Légère</span>
+        } @if (isAdvised(s)) {
+        <span
+          class="badge accent ai"
+          title="Décidée par Mistral d'après tes notes et ton historique"
+        >
+          <app-icon name="generate" [size]="12" [stroke]="2.6" />IA
+        </span>
         }
         <span class="num mins">{{ duration(s.durationMinutes) }}</span>
       </div>

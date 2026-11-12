@@ -105,6 +105,12 @@ export interface PlannedSession {
 
 export interface Schedule {
   today: string;
+  /** Qui a décidé de la prochaine séance : Mistral (d'après les notes) ou les règles. */
+  source: 'mistral' | 'rules';
+  /** Pourquoi Mistral n'a pas été utilisé, s'il était configuré. */
+  fallbackReason?: string;
+  /** Rythme du compte (séances par semaine), qui espace les séances. */
+  sessionsPerWeek: number;
   basedOn: { date: string; focus: Focus; durationMinutes: number; fatigue: number } | null;
   sessions: PlannedSession[];
 }

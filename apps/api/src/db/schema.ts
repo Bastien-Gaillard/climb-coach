@@ -17,6 +17,8 @@ import {
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
   username: text('username').notNull().unique(),
+  /** Rythme visé, utilisé pour espacer les séances du planning. */
+  sessionsPerWeek: smallint('sessions_per_week').notNull().default(3),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 

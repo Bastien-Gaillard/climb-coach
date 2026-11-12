@@ -13,6 +13,9 @@ export const IDEAL_MINUTES: Record<Focus, number> = {
   technique: 120,
 };
 
+/** Rythme pour lequel les écarts ci-dessous sont pensés ; les autres rythmes les mettent à l'échelle. */
+export const DEFAULT_SESSIONS_PER_WEEK = 3;
+
 /** Jours de récupération nécessaires APRÈS une séance de ce type. */
 const RECOVERY_DAYS: Record<Focus, number> = { strength: 2, endurance: 2, technique: 1 };
 /** Jours de repos voulus AVANT une séance de ce type, pour y arriver frais. */
@@ -41,8 +44,23 @@ export interface PlannedSession {
   reason: string;
 }
 
+/** Prochaine séance décidée par Mistral, qui remplace celle des règles. */
+export interface NextSessionOverride {
+  inDays: number;
+  focus: Focus;
+  durationMinutes: number;
+  intensity: 'light' | 'normal';
+  reason: string;
+}
+
 export interface Schedule {
   today: string;
+  /** Qui a décidé de la prochaine séance : Mistral (d'après les notes) ou les règles seules. */
+  source: 'mistral' | 'rules';
+  /** Pourquoi Mistral n'a pas été utilisé, s'il était configuré. */
+  fallbackReason?: string;
+  /** Rythme du compte, utilisé pour espacer les séances. */
+  sessionsPerWeek: number;
   basedOn: {
     date: string;
     focus: Focus;
@@ -56,8 +74,17 @@ export interface Schedule {
  * Planning des prochaines séances, recalculé à partir de la dernière séance enregistrée :
  * type suivant dans la rotation, jours de récup selon l'effort, durée idéale par type.
  */
-export function buildSchedule(history: SessionWithClimbs[], now: Date, horizonDays = 7): Schedule {
+export function buildSchedule(
+  history: SessionWithClimbs[],
+  now: Date,
+  {
+    horizonDays = 7,
+    sessionsPerWeek = DEFAULT_SESSIONS_PER_WEEK,
+    override,
+  }: { horizonDays?: number; sessionsPerWeek?: number; override?: NextSessionOverride } = {},
+): Schedule {
   const today = localDay(now);
+  const perWeek = Math.min(7, Math.max(1, Math.round(sessionsPerWeek)));
   const last = history[0];
   const sessions: PlannedSession[] = [];
 
@@ -72,7 +99,13 @@ export function buildSchedule(history: SessionWithClimbs[], now: Date, horizonDa
         'Première séance : technique pour prendre ses repères',
       ),
     );
-    return { today, basedOn: null, sessions: extendCycle(sessions, today, horizonDays) };
+    return {
+      today,
+      source: 'rules',
+      sessionsPerWeek: perWeek,
+      basedOn: null,
+      sessions: extendCycle(sessions, today, horizonDays, perWeek, 0),
+    };
   }
 
   const lastDay = localDay(last.date);
@@ -81,13 +114,16 @@ export function buildSchedule(history: SessionWithClimbs[], now: Date, horizonDa
 
   let focus = ROTATION[last.focus];
   let intensity: PlannedSession['intensity'] = 'normal';
-  let gap = Math.max(RECOVERY_DAYS[last.focus], READINESS_DAYS[focus]);
+  const exact = ruleGap(last.focus, focus, perWeek);
+  let gap = Math.max(1, Math.round(exact));
+  let carry = exact - gap;
   const why: string[] = [];
 
   if (sinceLast >= LONG_BREAK_DAYS) {
     focus = 'technique';
     intensity = 'light';
     gap = sinceLast;
+    carry = 0;
     why.push(`${sinceLast} jours sans grimper : reprise en douceur dès aujourd’hui`);
   } else {
     why.push(
@@ -110,14 +146,34 @@ export function buildSchedule(history: SessionWithClimbs[], now: Date, horizonDa
   if (diffDays(today, day) < 0) {
     if (sinceLast < LONG_BREAK_DAYS) why.push('prévue plus tôt, à rattraper dès aujourd’hui');
     day = today;
+    carry = 0;
   }
 
-  sessions.push(planned(today, day, focus, minutesFor(focus, intensity), intensity, sentence(why)));
+  if (override) {
+    // Mistral a lu les notes : sa séance remplace celle des règles, la suite du cycle en découle
+    sessions.push(
+      planned(
+        today,
+        addDays(today, override.inDays),
+        override.focus,
+        override.durationMinutes,
+        override.intensity,
+        override.reason,
+      ),
+    );
+    carry = 0;
+  } else {
+    sessions.push(
+      planned(today, day, focus, minutesFor(focus, intensity), intensity, sentence(why)),
+    );
+  }
 
-  extendCycle(sessions, today, horizonDays);
+  extendCycle(sessions, today, horizonDays, perWeek, carry);
 
   return {
     today,
+    source: override ? 'mistral' : 'rules',
+    sessionsPerWeek: perWeek,
     basedOn: {
       date: lastDay,
       focus: last.focus,
@@ -133,11 +189,16 @@ function extendCycle(
   sessions: PlannedSession[],
   today: string,
   horizonDays: number,
+  perWeek: number,
+  carry: number,
 ): PlannedSession[] {
-  while (sessions.length < 10) {
+  while (sessions.length < 50) {
     const prev = sessions[sessions.length - 1];
     const next = ROTATION[prev.focus];
-    const gap = Math.max(RECOVERY_DAYS[prev.focus], READINESS_DAYS[next]);
+    // Le reste des arrondis est reporté : sur la durée, on tombe pile sur le rythme demandé
+    const exact = ruleGap(prev.focus, next, perWeek) + carry;
+    const gap = Math.max(1, Math.round(exact));
+    carry = exact - gap;
     const date = addDays(prev.date, gap);
     if (diffDays(today, date) >= horizonDays) break;
     const reason =
@@ -147,6 +208,17 @@ function extendCycle(
     sessions.push(planned(today, date, next, IDEAL_MINUTES[next], 'normal', sentence([reason])));
   }
   return sessions;
+}
+
+/**
+ * Écart (en jours, non arrondi) entre deux séances : le plus long entre la récup de la séance
+ * passée et le repos voulu avant la suivante, mis à l'échelle du rythme hebdomadaire.
+ * Avec 3 séances par semaine, le cycle force → endurance → technique dure 7 jours.
+ */
+function ruleGap(prev: Focus, next: Focus, perWeek: number): number {
+  return (
+    (Math.max(RECOVERY_DAYS[prev], READINESS_DAYS[next]) * DEFAULT_SESSIONS_PER_WEEK) / perWeek
+  );
 }
 
 function planned(

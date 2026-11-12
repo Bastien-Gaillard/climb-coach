@@ -113,7 +113,8 @@
 <section class="card advice" [class.later]="a.inDays > 0" data-testid="advice">
   <span class="overline">
     <app-icon name="calendar" [size]="14" [stroke]="2.4" />Conseillé · {{ relativeDay(a.inDays)
-    }}@if (a.inDays > 0) { ({{ dayDate(a.date) | date: 'EEEE' }}) }
+    }}@if (a.inDays > 0) { ({{ dayDate(a.date) | date: 'EEEE' }}) } @if (adviceSource() ===
+    'mistral') { · IA }
   </span>
   <p>
     <strong>{{ focusLabel[a.focus] }}</strong> ·

@@ -59,9 +59,43 @@ describe('buildSchedule', () => {
   });
 
   it('respecte l’horizon demandé', () => {
-    const s = buildSchedule([session(0, now, { focus: 'endurance' })], now, 14);
+    const s = buildSchedule([session(0, now, { focus: 'endurance' })], now, {
+      horizonDays: 14,
+    });
     expect(s.sessions.every((p) => p.inDays < 14)).toBe(true);
     expect(s.sessions.length).toBeGreaterThan(3);
+  });
+});
+
+describe('buildSchedule · rythme hebdomadaire', () => {
+  const count = (perWeek: number) =>
+    buildSchedule([session(0, now, { focus: 'endurance' })], now, {
+      horizonDays: 28,
+      sessionsPerWeek: perWeek,
+    }).sessions.length;
+
+  it('cale le nombre de séances sur le rythme demandé', () => {
+    // Sur 4 semaines : 4 × rythme, moins la séance d'aujourd'hui déjà faite
+    for (const perWeek of [1, 2, 3, 4, 5, 6]) {
+      expect(Math.abs(count(perWeek) - (4 * perWeek - 1))).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it('jamais deux séances planifiées le même jour', () => {
+    const s = buildSchedule([session(0, now, { focus: 'endurance' })], now, {
+      horizonDays: 14,
+      sessionsPerWeek: 6,
+    });
+    const days = s.sessions.map((p) => p.inDays);
+    expect(new Set(days).size).toBe(days.length);
+    expect(s.sessionsPerWeek).toBe(6);
+  });
+
+  it('à 2 séances par semaine, la technique arrive plus tard', () => {
+    const s = buildSchedule([session(0, now, { focus: 'endurance' })], now, {
+      sessionsPerWeek: 2,
+    });
+    expect(s.sessions[0]).toMatchObject({ focus: 'technique', inDays: 3 });
   });
 });
 

@@ -11,7 +11,7 @@ import {
   relativeDay,
   STYLE_LABEL,
 } from '../../core/labels';
-import { Gym, PlannedSession, Session } from '../../core/models';
+import { Gym, PlannedSession, Schedule, Session } from '../../core/models';
 import { PlanStore } from '../../core/plan.store';
 import { Figure } from '../../shared/figure';
 import { blockFigures } from '../../shared/figures';
@@ -53,6 +53,7 @@ export class GeneratePage implements OnInit {
   protected readonly last = signal<Session | null>(null);
   /** Prochaine séance conseillée par le planning (jour, type, durée idéale). */
   protected readonly advice = signal<PlannedSession | null>(null);
+  protected readonly adviceSource = signal<Schedule['source']>('rules');
   protected readonly durationLabel = durationLabel;
   protected readonly relativeDay = relativeDay;
   protected readonly dayDate = dayDate;
@@ -92,6 +93,7 @@ export class GeneratePage implements OnInit {
       next: (s) => {
         const next = s.sessions[0] ?? null;
         this.advice.set(next);
+        this.adviceSource.set(s.source);
         // Séance conseillée aujourd'hui : on part sur sa durée idéale
         if (next && next.inDays === 0 && !this.result()) this.useAdvice(next);
       },

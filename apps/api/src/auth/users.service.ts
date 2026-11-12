@@ -20,6 +20,16 @@ export class UsersService {
     return this.db.query.users.findFirst({ where: eq(users.username, username) });
   }
 
+  /** Réglages modifiables depuis l'appli. */
+  async updateSettings(id: string, settings: { sessionsPerWeek: number }): Promise<User> {
+    const [user] = await this.db
+      .update(users)
+      .set({ sessionsPerWeek: settings.sessionsPerWeek })
+      .where(eq(users.id, id))
+      .returning();
+    return user;
+  }
+
   async create(raw: string): Promise<User> {
     const username = normalizeUsername(raw);
     if (await this.findByUsername(username)) {

@@ -28,7 +28,13 @@ const response: GeneratedPlan = {
   },
 };
 
-const emptySchedule: Schedule = { today: '2026-11-12', basedOn: null, sessions: [] };
+const emptySchedule: Schedule = {
+  today: '2026-11-12',
+  source: 'rules',
+  sessionsPerWeek: 3,
+  basedOn: null,
+  sessions: [],
+};
 
 describe('GeneratePage', () => {
   let fixture: ComponentFixture<GeneratePage>;
@@ -216,6 +222,8 @@ describe('GeneratePage', () => {
     http.expectOne((r) => r.url === '/api/sessions').flush([]);
     flushSchedule({
       today: '2026-11-12',
+      source: 'rules',
+      sessionsPerWeek: 3,
       basedOn: null,
       sessions: [
         {

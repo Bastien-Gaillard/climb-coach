@@ -33,7 +33,7 @@ export class PlansController {
     @CurrentUser() user: User,
     @Query(new ZodValidationPipe(ScheduleQuerySchema)) query: z.infer<typeof ScheduleQuerySchema>,
   ) {
-    return this.plans.schedule(user.id, query.days);
+    return this.plans.schedule(user.id, query.days, user.sessionsPerWeek);
   }
 
   @Get()

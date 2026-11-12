@@ -1,0 +1,1 @@
+ALTER TABLE "users" ADD COLUMN "sessions_per_week" smallint DEFAULT 3 NOT NULL;
