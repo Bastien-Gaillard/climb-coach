@@ -5,7 +5,8 @@
 }
 
 .hero {
-  margin: -20px -16px 0;
+  // Pleine largeur, mais sous la ligne du compte (ne pas remonter dessus)
+  margin: 0 -16px;
   padding: 32px 20px 20px;
   display: flex;
   flex-direction: column;

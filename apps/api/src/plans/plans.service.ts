@@ -208,6 +208,11 @@ export class PlansService {
     this.adviceInFlight.set(userId, { key, done });
   }
 
+  /** État de Mistral (quota, débit, panne), partagé par la génération et le planning. */
+  aiStatus() {
+    return this.mistral.status;
+  }
+
   async recent(userId: string, limit = 10) {
     return this.db.query.generatedPlans.findMany({
       where: eq(generatedPlans.userId, userId),

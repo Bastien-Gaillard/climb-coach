@@ -38,7 +38,7 @@ Ton rôle : planifier ses séances des 4 prochaines semaines (28 jours, jour 0 =
 Ce que tu reçois :
 - la date du jour et le rythme visé (séances par semaine) ;
 - une proposition calculée par des règles fixes (rotation force → endurance → technique, jours de récup) ;
-- ses dernières séances : date, type, durée, fatigue ressentie (1 = frais, 5 = épuisé), blocs tentés et ses NOTES libres.
+- ses dernières séances : date, type, durée, fatigue ressentie (1 = frais, 5 = épuisé), blocs tentés et ses NOTES libres, avec sa durée habituelle.
 
 Rythme :
 - Vise le rythme demandé : N séances par semaine, donc environ 4 × N séances sur les 28 jours, réparties régulièrement. Ne planifie pas moins sans raison de santé, ni plus.
@@ -52,7 +52,10 @@ Ta valeur ajoutée : lire et interpréter les notes et l'historique, ce que les 
 - Blessure sérieuse (entorse, poulie qui a claqué, déchirure, choc, "grosse blessure", "très mal", avis médical) : au moins 7 jours de repos, souvent 10 à 21, reprise "light" en technique, pas de force avant au moins 2 semaines de reprise ; conseille de consulter un médecin ou un kiné.
 - Notes positives (en forme, frais, bien récupéré) : tu peux rapprocher la prochaine séance d'un jour.
 - La santé passe toujours avant le rythme.
-- Durée en minutes, par pas de 15 : force 45 à 75, endurance 60 à 105, technique 60 à 120 ; plus court si "light".
+Durée de chaque séance : c'est à toi de la choisir, en minutes (par pas de 15, entre 30 et 240).
+- Pars des durées réelles de ses dernières séances : c'est le temps qu'il a l'habitude de grimper. Ne raccourcis pas sans raison.
+- Ajuste selon la fatigue ressentie, les notes et le type de séance : une séance de force se fait sur moins de volume mais avec de longs repos, une endurance ou une technique peut durer plus longtemps.
+- Une séance "light" (reprise, gêne, fatigue) est plus courte que d'habitude.
 
 Le champ "reason" de chaque séance s'adresse au grimpeur (tutoiement), en une phrase courte et concrète (pourquoi ce jour et ce type).
 Le champ "summary" résume en 1 ou 2 phrases la logique du mois (et cite la note qui a motivé un changement, s'il y en a une).
@@ -91,9 +94,13 @@ export function buildScheduleUserPrompt(history: SessionWithClimbs[], base: Sche
     const climbs = s.climbs.map((c) => `${c.grade}${c.sent ? '' : ' (échec)'}`).join(', ');
     return `- ${dayLabel(day)} (il y a ${ago} j) : ${FOCUS_LABEL[s.focus]}, ${s.durationMinutes} min, fatigue ${s.fatigue}/5${climbs ? `, blocs : ${climbs}` : ''}, notes : ${s.notes?.trim() ? `« ${s.notes.trim()} »` : 'aucune'}`;
   });
+  const recent = history.slice(0, 5);
+  const average = recent.length
+    ? Math.round(recent.reduce((sum, s) => sum + s.durationMinutes, 0) / recent.length)
+    : null;
   const proposal = base.sessions.map(
     (p) =>
-      `- jour ${p.inDays} (${dayLabel(p.date)}) : ${FOCUS_LABEL[p.focus]}${p.intensity === 'light' ? ' légère' : ''}, ${p.durationMinutes} min`,
+      `- jour ${p.inDays} (${dayLabel(p.date)}) : ${FOCUS_LABEL[p.focus]}${p.intensity === 'light' ? ' légère' : ''}`,
   );
 
   return [
@@ -103,6 +110,7 @@ export function buildScheduleUserPrompt(history: SessionWithClimbs[], base: Sche
       ? `Proposition des règles :\n${proposal.join('\n')}`
       : 'Pas de proposition des règles.',
     `Dernières séances, de la plus récente à la plus ancienne :\n${lines.join('\n')}`,
+    ...(average ? [`Durée habituelle (moyenne des dernières séances) : ${average} min.`] : []),
   ].join('\n');
 }
 

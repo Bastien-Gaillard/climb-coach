@@ -120,3 +120,13 @@ export interface Schedule {
   basedOn: { date: string; focus: Focus; durationMinutes: number; fatigue: number } | null;
   sessions: PlannedSession[];
 }
+
+/** État de Mistral : bannière quand le quota est atteint ou qu'il ne répond plus. */
+export interface AiStatus {
+  enabled: boolean;
+  state: 'ok' | 'rate_limited' | 'quota_exceeded' | 'error';
+  message?: string;
+  since?: string;
+  lastSuccessAt?: string;
+  lastModel?: string | null;
+}

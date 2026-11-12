@@ -75,6 +75,9 @@ describe('buildScheduleUserPrompt', () => {
     expect(prompt).toMatch(/- jour \d+ \(.*\) : technique/);
     expect(prompt).toContain('« grosse douleur au majeur »');
     expect(prompt).toContain('notes : aucune');
+    // Les durées viennent de son historique, pas de valeurs imposées
+    expect(prompt).toContain('Durée habituelle (moyenne des dernières séances) : 90 min.');
+    expect(prompt).not.toMatch(/jour \d+ .*min/);
   });
 });
 

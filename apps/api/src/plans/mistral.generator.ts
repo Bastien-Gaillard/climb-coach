@@ -9,7 +9,11 @@ import { analyzeHistory, FOCUS_LABEL } from './history-analysis';
 import { Plan, planFitsTime, PlanSchema } from './plan.schema';
 
 export class MistralError extends Error {
-  constructor(message: string) {
+  constructor(
+    message: string,
+    /** Code HTTP renvoyé par Mistral, s'il y en a un. */
+    readonly status?: number,
+  ) {
     super(message);
     this.name = 'MistralError';
   }
@@ -22,7 +26,7 @@ export class MistralRateLimitError extends MistralError {
     /** Délai demandé par Mistral (en-tête Retry-After), s'il est donné. */
     readonly retryAfterMs?: number,
   ) {
-    super(message);
+    super(message, 429);
     this.name = 'MistralRateLimitError';
   }
 }
@@ -30,13 +34,57 @@ export class MistralRateLimitError extends MistralError {
 /** Modèle mis de côté après un 429 sans délai indiqué par Mistral. */
 const DEFAULT_COOLDOWN_MS = 30_000;
 
-/** « mistral-small-latest, ministral-8b-2512 » → liste ordonnée, sans doublon. */
-export function parseModels(raw: string | undefined): string[] {
-  const models = (raw ?? '')
+/**
+ * « mistral-small-latest, ministral-8b-2512@34000 » → modèles dans l'ordre, sans doublon, avec
+ * leur espacement minimal entre deux appels (en ms) quand il est précisé après « @ ».
+ */
+export function parseModelSpecs(raw: string | undefined): { model: string; intervalMs?: number }[] {
+  const seen = new Set<string>();
+  const specs = (raw ?? '')
     .split(',')
     .map((m) => m.trim())
-    .filter(Boolean);
-  return models.length ? [...new Set(models)] : ['mistral-small-latest'];
+    .filter(Boolean)
+    .map((m) => {
+      const [model, interval] = m.split('@').map((x) => x.trim());
+      const ms = Number(interval);
+      return { model, ...(interval && Number.isFinite(ms) && ms >= 0 ? { intervalMs: ms } : {}) };
+    })
+    .filter((s) => s.model && !seen.has(s.model) && seen.add(s.model));
+  return specs.length ? specs : [{ model: 'mistral-small-latest' }];
+}
+
+/** Noms des modèles seuls, dans l'ordre de préférence. */
+export function parseModels(raw: string | undefined): string[] {
+  return parseModelSpecs(raw).map((s) => s.model);
+}
+
+/** État de Mistral vu par l'appli, affiché en bannière quand il ne répond plus. */
+export interface AiStatus {
+  enabled: boolean;
+  /** quota_exceeded : quota ou limite de dépenses atteint ; rate_limited : trop de demandes. */
+  state: 'ok' | 'rate_limited' | 'quota_exceeded' | 'error';
+  /** Dernière erreur, telle que Mistral l'a décrite. */
+  message?: string;
+  /** Depuis quand Mistral ne répond plus (ISO). */
+  since?: string;
+  lastSuccessAt?: string;
+  lastModel?: string | null;
+}
+
+/** Mots qui trahissent un quota ou un budget épuisé, plutôt qu'un simple débit trop élevé. */
+const QUOTA_WORDS =
+  /quota|insufficient|credit|billing|budget|spend|payment|monthly|exhaust|capacity exceeded|limit reached/i;
+
+/** Classe l'échec final d'un appel : quota épuisé, débit trop élevé, ou autre panne. */
+export function classifyFailure(errors: MistralError[]): AiStatus['state'] {
+  const quota = errors.some(
+    (e) =>
+      e.status === 402 ||
+      ((e.status === 429 || e.status === 403) && QUOTA_WORDS.test(e.message)) ||
+      (e instanceof MistralRateLimitError && (e.retryAfterMs ?? 0) > MAX_RETRY_WAIT_MS),
+  );
+  if (quota) return 'quota_exceeded';
+  return errors.some((e) => e instanceof MistralRateLimitError) ? 'rate_limited' : 'error';
 }
 
 /** Au-delà, ce n'est plus un simple débit trop élevé (quota épuisé) : inutile d'attendre. */
@@ -228,6 +276,12 @@ export class MistralGenerator implements PlanGenerator {
   private readonly cooldownUntil = new Map<string, number>();
   /** Modèle qui a répondu au dernier appel réussi. */
   lastModel: string | null = null;
+  private state: Omit<AiStatus, 'enabled' | 'lastModel'> = { state: 'ok' };
+
+  /** État courant de Mistral (pour la bannière de l'appli). */
+  get status(): AiStatus {
+    return { enabled: this.enabled, ...this.state, lastModel: this.lastModel };
+  }
 
   constructor(private readonly config: ConfigService<Env, true>) {}
 
@@ -366,8 +420,9 @@ export class MistralGenerator implements PlanGenerator {
 
   /** Attend que le premier modèle utilisable ait respecté son espacement minimal. */
   private async waitForAnyModel(): Promise<void> {
-    const interval = this.config.get('MISTRAL_MIN_INTERVAL_MS', { infer: true }) ?? 1100;
-    const next = Math.min(...this.models.map((m) => (this.lastCallAt.get(m) ?? 0) + interval));
+    const next = Math.min(
+      ...this.models.map((m) => (this.lastCallAt.get(m) ?? 0) + this.intervalFor(m)),
+    );
     const wait = next - Date.now();
     if (wait > 0) await sleep(wait);
   }
@@ -392,6 +447,8 @@ export class MistralGenerator implements PlanGenerator {
             this.logger.warn(`${model} prend le relais (${describe(errors, true)})`);
           }
           this.lastModel = model;
+          if (this.state.state !== 'ok') this.logger.log(`Mistral répond de nouveau (${model})`);
+          this.state = { state: 'ok', lastSuccessAt: new Date().toISOString() };
           return content;
         } catch (e) {
           if (!(e instanceof MistralError)) throw e;
@@ -412,6 +469,18 @@ export class MistralGenerator implements PlanGenerator {
       if (limited.length === 0 || attempt >= maxRetries || wait > MAX_RETRY_WAIT_MS) {
         const last = errors[errors.length - 1].error;
         const message = describe(errors, models.length > 1);
+        const state = classifyFailure(errors.map((x) => x.error));
+        this.state = {
+          ...this.state,
+          state,
+          message,
+          // On garde le début de la panne tant qu'elle dure
+          since:
+            this.state.state === state && this.state.since
+              ? this.state.since
+              : new Date().toISOString(),
+        };
+        if (state === 'quota_exceeded') this.logger.error(`Quota Mistral atteint : ${message}`);
         throw last instanceof MistralRateLimitError
           ? new MistralRateLimitError(message, last.retryAfterMs)
           : new MistralError(message);
@@ -420,9 +489,17 @@ export class MistralGenerator implements PlanGenerator {
     }
   }
 
+  /** Espacement du modèle (« modele@ms » dans MISTRAL_MODEL), sinon MISTRAL_MIN_INTERVAL_MS. */
+  private intervalFor(model: string): number {
+    const spec = parseModelSpecs(this.config.get('MISTRAL_MODEL', { infer: true })).find(
+      (s) => s.model === model,
+    );
+    return spec?.intervalMs ?? this.config.get('MISTRAL_MIN_INTERVAL_MS', { infer: true }) ?? 1100;
+  }
+
   /** Espacement minimal entre deux appels au même modèle. */
   private async waitTurn(model: string): Promise<void> {
-    const interval = this.config.get('MISTRAL_MIN_INTERVAL_MS', { infer: true }) ?? 1100;
+    const interval = this.intervalFor(model);
     const wait = (this.lastCallAt.get(model) ?? 0) + interval - Date.now();
     if (wait > 0) await sleep(wait);
     this.lastCallAt.set(model, Date.now());
@@ -463,7 +540,7 @@ export class MistralGenerator implements PlanGenerator {
             Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : undefined,
           );
         }
-        throw new MistralError(message);
+        throw new MistralError(message, res.status);
       }
       const body = (await res.json()) as { choices?: { message?: { content?: string } }[] };
       const content = body.choices?.[0]?.message?.content;

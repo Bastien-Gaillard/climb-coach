@@ -34,7 +34,8 @@
 }
 
 main {
-  padding: 20px 16px calc(110px + env(safe-area-inset-bottom));
+  // L'appli s'étend sous la barre d'état (viewport-fit=cover) : on laisse la place à l'encoche
+  padding: calc(20px + env(safe-area-inset-top)) 16px calc(110px + env(safe-area-inset-bottom));
   max-width: 720px;
   margin: 0 auto;
 }

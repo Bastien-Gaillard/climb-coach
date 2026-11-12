@@ -75,6 +75,10 @@ describe('GeneratePage', () => {
   });
 
   afterEach(() => {
+    // Après une génération par les règles, la page vérifie l'état de Mistral
+    http
+      .match((r) => r.url === '/api/plans/ai-status')
+      .forEach((r) => r.flush({ enabled: true, state: 'ok' }));
     http.verify();
     sessionStorage.clear();
     localStorage.clear();

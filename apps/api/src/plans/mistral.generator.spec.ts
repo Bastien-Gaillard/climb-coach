@@ -1,5 +1,13 @@
 import { ConfigService } from '@nestjs/config';
-import { bracketGrades, MistralError, MistralGenerator, parseModels } from './mistral.generator';
+import {
+  bracketGrades,
+  classifyFailure,
+  MistralError,
+  MistralGenerator,
+  MistralRateLimitError,
+  parseModels,
+  parseModelSpecs,
+} from './mistral.generator';
 import { Plan } from './plan.schema';
 import { session } from './test-helpers';
 
@@ -346,5 +354,67 @@ describe('plusieurs modèles', () => {
     await expect(gen.chat([])).rejects.toThrow(
       'small : HTTP 500 : boom ; medium : HTTP 500 : boom',
     );
+  });
+});
+
+describe('état de Mistral (bannière de quota)', () => {
+  const fail = (status: number, text: string, retryAfter?: string) =>
+    ({
+      ok: false,
+      status,
+      headers: new Headers(retryAfter ? { 'retry-after': retryAfter } : {}),
+      text: async () => text,
+    }) as unknown as Response;
+  const ok = () =>
+    ({
+      ok: true,
+      status: 200,
+      json: async () => ({ choices: [{ message: { content: '{}' } }] }),
+    }) as Response;
+
+  it('lit l’espacement propre à chaque modèle', () => {
+    expect(parseModelSpecs('mistral-small-latest, ministral-8b-2512@34000')).toEqual([
+      { model: 'mistral-small-latest' },
+      { model: 'ministral-8b-2512', intervalMs: 34000 },
+    ]);
+    expect(parseModels('a@100,b')).toEqual(['a', 'b']);
+  });
+
+  it('classe les échecs : quota, débit, autre', () => {
+    expect(classifyFailure([new MistralError('HTTP 402 : payment required', 402)])).toBe(
+      'quota_exceeded',
+    );
+    expect(classifyFailure([new MistralRateLimitError('HTTP 429 : monthly quota exceeded')])).toBe(
+      'quota_exceeded',
+    );
+    expect(classifyFailure([new MistralRateLimitError('HTTP 429', 3_600_000)])).toBe(
+      'quota_exceeded',
+    );
+    expect(classifyFailure([new MistralRateLimitError('HTTP 429 : Rate limit exceeded')])).toBe(
+      'rate_limited',
+    );
+    expect(classifyFailure([new MistralError('Timeout')])).toBe('error');
+  });
+
+  it('passe en « quota atteint » puis revient à la normale au premier succès', async () => {
+    const gen = makeGenerator({ MISTRAL_MAX_RETRIES: 0 });
+    expect(gen.status.state).toBe('ok');
+
+    jest.spyOn(global, 'fetch').mockResolvedValueOnce(fail(402, 'spending limit reached'));
+    await expect(gen.chat([])).rejects.toThrow('HTTP 402');
+    expect(gen.status).toMatchObject({ enabled: true, state: 'quota_exceeded' });
+    expect(gen.status.message).toContain('spending limit reached');
+    const since = gen.status.since;
+    expect(since).toBeDefined();
+
+    // Toujours en panne : la date de début ne bouge pas
+    jest.spyOn(global, 'fetch').mockResolvedValueOnce(fail(402, 'spending limit reached'));
+    await expect(gen.chat([])).rejects.toThrow();
+    expect(gen.status.since).toBe(since);
+
+    jest.spyOn(global, 'fetch').mockResolvedValueOnce(ok());
+    await gen.chat([]);
+    expect(gen.status.state).toBe('ok');
+    expect(gen.status.lastSuccessAt).toBeDefined();
   });
 });

@@ -2,6 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { EMPTY, expand, Observable, switchMap, timer } from 'rxjs';
 import {
+  AiStatus,
   CreateSession,
   GeneratedPlan,
   Gym,
@@ -56,6 +57,11 @@ export class ApiService {
           : EMPTY,
       ),
     );
+  }
+
+  /** État de Mistral (quota atteint, saturé, en panne). */
+  aiStatus(): Observable<AiStatus> {
+    return this.http.get<AiStatus>(`${this.base}/plans/ai-status`);
   }
 
   /** Réglages du compte connecté. */

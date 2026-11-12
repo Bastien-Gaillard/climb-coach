@@ -36,6 +36,12 @@ export class PlansController {
     return this.plans.schedule(user.id, query.days, user.sessionsPerWeek);
   }
 
+  /** État de Mistral : l'appli affiche une bannière quand le quota est atteint. */
+  @Get('ai-status')
+  aiStatus() {
+    return this.plans.aiStatus();
+  }
+
   @Get()
   recent(@CurrentUser() user: User) {
     return this.plans.recent(user.id);
