@@ -6,7 +6,7 @@ import { MistralScheduleAdvisor } from './mistral.schedule';
 import { Plan } from './plan.schema';
 import { PlansService } from './plans.service';
 import { RuleBasedGenerator } from './rule-based.generator';
-import { NextSessionOverride } from './schedule';
+import { MonthPlan } from './mistral.schedule';
 import { session } from './test-helpers';
 
 const now = new Date('2025-11-23T18:00:00Z');
@@ -28,7 +28,7 @@ function setup({
 }: {
   enabled: boolean;
   mistral?: () => Promise<Plan>;
-  advise?: () => Promise<NextSessionOverride>;
+  advise?: () => Promise<MonthPlan>;
 }) {
   const inserted: unknown[] = [];
   const db = {
@@ -56,7 +56,7 @@ function setup({
 
   const advisor = {
     enabled,
-    adviseNext: jest.fn(advise ?? (async () => Promise.reject(new MistralError('non prévu')))),
+    advisePlan: jest.fn(advise ?? (async () => Promise.reject(new MistralError('non prévu')))),
   } as unknown as MistralScheduleAdvisor;
 
   const service = new PlansService(
@@ -134,12 +134,32 @@ describe('PlansService.generate', () => {
 });
 
 describe('PlansService.schedule', () => {
-  const injury: NextSessionOverride = {
-    inDays: 10,
-    focus: 'technique',
-    intensity: 'light',
-    durationMinutes: 60,
-    reason: 'Tu parles d’une grosse blessure à l’épaule : 10 jours de repos, puis reprise douce.',
+  const injury: MonthPlan = {
+    summary: 'Grosse blessure à l’épaule : repos, puis reprise progressive.',
+    sessions: [
+      {
+        inDays: 10,
+        focus: 'technique',
+        intensity: 'light',
+        durationMinutes: 60,
+        reason:
+          'Tu parles d’une grosse blessure à l’épaule : 10 jours de repos, puis reprise douce.',
+      },
+      {
+        inDays: 13,
+        focus: 'technique',
+        intensity: 'light',
+        durationMinutes: 60,
+        reason: 'Reprise.',
+      },
+      {
+        inDays: 17,
+        focus: 'endurance',
+        intensity: 'normal',
+        durationMinutes: 75,
+        reason: 'Volume.',
+      },
+    ],
   };
   const history = [session(0, now, { focus: 'endurance', notes: 'grosse blessure épaule' })];
 
@@ -149,11 +169,14 @@ describe('PlansService.schedule', () => {
     const s = await service.schedule('u1', 14);
     expect(s.source).toBe('rules');
     expect(s.advicePending).toBeUndefined();
-    expect(advisor.adviseNext).not.toHaveBeenCalled();
+    expect(advisor.advisePlan).not.toHaveBeenCalled();
   });
 
   it('répond tout de suite avec les règles, puis avec l’avis de Mistral', async () => {
-    const { service, sessions } = setup({ enabled: true, advise: async () => ({ ...injury }) });
+    const { service, sessions } = setup({
+      enabled: true,
+      advise: async () => structuredClone(injury),
+    });
     (sessions.findRecent as jest.Mock).mockResolvedValue(history);
 
     const first = await service.schedule('u1', 21);
@@ -165,50 +188,100 @@ describe('PlansService.schedule', () => {
     expect(s.advicePending).toBeUndefined();
     expect(s.sessions[0]).toMatchObject({ inDays: 10, focus: 'technique', intensity: 'light' });
     expect(s.sessions[0].reason).toContain('épaule');
-    // Après la technique : force, 3 jours plus tard (rythme 3/semaine)
-    expect(s.sessions[1]).toMatchObject({ inDays: 13, focus: 'strength' });
+    expect(s.summary).toContain('épaule');
+    // Tout le plan vient de Mistral, les règles ne font que le prolonger au-delà
+    expect(s.sessions.slice(0, 3).map((x) => [x.inDays, x.source])).toEqual([
+      [10, 'mistral'],
+      [13, 'mistral'],
+      [17, 'mistral'],
+    ]);
+    expect(s.sessions[3]).toMatchObject({ source: 'rules' });
   });
 
   it('un seul appel à Mistral par historique, même le lendemain', async () => {
     let today = now;
     const { service, sessions, advisor } = setup({
       enabled: true,
-      advise: async () => ({ ...injury }),
+      advise: async () => structuredClone(injury),
     });
     (service as unknown as { clock: () => Date }).clock = () => today;
     (sessions.findRecent as jest.Mock).mockResolvedValue(history);
     await service.schedule('u1');
     await service.schedule('u1'); // pendant le calcul : pas de second appel
     await service.adviceSettled('u1');
-    expect(advisor.adviseNext).toHaveBeenCalledTimes(1);
+    expect(advisor.advisePlan).toHaveBeenCalledTimes(1);
 
     // Le lendemain : même avis, une journée plus proche
     today = new Date(now.getTime() + 24 * 3600 * 1000);
     const s = await service.schedule('u1');
     expect(s.sessions[0].inDays).toBe(9);
-    expect(advisor.adviseNext).toHaveBeenCalledTimes(1);
+    expect(advisor.advisePlan).toHaveBeenCalledTimes(1);
 
     // Nouvelle séance enregistrée : on redemande
     (sessions.findRecent as jest.Mock).mockResolvedValue([session(0, today), ...history]);
     await service.schedule('u1');
-    expect(advisor.adviseNext).toHaveBeenCalledTimes(2);
+    expect(advisor.advisePlan).toHaveBeenCalledTimes(2);
   });
 
   it('demande l’avis dès qu’une séance est enregistrée', async () => {
     const { service, sessions, advisor } = setup({
       enabled: true,
-      advise: async () => ({ ...injury }),
+      advise: async () => structuredClone(injury),
     });
     (sessions.findRecent as jest.Mock).mockResolvedValue(history);
     const listener = (sessions.onChange as jest.Mock).mock.calls[0][0];
     listener({ id: 'u1', sessionsPerWeek: 3 });
     await new Promise((r) => setTimeout(r, 0));
     await service.adviceSettled('u1');
-    expect(advisor.adviseNext).toHaveBeenCalledTimes(1);
+    expect(advisor.advisePlan).toHaveBeenCalledTimes(1);
 
     const s = await service.schedule('u1', 7, 3);
     expect(s.source).toBe('mistral');
-    expect(advisor.adviseNext).toHaveBeenCalledTimes(1);
+    expect(advisor.advisePlan).toHaveBeenCalledTimes(1);
+  });
+
+  it('redemande un plan quand une séance prévue est passée sans être faite', async () => {
+    let today = now;
+    const { service, sessions, advisor } = setup({
+      enabled: true,
+      advise: async () => structuredClone(injury),
+    });
+    (service as unknown as { clock: () => Date }).clock = () => today;
+    (sessions.findRecent as jest.Mock).mockResolvedValue(history);
+    await service.schedule('u1');
+    await service.adviceSettled('u1');
+
+    today = new Date(now.getTime() + 11 * 24 * 3600 * 1000); // jour 10 passé sans séance
+    const s = await service.schedule('u1', 28);
+    expect(s.advicePending).toBe(true);
+    expect(s.sessions[0]).toMatchObject({ inDays: 2, source: 'mistral' }); // le jour 13
+    await service.adviceSettled('u1');
+    expect(advisor.advisePlan).toHaveBeenCalledTimes(2);
+
+    await service.schedule('u1', 28);
+    expect(advisor.advisePlan).toHaveBeenCalledTimes(2);
+  });
+
+  it('redemande un plan quand une séance prévue est passée sans être faite', async () => {
+    let today = now;
+    const { service, sessions, advisor } = setup({
+      enabled: true,
+      advise: async () => structuredClone(injury),
+    });
+    (service as unknown as { clock: () => Date }).clock = () => today;
+    (sessions.findRecent as jest.Mock).mockResolvedValue(history);
+    await service.schedule('u1');
+    await service.adviceSettled('u1');
+
+    today = new Date(now.getTime() + 11 * 24 * 3600 * 1000); // jour 10 passé sans séance
+    const s = await service.schedule('u1', 28);
+    expect(s.advicePending).toBe(true);
+    expect(s.sessions[0]).toMatchObject({ inDays: 2, source: 'mistral' }); // le jour 13
+    await service.adviceSettled('u1');
+    expect(advisor.advisePlan).toHaveBeenCalledTimes(2);
+
+    await service.schedule('u1', 28);
+    expect(advisor.advisePlan).toHaveBeenCalledTimes(2);
   });
 
   it('retombe sur les règles si Mistral échoue, en gardant la raison', async () => {

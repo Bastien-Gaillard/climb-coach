@@ -2,122 +2,138 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, fakeAsync, TestBed, tick } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { Schedule } from '../../core/models';
+import { PlannedSession, Schedule, Session } from '../../core/models';
 import { PlanningPage } from './planning';
 
-const schedule = (perWeek: number, inDays: number): Schedule => ({
-  today: '2026-11-12',
+/** AAAA-MM-JJ local, décalé de `n` jours par rapport à aujourd'hui. */
+function day(n: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + n);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+const planned = (inDays: number, extra: Partial<PlannedSession> = {}): PlannedSession => ({
+  date: day(inDays),
+  inDays,
+  focus: 'technique',
+  durationMinutes: 120,
+  intensity: 'normal',
+  reason: 'Récup après l’endurance',
   source: 'rules',
-  sessionsPerWeek: perWeek,
-  basedOn: { date: '2026-11-12', focus: 'endurance', durationMinutes: 90, fatigue: 3 },
-  sessions: [
-    {
-      date: '2026-11-14',
-      inDays,
-      focus: 'technique',
-      durationMinutes: 120,
-      intensity: 'normal',
-      reason: 'Récup après l’endurance',
-    },
-  ],
+  ...extra,
 });
+
+const schedule = (perWeek: number, sessions: PlannedSession[], extra: Partial<Schedule> = {}) =>
+  ({
+    today: day(0),
+    source: 'rules',
+    sessionsPerWeek: perWeek,
+    basedOn: { date: day(0), focus: 'endurance', durationMinutes: 90, fatigue: 3 },
+    sessions,
+    ...extra,
+  }) as Schedule;
+
+const done: Session = {
+  id: 's1',
+  date: new Date().toISOString(),
+  durationMinutes: 90,
+  focus: 'endurance',
+  fatigue: 3,
+  notes: null,
+  climbs: [],
+};
 
 describe('PlanningPage', () => {
   let fixture: ComponentFixture<PlanningPage>;
   let http: HttpTestingController;
   let el: HTMLElement;
 
+  const open = (s: Schedule) => {
+    fixture = TestBed.createComponent(PlanningPage);
+    el = fixture.nativeElement;
+    fixture.detectChanges();
+    http.expectOne((r) => r.url === '/api/plans/schedule').flush(s);
+    http.expectOne((r) => r.url === '/api/sessions').flush([done]);
+    fixture.detectChanges();
+  };
+  const items = () => el.querySelectorAll('[data-testid=planning] > li');
+
   beforeEach(() => {
     TestBed.configureTestingModule({
       imports: [PlanningPage],
       providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
     });
-    fixture = TestBed.createComponent(PlanningPage);
     http = TestBed.inject(HttpTestingController);
-    el = fixture.nativeElement;
-    fixture.detectChanges();
-    http.expectOne((r) => r.url === '/api/plans/schedule').flush(schedule(3, 2));
-    fixture.detectChanges();
   });
 
   afterEach(() => http.verify());
 
-  it('affiche 7 jours, séances et repos', () => {
-    const days = el.querySelectorAll('[data-testid=planning] > li');
-    expect(days.length).toBe(7);
-    expect(days[2].textContent).toContain('Technique');
-    expect(days[2].textContent).toContain('2 h');
-    expect(days[0].textContent).toContain('Repos');
+  it('affiche le mois : séance faite aujourd’hui et séances prévues', () => {
+    open(schedule(3, [planned(2), planned(5, { focus: 'strength', durationMinutes: 60 })]));
+
+    const today = el.querySelector('.cal-day.today')!;
+    expect(today.classList).toContain('done');
+    expect(el.querySelectorAll('.cal-day.planned').length).toBe(2);
+    expect(el.querySelectorAll('.cal-row:not(.cal-head)').length).toBe(5);
+
+    expect(items().length).toBe(2);
+    expect(items()[0].textContent).toContain('Technique');
+    expect(items()[0].textContent).toContain('2 h');
+    expect(items()[1].textContent).toContain('Force');
   });
 
-  it('signale la séance décidée par Mistral', () => {
-    fixture = TestBed.createComponent(PlanningPage);
-    el = fixture.nativeElement;
-    fixture.detectChanges();
-    http
-      .expectOne((r) => r.url === '/api/plans/schedule')
-      .flush({ ...schedule(3, 2), source: 'mistral' });
-    fixture.detectChanges();
-    const days = el.querySelectorAll('[data-testid=planning] > li');
-    expect(days[2].querySelector('.ai')?.textContent).toContain('IA');
+  it('badge IA sur chaque séance planifiée par Mistral, et son résumé du mois', () => {
+    open(
+      schedule(
+        3,
+        [planned(2, { source: 'mistral' }), planned(5, { source: 'mistral' }), planned(30)],
+        {
+          source: 'mistral',
+          summary: 'Mois de reprise après ta blessure.',
+        },
+      ),
+    );
+    expect(el.querySelector('[data-testid=summary]')?.textContent).toContain('reprise');
+    expect(items()[0].querySelector('.ai')).not.toBeNull();
+    expect(items()[1].querySelector('.ai')).not.toBeNull();
+    expect(el.querySelectorAll('.cal-day .ai-dot').length).toBe(2);
   });
 
-  it('prolonge l’affichage quand la prochaine séance est loin (blessure)', () => {
-    fixture = TestBed.createComponent(PlanningPage);
-    el = fixture.nativeElement;
-    fixture.detectChanges();
-    http
-      .expectOne((r) => r.url === '/api/plans/schedule')
-      .flush({ ...schedule(3, 10), source: 'mistral' });
-    fixture.detectChanges();
-    const days = el.querySelectorAll('[data-testid=planning] > li');
-    expect(days.length).toBe(11);
-    expect(days[10].textContent).toContain('Technique');
-  });
-
-  it('se met à jour quand Mistral a fini de relire les notes', fakeAsync(() => {
-    fixture = TestBed.createComponent(PlanningPage);
-    el = fixture.nativeElement;
-    fixture.detectChanges();
-    http
-      .expectOne((r) => r.url === '/api/plans/schedule')
-      .flush({ ...schedule(3, 2), advicePending: true });
-    fixture.detectChanges();
+  it('se met à jour quand Mistral a fini de préparer le mois', fakeAsync(() => {
+    open(schedule(3, [planned(2)], { advicePending: true }));
     expect(el.querySelector('[data-testid=advice-pending]')).not.toBeNull();
 
     tick(6000);
     http
       .expectOne((r) => r.url === '/api/plans/schedule')
-      .flush({ ...schedule(3, 7), source: 'mistral' });
+      .flush(schedule(3, [planned(7, { source: 'mistral' })], { source: 'mistral' }));
     fixture.detectChanges();
     expect(el.querySelector('[data-testid=advice-pending]')).toBeNull();
-    expect(
-      el.querySelectorAll('[data-testid=planning] > li')[7].querySelector('.ai'),
-    ).not.toBeNull();
+    expect(items()[0].querySelector('.ai')).not.toBeNull();
     tick(10000);
     http.expectNone((r) => r.url === '/api/plans/schedule');
   }));
 
   it('enregistre le rythme puis recalcule le planning', () => {
+    open(schedule(3, [planned(2)]));
     const checked = () => el.querySelector('.seg [aria-checked=true]')?.textContent?.trim();
     expect(checked()).toBe('3');
 
-    const four = Array.from(el.querySelectorAll<HTMLButtonElement>('.seg button')).find(
-      (b) => b.textContent?.trim() === '4',
-    )!;
-    four.click();
+    Array.from(el.querySelectorAll<HTMLButtonElement>('.seg button'))
+      .find((b) => b.textContent?.trim() === '5')!
+      .click();
     fixture.detectChanges();
 
     const req = http.expectOne('/api/auth/me');
     expect(req.request.method).toBe('PATCH');
-    expect(req.request.body).toEqual({ sessionsPerWeek: 4 });
-    req.flush({ id: 'u1', username: 'kuzimu', sessionsPerWeek: 4 });
-    http.expectOne((r) => r.url === '/api/plans/schedule').flush(schedule(4, 1));
+    expect(req.request.body).toEqual({ sessionsPerWeek: 5 });
+    req.flush({ id: 'u1', username: 'kuzimu', sessionsPerWeek: 5 });
+    http
+      .expectOne((r) => r.url === '/api/plans/schedule')
+      .flush(schedule(5, [planned(1), planned(2), planned(4), planned(5)]));
     fixture.detectChanges();
 
-    expect(checked()).toBe('4');
-    expect(el.querySelectorAll('[data-testid=planning] > li')[1].textContent).toContain(
-      'Technique',
-    );
+    expect(checked()).toBe('5');
+    expect(items().length).toBe(4);
   });
 });

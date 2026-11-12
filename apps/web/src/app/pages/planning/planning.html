@@ -1,5 +1,5 @@
 <header class="hero dots">
-  <span class="overline">{{ days().length || 7 }} prochains jours</span>
+  <span class="overline">4 prochaines semaines</span>
   <h1>Planning</h1>
 </header>
 
@@ -26,41 +26,89 @@
   </div>
 </section>
 
-@if (schedule()!.basedOn; as b) {
-<p class="muted small based-on">
-  Calculé depuis ta dernière séance : {{ focusLabel[b.focus].toLowerCase() }}, {{
-  duration(b.durationMinutes) }}, le {{ dayDate(b.date) | date: 'EEEE d MMMM' }} · fatigue {{
-  b.fatigue }}/5. Il se met à jour à chaque séance enregistrée.
-</p>
-} @if (schedule()!.advicePending) {
+@if (schedule()!.advicePending) {
 <p class="muted small pending" data-testid="advice-pending">
-  <app-icon name="generate" [size]="14" [stroke]="2.6" />Mistral relit tes notes, le planning va se
-  mettre à jour…
+  <app-icon name="generate" [size]="14" [stroke]="2.6" />Mistral relit tes notes et prépare le mois,
+  le planning va se mettre à jour…
 </p>
 } @if (schedule()!.fallbackReason; as r) {
 <p class="muted small">
   Mistral n'a pas pu relire tes notes ({{ r }}) : planning calculé par les règles seules.
 </p>
+} @if (schedule()!.summary; as sum) {
+<p class="card summary" data-testid="summary">
+  <span class="badge accent ai"><app-icon name="generate" [size]="12" [stroke]="2.6" />IA</span>
+  {{ sum }}
+</p>
 }
 
-<ol class="week" data-testid="planning">
-  @for (d of days(); track d.inDays) {
-  <li [class.today]="d.inDays === 0" [class.rest]="!d.session">
-    <div class="day">
-      <span class="overline">{{ d.date | date: 'EEE' }}</span>
-      <span class="num">{{ d.date | date: 'd' }}</span>
-    </div>
+<section class="calendar" aria-label="Calendrier des séances" data-testid="calendar">
+  <div class="cal-row cal-head" aria-hidden="true">
+    @for (w of weekdays; track $index) {
+    <span>{{ w }}</span>
+    }
+    <span class="count"></span>
+  </div>
+  @for (week of calendar(); track week[0].key; let wi = $index) {
+  <div class="cal-row">
+    @for (d of week; track d.key) {
+    <button
+      type="button"
+      class="cal-day"
+      [class.today]="d.inDays === 0"
+      [class.past]="d.inDays < 0"
+      [class.done]="d.done"
+      [class.planned]="d.planned"
+      [attr.data-focus]="d.planned?.focus ?? d.done?.focus"
+      [disabled]="!d.planned"
+      (click)="show(d)"
+      [attr.aria-label]="
+        (d.date | date: 'EEEE d MMMM') +
+        (d.done ? ' : séance faite, ' + focusLabel[d.done.focus] : '') +
+        (d.planned ? ' : ' + focusLabel[d.planned.focus] + ', ' + duration(d.planned.durationMinutes) : '')
+      "
+    >
+      <span class="n">{{ d.date | date: 'd' }}</span>
+      @if (d.done) {
+      <span class="chip">✓</span>
+      } @else if (d.planned) {
+      <span class="chip">{{ focusLetter[d.planned.focus] }}</span>
+      @if (d.planned.source === 'mistral') {
+      <span class="ai-dot" aria-hidden="true"></span>
+      } }
+    </button>
+    }
+    <span class="count" [attr.title]="weekCounts()[wi] + ' séances cette semaine'">
+      {{ weekCounts()[wi] }}
+    </span>
+  </div>
+  }
+  <p class="legend muted small">
+    <span class="chip" data-focus="strength">F</span> Force
+    <span class="chip" data-focus="endurance">E</span> Endurance
+    <span class="chip" data-focus="technique">T</span> Technique
+    <span class="chip done">✓</span> Faite <span class="ai-dot"></span> IA
+  </p>
+</section>
 
-    @if (d.session; as s) {
+<h2 class="overline">Prochaines séances</h2>
+<ol class="list" data-testid="planning">
+  @for (s of upcoming(); track s.date; let first = $first) {
+  <li [id]="'plan-' + s.date">
+    <div class="when">
+      <span class="overline">{{ dayDate(s.date) | date: 'EEE' }}</span>
+      <span class="num">{{ dayDate(s.date) | date: 'd' }}</span>
+      <span class="overline">{{ dayDate(s.date) | date: 'MMM' }}</span>
+    </div>
     <div class="session" [class]="s.focus">
       <div class="head">
         <strong>{{ focusLabel[s.focus] }}</strong>
         @if (s.intensity === 'light') {
         <span class="badge">Légère</span>
-        } @if (isAdvised(s)) {
+        } @if (s.source === 'mistral') {
         <span
           class="badge accent ai"
-          title="Décidée par Mistral d'après tes notes et ton historique"
+          title="Planifiée par Mistral d'après tes notes et ton historique"
         >
           <app-icon name="generate" [size]="12" [stroke]="2.6" />IA
         </span>
@@ -72,15 +120,10 @@
       <a routerLink="/generer" class="btn primary go">
         <app-icon name="generate" [size]="18" [stroke]="2.4" />Générer cette séance
       </a>
-      } @else {
+      } @else if (first) {
       <span class="muted small">{{ relative(s.inDays) }}</span>
       }
     </div>
-    } @else {
-    <div class="session rest">
-      <span class="muted">Repos</span>
-    </div>
-    }
   </li>
   }
 </ol>

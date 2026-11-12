@@ -12,7 +12,7 @@ const GeneratePlanSchema = z.object({
 });
 
 const ScheduleQuerySchema = z.object({
-  days: z.coerce.number().int().min(1).max(28).default(7),
+  days: z.coerce.number().int().min(1).max(42).default(7),
 });
 
 @Controller('plans')

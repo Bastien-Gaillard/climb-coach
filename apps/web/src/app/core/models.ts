@@ -101,12 +101,16 @@ export interface PlannedSession {
   durationMinutes: number;
   intensity: 'light' | 'normal';
   reason: string;
+  /** Qui a placé cette séance : Mistral (d'après les notes) ou les règles. */
+  source: 'mistral' | 'rules';
 }
 
 export interface Schedule {
   today: string;
-  /** Qui a décidé de la prochaine séance : Mistral (d'après les notes) ou les règles. */
+  /** Qui a construit le planning : Mistral (d'après les notes) ou les règles. */
   source: 'mistral' | 'rules';
+  /** Mot de Mistral sur le mois à venir. */
+  summary?: string;
   /** Pourquoi Mistral n'a pas été utilisé, s'il était configuré. */
   fallbackReason?: string;
   /** Mistral relit les notes en arrière-plan : le planning va être mis à jour. */

@@ -233,6 +233,7 @@ describe('GeneratePage', () => {
           durationMinutes: 120,
           intensity: 'normal',
           reason: '2 jours de récup après l’endurance',
+          source: 'rules',
         },
       ],
     });

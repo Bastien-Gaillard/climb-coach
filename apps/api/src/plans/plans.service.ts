@@ -7,10 +7,10 @@ import { SessionsService } from '../sessions/sessions.service';
 import { GeneratorContext } from './generator';
 import { withGymColors } from './gym-colors';
 import { MistralGenerator } from './mistral.generator';
-import { MistralScheduleAdvisor } from './mistral.schedule';
+import { ADVICE_HORIZON_DAYS, MistralScheduleAdvisor } from './mistral.schedule';
 import { Plan } from './plan.schema';
 import { RuleBasedGenerator } from './rule-based.generator';
-import { addDays, buildSchedule, diffDays, NextSessionOverride, Schedule } from './schedule';
+import { AdvisedSession, addDays, buildSchedule, diffDays, Schedule } from './schedule';
 
 export const CLOCK = Symbol('CLOCK');
 export type Clock = () => Date;
@@ -30,11 +30,13 @@ export interface GeneratedPlanResult {
 /** Un échec de Mistral n'est retenté qu'au bout de ce délai. */
 const FAILURE_RETRY_MS = 10 * 60 * 1000;
 
-/** Avis de Mistral sur la prochaine séance, daté pour rester valable les jours suivants. */
+/** Plan du mois par Mistral, daté pour rester valable les jours suivants. */
 interface CachedAdvice {
-  /** Historique et rythme sur lesquels porte l'avis : s'ils changent, on redemande. */
+  /** Historique et rythme sur lesquels porte le plan : s'ils changent, on redemande. */
   key: string;
-  advice?: Omit<NextSessionOverride, 'inDays'> & { date: string };
+  /** Jour où le plan a été demandé. */
+  asOf: string;
+  plan?: { summary?: string; sessions: (Omit<AdvisedSession, 'inDays'> & { date: string })[] };
   fallbackReason?: string;
   at: number;
 }
@@ -110,9 +112,10 @@ export class PlansService {
 
   /**
    * Prochaines séances conseillées. Les règles proposent ; Mistral relit les notes et
-   * l'historique pour décider de la prochaine séance (ex : blessure → repos plus long), la suite
-   * du cycle venant des règles. L'avis de Mistral est demandé en arrière-plan, une seule fois
-   * par historique et rythme : en attendant, on renvoie les règles avec `advicePending`.
+   * l'historique et planifie les 4 semaines à venir (ex : blessure → repos plus long), les règles
+   * prolongeant son plan au besoin. Le plan est demandé en arrière-plan, une fois par historique
+   * et rythme (et de nouveau si une séance prévue est passée sans être faite) : en attendant,
+   * on renvoie les règles avec `advicePending`.
    */
   async schedule(userId: string, horizonDays = 7, sessionsPerWeek?: number): Promise<Schedule> {
     const now = this.clock();
@@ -125,51 +128,79 @@ export class PlansService {
       ...history.map((s) => `${s.id}:${s.fatigue}:${s.durationMinutes}:${s.notes ?? ''}`),
     ].join('|');
     const cached = this.adviceCache.get(userId);
+    const sameKey = cached?.key === key;
 
-    if (cached?.key === key && cached.advice) {
-      const inDays = diffDays(base.today, cached.advice.date);
-      // Séance conseillée passée sans être faite : les règles la proposent dès aujourd'hui
-      if (inDays < 0) return base;
-      const { date: _date, ...rest } = cached.advice;
-      return buildSchedule(history, now, {
-        horizonDays,
-        sessionsPerWeek,
-        override: { ...rest, inDays },
-      });
+    if (sameKey && cached.plan) {
+      const advised = cached.plan.sessions.map(({ date, ...rest }) => ({
+        ...rest,
+        inDays: diffDays(base.today, date),
+      }));
+      // Une séance prévue est passée sans être faite : on redemande un plan (une fois par jour)
+      const missed = advised.some((a) => a.inDays < 0);
+      if (missed && cached.asOf !== base.today) this.requestAdvice(userId, key, history, now);
+      const upcoming = advised.filter((a) => a.inDays >= 0);
+      if (!upcoming.length) return { ...base, advicePending: this.adviceInFlight.has(userId) };
+      return {
+        ...buildSchedule(history, now, {
+          horizonDays,
+          sessionsPerWeek,
+          advised: upcoming,
+          summary: cached.plan.summary,
+        }),
+        ...(this.adviceInFlight.has(userId) ? { advicePending: true } : {}),
+      };
     }
-    if (cached?.key === key && now.getTime() - cached.at < FAILURE_RETRY_MS) {
+    if (sameKey && now.getTime() - cached.at < FAILURE_RETRY_MS) {
       return { ...base, fallbackReason: cached.fallbackReason };
     }
 
-    this.requestAdvice(userId, key, history, base);
+    this.requestAdvice(userId, key, history, now, sessionsPerWeek);
     return { ...base, advicePending: true };
   }
 
-  /** Attend la fin de l'avis en cours (utile aux tests). */
+  /** Attend la fin du plan en cours de calcul (utile aux tests). */
   async adviceSettled(userId: string): Promise<void> {
     await this.adviceInFlight.get(userId)?.done;
   }
 
-  /** Lance l'avis de Mistral en tâche de fond, sans doublon pour un même historique. */
+  /** Demande le plan du mois à Mistral en tâche de fond, sans doublon pour un même historique. */
   private requestAdvice(
     userId: string,
     key: string,
     history: Awaited<ReturnType<SessionsService['findRecent']>>,
-    base: Schedule,
+    now: Date,
+    sessionsPerWeek?: number,
   ): void {
     if (this.adviceInFlight.get(userId)?.key === key) return;
+    // Mistral reçoit la proposition des règles sur tout son horizon
+    const base = buildSchedule(history, now, {
+      horizonDays: ADVICE_HORIZON_DAYS,
+      sessionsPerWeek: sessionsPerWeek ?? Number(key.split('|')[0]),
+    });
     const done = this.advisor
-      .adviseNext(history, base)
-      .then(({ inDays, ...rest }) => {
+      .advisePlan(history, base)
+      .then((plan) => {
         this.adviceCache.set(userId, {
           key,
+          asOf: base.today,
           at: Date.now(),
-          advice: { ...rest, date: addDays(base.today, inDays) },
+          plan: {
+            summary: plan.summary,
+            sessions: plan.sessions.map(({ inDays, ...rest }) => ({
+              ...rest,
+              date: addDays(base.today, inDays),
+            })),
+          },
         });
       })
       .catch((e: Error) => {
         this.logger.warn(`Mistral indisponible pour le planning, règles seules : ${e.message}`);
-        this.adviceCache.set(userId, { key, at: Date.now(), fallbackReason: e.message });
+        this.adviceCache.set(userId, {
+          key,
+          asOf: base.today,
+          at: Date.now(),
+          fallbackReason: e.message,
+        });
       })
       .finally(() => {
         if (this.adviceInFlight.get(userId)?.done === done) this.adviceInFlight.delete(userId);

@@ -28,11 +28,195 @@
   }
 }
 
-.based-on {
-  line-height: 1.45;
+.pending {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
-.week {
+.summary {
+  padding: 12px 14px;
+  line-height: 1.45;
+  color: var(--ink-2);
+
+  .badge {
+    margin-right: 6px;
+    vertical-align: 2px;
+  }
+}
+
+.ai {
+  gap: 3px;
+}
+
+// ---------- Calendrier
+
+.calendar {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cal-row {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr)) 22px;
+  gap: 4px;
+  align-items: center;
+}
+
+.cal-head span {
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.count {
+  text-align: center;
+  font-family: var(--font-num);
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--muted);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 4px;
+  border-radius: 7px;
+  font-family: var(--font-num);
+  font-weight: 700;
+  font-size: 14px;
+  background: var(--surface-2);
+  color: var(--ink);
+
+  &[data-focus='strength'] {
+    background: var(--ink);
+    color: var(--bg);
+  }
+
+  &[data-focus='endurance'] {
+    background: var(--accent);
+    color: var(--on-accent);
+  }
+
+  &[data-focus='technique'] {
+    background: var(--line-strong);
+    color: var(--ink);
+  }
+
+  &.done {
+    background: none;
+    box-shadow: inset 0 0 0 2px var(--ink);
+  }
+}
+
+.ai-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: #c45a2c;
+}
+
+.cal-day {
+  position: relative;
+  min-height: 54px;
+  height: auto;
+  padding: 5px 2px 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 3px;
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: var(--shadow-1);
+  color: var(--ink);
+
+  &:disabled {
+    opacity: 1;
+    cursor: default;
+  }
+
+  .n {
+    font-family: var(--font-num);
+    font-weight: 600;
+    font-size: 15px;
+    line-height: 1;
+  }
+
+  &.past {
+    background: none;
+    box-shadow: none;
+    color: var(--muted);
+  }
+
+  &.done .chip {
+    background: none;
+    box-shadow: inset 0 0 0 2px currentColor;
+    color: var(--ink);
+  }
+
+  &.today {
+    box-shadow: inset 0 0 0 2px var(--ink);
+
+    .n {
+      font-weight: 800;
+    }
+  }
+
+  .ai-dot {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+  }
+}
+
+.cal-day.planned[data-focus='strength'] .chip {
+  background: var(--ink);
+  color: var(--bg);
+}
+
+.cal-day.planned[data-focus='endurance'] .chip {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.cal-day.planned[data-focus='technique'] .chip {
+  background: var(--line-strong);
+  color: var(--ink);
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+
+  .chip {
+    min-width: 18px;
+    height: 18px;
+    font-size: 12px;
+    margin-left: 6px;
+  }
+
+  .chip:first-child {
+    margin-left: 0;
+  }
+}
+
+// ---------- Liste détaillée
+
+h2.overline {
+  margin-bottom: -8px;
+}
+
+.list {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -44,30 +228,20 @@
     display: flex;
     gap: 12px;
     align-items: stretch;
+    scroll-margin: 80px;
   }
 }
 
-.day {
-  flex: 0 0 52px;
+.when {
+  flex: 0 0 48px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  border-radius: 14px;
 
   .num {
-    font-size: 26px;
+    font-size: 24px;
     line-height: 1;
-  }
-
-  .today & {
-    background: var(--ink);
-    color: var(--bg);
-
-    .overline {
-      color: inherit;
-      opacity: 0.75;
-    }
   }
 }
 
@@ -91,15 +265,7 @@
   }
 
   &.technique {
-    border-left-color: var(--muted);
-  }
-
-  &.rest {
-    background: none;
-    box-shadow: none;
-    border: 2px dashed var(--line);
-    justify-content: center;
-    padding: 10px 14px;
+    border-left-color: var(--line-strong);
   }
 
   p {
@@ -121,16 +287,6 @@
     margin-left: auto;
     font-size: 22px;
   }
-}
-
-.pending {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.ai {
-  gap: 3px;
 }
 
 .go {

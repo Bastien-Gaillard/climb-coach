@@ -101,7 +101,7 @@ export class GeneratePage implements OnInit {
         next: (s) => {
           const next = s.sessions[0] ?? null;
           this.advice.set(next);
-          this.adviceSource.set(s.source);
+          this.adviceSource.set(next?.source ?? 'rules');
           this.advicePending.set(!!s.advicePending);
           // Séance conseillée aujourd'hui : on part sur sa durée idéale, sauf choix déjà fait
           if (next && next.inDays === 0 && !this.result() && !this.touched) this.useAdvice(next);

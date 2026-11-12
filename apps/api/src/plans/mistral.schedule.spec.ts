@@ -2,69 +2,83 @@ import { MistralError, MistralGenerator } from './mistral.generator';
 import {
   buildScheduleUserPrompt,
   MistralScheduleAdvisor,
-  parseNextSession,
+  parseMonthPlan,
 } from './mistral.schedule';
 import { buildSchedule } from './schedule';
 import { session } from './test-helpers';
 
 const now = new Date('2026-11-12T16:00:00Z');
+const s = (inDays: number, focus = 'technique', extra: object = {}) => ({
+  inDays,
+  focus,
+  intensity: 'normal',
+  durationMinutes: 90,
+  reason: 'ok',
+  ...extra,
+});
 
-describe('parseNextSession', () => {
-  it('accepte une réponse valide et arrondit la durée au quart d’heure', () => {
-    const advice = parseNextSession(
-      '```json\n{"inDays": 7, "focus": "technique", "intensity": "light", "durationMinutes": 70, "reason": "Repos pour ton doigt."}\n```',
+describe('parseMonthPlan', () => {
+  it('accepte un plan valide, le remet dans l’ordre et arrondit les durées', () => {
+    const plan = parseMonthPlan(
+      '```json\n' +
+        JSON.stringify({
+          summary: 'Mois tranquille.',
+          sessions: [s(4, 'strength', { durationMinutes: 70 }), s(2), s(2, 'endurance')],
+        }) +
+        '\n```',
+      3,
     );
-    expect(advice).toEqual({
-      inDays: 7,
-      focus: 'technique',
-      intensity: 'light',
-      durationMinutes: 75,
-      reason: 'Repos pour ton doigt.',
-    });
+    expect(plan.summary).toBe('Mois tranquille.');
+    expect(plan.sessions.map((x) => [x.inDays, x.focus, x.durationMinutes])).toEqual([
+      [2, 'technique', 90],
+      [4, 'strength', 75],
+    ]);
   });
 
-  it('tolère des nombres écrits en texte', () => {
-    const advice = parseNextSession(
-      '{"inDays": "3", "focus": "endurance", "intensity": "normal", "durationMinutes": "90", "reason": "ok"}',
+  it('tolère une liste seule et des nombres écrits en texte', () => {
+    const plan = parseMonthPlan(
+      JSON.stringify([{ ...s(3), inDays: '3', durationMinutes: '60' }]),
+      3,
     );
-    expect(advice).toMatchObject({ inDays: 3, durationMinutes: 90 });
+    expect(plan.sessions[0]).toMatchObject({ inDays: 3, durationMinutes: 60 });
   });
 
-  it('rejette un délai hors bornes ou un type inconnu', () => {
-    expect(() =>
-      parseNextSession(
-        '{"inDays": 60, "focus": "technique", "intensity": "light", "durationMinutes": 60, "reason": "x"}',
-      ),
-    ).toThrow(MistralError);
-    expect(() =>
-      parseNextSession(
-        '{"inDays": 2, "focus": "yoga", "intensity": "light", "durationMinutes": 60, "reason": "x"}',
-      ),
-    ).toThrow(MistralError);
-    expect(() => parseNextSession('pas du json')).toThrow(MistralError);
+  it('ignore les séances au-delà de 28 jours', () => {
+    const plan = parseMonthPlan(JSON.stringify({ sessions: [s(1), s(40)] }), 3);
+    expect(plan.sessions.map((x) => x.inDays)).toEqual([1]);
+  });
+
+  it('rejette un type inconnu, du texte, ou bien trop de séances', () => {
+    expect(() => parseMonthPlan(JSON.stringify({ sessions: [s(2, 'yoga')] }), 3)).toThrow(
+      MistralError,
+    );
+    expect(() => parseMonthPlan('pas du json', 3)).toThrow(MistralError);
+    const tooMany = Array.from({ length: 20 }, (_, i) => s(i));
+    expect(() => parseMonthPlan(JSON.stringify({ sessions: tooMany }), 3)).toThrow(
+      '20 séances sur 28 jours',
+    );
   });
 });
 
 describe('buildScheduleUserPrompt', () => {
-  it('donne à Mistral la proposition des règles, le rythme et les notes', () => {
+  it('donne à Mistral la proposition des règles sur 28 jours, le rythme et les notes', () => {
     const history = [
       session(0, now, { focus: 'endurance', fatigue: 4, notes: 'grosse douleur au majeur' }),
       session(3, now, { focus: 'strength' }),
     ];
     const prompt = buildScheduleUserPrompt(
       history,
-      buildSchedule(history, now, { sessionsPerWeek: 4 }),
+      buildSchedule(history, now, { sessionsPerWeek: 4, horizonDays: 28 }),
     );
     expect(prompt).toContain('jeudi 12 novembre');
-    expect(prompt).toContain('4 séances par semaine');
-    expect(prompt).toContain('Proposition des règles : technique');
+    expect(prompt).toContain('4 séances par semaine, soit environ 16 séances sur 28 jours');
+    expect(prompt).toMatch(/- jour \d+ \(.*\) : technique/);
     expect(prompt).toContain('« grosse douleur au majeur »');
     expect(prompt).toContain('notes : aucune');
   });
 });
 
 describe('MistralScheduleAdvisor', () => {
-  const reply = (o: object) => JSON.stringify(o);
   const advisorWith = (...answers: string[]) => {
     const chat = jest.fn();
     answers.forEach((a) => chat.mockResolvedValueOnce(a));
@@ -75,33 +89,19 @@ describe('MistralScheduleAdvisor', () => {
     return { advisor, chat };
   };
   const history = [session(0, now, { focus: 'endurance' })];
-  const base = buildSchedule(history, now);
+  const base = buildSchedule(history, now, { horizonDays: 28 });
 
-  it('redemande une fois si la réponse est invalide', async () => {
-    const { advisor, chat } = advisorWith(
-      'oups',
-      reply({
-        inDays: 2,
-        focus: 'technique',
-        intensity: 'normal',
-        durationMinutes: 120,
-        reason: 'RAS',
-      }),
-    );
-    await expect(advisor.adviseNext(history, base)).resolves.toMatchObject({ inDays: 2 });
+  it('redemande une fois si la réponse est invalide, en priorité basse', async () => {
+    const { advisor, chat } = advisorWith('oups', JSON.stringify({ sessions: [s(2), s(5)] }));
+    const plan = await advisor.advisePlan(history, base);
+    expect(plan.sessions).toHaveLength(2);
     expect(chat).toHaveBeenCalledTimes(2);
+    expect(chat.mock.calls[0][1]).toBe('low');
   });
 
   it('jamais une deuxième séance le jour même', async () => {
-    const { advisor } = advisorWith(
-      reply({
-        inDays: 0,
-        focus: 'technique',
-        intensity: 'light',
-        durationMinutes: 60,
-        reason: 'En forme',
-      }),
-    );
-    await expect(advisor.adviseNext(history, base)).resolves.toMatchObject({ inDays: 1 });
+    const { advisor } = advisorWith(JSON.stringify({ sessions: [s(0), s(2)] }));
+    const plan = await advisor.advisePlan(history, base);
+    expect(plan.sessions.map((x) => x.inDays)).toEqual([2]);
   });
 });

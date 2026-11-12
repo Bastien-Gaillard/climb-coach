@@ -42,10 +42,12 @@ export interface PlannedSession {
   durationMinutes: number;
   intensity: 'light' | 'normal';
   reason: string;
+  /** Qui a placé cette séance : Mistral (d'après les notes) ou les règles. */
+  source: 'mistral' | 'rules';
 }
 
-/** Prochaine séance décidée par Mistral, qui remplace celle des règles. */
-export interface NextSessionOverride {
+/** Séance planifiée par Mistral (jours comptés à partir d'aujourd'hui). */
+export interface AdvisedSession {
   inDays: number;
   focus: Focus;
   durationMinutes: number;
@@ -55,8 +57,10 @@ export interface NextSessionOverride {
 
 export interface Schedule {
   today: string;
-  /** Qui a décidé de la prochaine séance : Mistral (d'après les notes) ou les règles seules. */
+  /** Qui a construit le planning : Mistral (d'après les notes) ou les règles seules. */
   source: 'mistral' | 'rules';
+  /** Mot de Mistral sur le mois à venir. */
+  summary?: string;
   /** Pourquoi Mistral n'a pas été utilisé, s'il était configuré. */
   fallbackReason?: string;
   /** Mistral relit les notes en arrière-plan : redemander le planning dans quelques secondes. */
@@ -82,8 +86,15 @@ export function buildSchedule(
   {
     horizonDays = 7,
     sessionsPerWeek = DEFAULT_SESSIONS_PER_WEEK,
-    override,
-  }: { horizonDays?: number; sessionsPerWeek?: number; override?: NextSessionOverride } = {},
+    advised,
+    summary,
+  }: {
+    horizonDays?: number;
+    sessionsPerWeek?: number;
+    /** Plan de Mistral : remplace celui des règles, qui ne servent plus qu'à le prolonger. */
+    advised?: AdvisedSession[];
+    summary?: string;
+  } = {},
 ): Schedule {
   const today = localDay(now);
   const perWeek = Math.min(7, Math.max(1, Math.round(sessionsPerWeek)));
@@ -151,18 +162,25 @@ export function buildSchedule(
     carry = 0;
   }
 
-  if (override) {
-    // Mistral a lu les notes : sa séance remplace celle des règles, la suite du cycle en découle
-    sessions.push(
-      planned(
-        today,
-        addDays(today, override.inDays),
-        override.focus,
-        override.durationMinutes,
-        override.intensity,
-        override.reason,
-      ),
-    );
+  const plan = [...(advised ?? [])]
+    .filter((a) => a.inDays >= 0)
+    .sort((a, b) => a.inDays - b.inDays);
+  if (plan.length) {
+    // Mistral a lu les notes : son plan remplace celui des règles, qui le prolongent au besoin
+    const shown = plan.filter((a) => a.inDays < horizonDays);
+    for (const a of shown.length ? shown : plan.slice(0, 1)) {
+      sessions.push(
+        planned(
+          today,
+          addDays(today, a.inDays),
+          a.focus,
+          a.durationMinutes,
+          a.intensity,
+          a.reason,
+          'mistral',
+        ),
+      );
+    }
     carry = 0;
   } else {
     sessions.push(
@@ -174,7 +192,8 @@ export function buildSchedule(
 
   return {
     today,
-    source: override ? 'mistral' : 'rules',
+    source: plan.length ? 'mistral' : 'rules',
+    ...(plan.length && summary ? { summary } : {}),
     sessionsPerWeek: perWeek,
     basedOn: {
       date: lastDay,
@@ -230,8 +249,9 @@ function planned(
   durationMinutes: number,
   intensity: PlannedSession['intensity'],
   reason: string,
+  source: PlannedSession['source'] = 'rules',
 ): PlannedSession {
-  return { date, inDays: diffDays(today, date), focus, durationMinutes, intensity, reason };
+  return { date, inDays: diffDays(today, date), focus, durationMinutes, intensity, reason, source };
 }
 
 function minutesFor(focus: Focus, intensity: PlannedSession['intensity']): number {
