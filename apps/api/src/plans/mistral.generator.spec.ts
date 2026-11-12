@@ -1,5 +1,5 @@
 import { ConfigService } from '@nestjs/config';
-import { bracketGrades, MistralError, MistralGenerator } from './mistral.generator';
+import { bracketGrades, MistralError, MistralGenerator, parseModels } from './mistral.generator';
 import { Plan } from './plan.schema';
 import { session } from './test-helpers';
 
@@ -11,6 +11,8 @@ function makeGenerator(env: Record<string, unknown> = {}) {
     MISTRAL_MODEL: 'mistral-small-latest',
     MISTRAL_BASE_URL: 'https://api.mistral.ai/v1',
     MISTRAL_TIMEOUT_MS: 1000,
+    MISTRAL_MIN_INTERVAL_MS: 0,
+    MISTRAL_MAX_RETRIES: 2,
     ...env,
   };
   return new MistralGenerator({ get: (k: string) => values[k] } as unknown as ConfigService<
@@ -149,9 +151,69 @@ describe('MistralGenerator.generate', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
+  it('retente après un HTTP 429 en respectant Retry-After', async () => {
+    const ok = {
+      ok: true,
+      status: 200,
+      json: async () => ({ choices: [{ message: { content: JSON.stringify(validPlan) } }] }),
+    } as Response;
+    const tooMany = {
+      ok: false,
+      status: 429,
+      headers: new Headers({ 'retry-after': '0.01' }),
+      text: async () => '{"message":"Requests rate limit exceeded"}',
+    } as unknown as Response;
+    const fetchSpy = jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValueOnce(tooMany)
+      .mockResolvedValueOnce(ok);
+    await expect(makeGenerator().generate(ctx)).resolves.toEqual(validPlan);
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('abandonne après les tentatives, avec le détail de Mistral', async () => {
+    const tooMany = {
+      ok: false,
+      status: 429,
+      headers: new Headers({ 'retry-after': '0.01' }),
+      text: async () => '{"message":"Requests rate limit exceeded"}',
+    } as unknown as Response;
+    const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue(tooMany);
+    await expect(makeGenerator().generate(ctx)).rejects.toThrow(
+      'HTTP 429 : {"message":"Requests rate limit exceeded"}',
+    );
+    expect(fetchSpy).toHaveBeenCalledTimes(3);
+  });
+
+  it('n’attend pas quand Mistral demande un long délai (quota épuisé)', async () => {
+    const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: false,
+      status: 429,
+      headers: new Headers({ 'retry-after': '3600' }),
+      text: async () => 'quota exceeded',
+    } as unknown as Response);
+    await expect(makeGenerator().generate(ctx)).rejects.toThrow('quota exceeded');
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('espace les appels successifs', async () => {
+    const gen = makeGenerator({ MISTRAL_MIN_INTERVAL_MS: 200 });
+    const times: number[] = [];
+    jest.spyOn(global, 'fetch').mockImplementation(async () => {
+      times.push(Date.now());
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ choices: [{ message: { content: '{}' } }] }),
+      } as Response;
+    });
+    await Promise.all([gen.chat([]), gen.chat([])]);
+    expect(times[1] - times[0]).toBeGreaterThanOrEqual(190);
+  });
+
   it('remonte une erreur HTTP', async () => {
-    mockFetch({ ok: false, status: 429 });
-    await expect(makeGenerator().generate(ctx)).rejects.toThrow('HTTP 429');
+    mockFetch({ ok: false, status: 500 });
+    await expect(makeGenerator().generate(ctx)).rejects.toThrow('HTTP 500');
   });
 
   it('remonte une réponse vide', async () => {
@@ -197,5 +259,78 @@ describe('MistralGenerator.buildUserPrompt', () => {
     });
     expect(prompt).toContain('intensité light');
     expect(prompt).toContain('Douleur signalée il y a 2 j');
+  });
+});
+
+describe('plusieurs modèles', () => {
+  const ok = (content = '{"ok":true}') =>
+    ({
+      ok: true,
+      status: 200,
+      json: async () => ({ choices: [{ message: { content } }] }),
+    }) as Response;
+  const tooMany = () =>
+    ({
+      ok: false,
+      status: 429,
+      headers: new Headers(),
+      text: async () => 'rate limit exceeded',
+    }) as unknown as Response;
+  const modelOf = (call: unknown[]) =>
+    JSON.parse((call[1] as RequestInit).body as string).model as string;
+
+  it('lit la liste de MISTRAL_MODEL', () => {
+    expect(parseModels(' mistral-small-latest , ministral-8b-2512,,mistral-small-latest')).toEqual([
+      'mistral-small-latest',
+      'ministral-8b-2512',
+    ]);
+    expect(parseModels('')).toEqual(['mistral-small-latest']);
+  });
+
+  it('passe au modèle suivant sur un 429, sans attendre', async () => {
+    const gen = makeGenerator({ MISTRAL_MODEL: 'small,medium' });
+    const fetchSpy = jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValueOnce(tooMany())
+      .mockResolvedValueOnce(ok());
+    await expect(gen.chat([])).resolves.toBe('{"ok":true}');
+    expect(fetchSpy.mock.calls.map(modelOf)).toEqual(['small', 'medium']);
+    expect(gen.lastModel).toBe('medium');
+  });
+
+  it('ignore ensuite le modèle saturé pendant sa mise à l’écart', async () => {
+    const gen = makeGenerator({ MISTRAL_MODEL: 'small,medium' });
+    const fetchSpy = jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValueOnce(tooMany())
+      .mockResolvedValue(ok());
+    await gen.chat([]);
+    await gen.chat([]);
+    expect(fetchSpy.mock.calls.map(modelOf)).toEqual(['small', 'medium', 'medium']);
+  });
+
+  it('passe aussi au suivant sur une erreur serveur', async () => {
+    const gen = makeGenerator({ MISTRAL_MODEL: 'small,medium' });
+    jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 503,
+        text: async () => 'unavailable',
+      } as unknown as Response)
+      .mockResolvedValueOnce(ok());
+    await expect(gen.chat([])).resolves.toBe('{"ok":true}');
+  });
+
+  it('tous en échec : l’erreur cite chaque modèle', async () => {
+    const gen = makeGenerator({ MISTRAL_MODEL: 'small,medium', MISTRAL_MAX_RETRIES: 0 });
+    jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: false,
+      status: 500,
+      text: async () => 'boom',
+    } as unknown as Response);
+    await expect(gen.chat([])).rejects.toThrow(
+      'small : HTTP 500 : boom ; medium : HTTP 500 : boom',
+    );
   });
 });

@@ -1,5 +1,5 @@
 import { gradeFromValue, gradeValue } from '@climb-coach/grades';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Env } from '../config/env';
 import { REFERENCE_SYSTEM } from '../sessions/climb-normalizer';
@@ -14,6 +14,34 @@ export class MistralError extends Error {
     this.name = 'MistralError';
   }
 }
+
+/** HTTP 429 : trop de requêtes, ou quota du compte Mistral épuisé. */
+export class MistralRateLimitError extends MistralError {
+  constructor(
+    message: string,
+    /** Délai demandé par Mistral (en-tête Retry-After), s'il est donné. */
+    readonly retryAfterMs?: number,
+  ) {
+    super(message);
+    this.name = 'MistralRateLimitError';
+  }
+}
+
+/** Modèle mis de côté après un 429 sans délai indiqué par Mistral. */
+const DEFAULT_COOLDOWN_MS = 30_000;
+
+/** « mistral-small-latest, ministral-8b-2512 » → liste ordonnée, sans doublon. */
+export function parseModels(raw: string | undefined): string[] {
+  const models = (raw ?? '')
+    .split(',')
+    .map((m) => m.trim())
+    .filter(Boolean);
+  return models.length ? [...new Set(models)] : ['mistral-small-latest'];
+}
+
+/** Au-delà, ce n'est plus un simple débit trop élevé (quota épuisé) : inutile d'attendre. */
+const MAX_RETRY_WAIT_MS = 10_000;
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 /**
  * Certains modèles entourent le JSON de balises Markdown ou de texte :
@@ -183,6 +211,15 @@ Le champ "target" est optionnel. Pas de texte autour, pas de balises Markdown, p
 export class MistralGenerator implements PlanGenerator {
   readonly name = 'mistral' as const;
 
+  private readonly logger = new Logger('Mistral');
+  /** Appels mis en file : un seul à la fois (limites de débit de Mistral). */
+  private queue: Promise<unknown> = Promise.resolve();
+  /** Par modèle : dernier appel (pour l'espacement) et fin de mise à l'écart après un 429. */
+  private readonly lastCallAt = new Map<string, number>();
+  private readonly cooldownUntil = new Map<string, number>();
+  /** Modèle qui a répondu au dernier appel réussi. */
+  lastModel: string | null = null;
+
   constructor(private readonly config: ConfigService<Env, true>) {}
 
   get enabled(): boolean {
@@ -280,8 +317,80 @@ export class MistralGenerator implements PlanGenerator {
     return plan;
   }
 
-  /** Appel brut à l'API de chat de Mistral (réponse JSON attendue). Partagé avec le planning. */
-  async chat(messages: ChatMessage[]): Promise<string> {
+  /** Modèles à essayer, par ordre de préférence (MISTRAL_MODEL, séparés par des virgules). */
+  get models(): string[] {
+    return parseModels(this.config.get('MISTRAL_MODEL', { infer: true }));
+  }
+
+  /**
+   * Appel à l'API de chat de Mistral (réponse JSON attendue), partagé avec le planning.
+   * Les appels passent un par un. Chaque modèle de MISTRAL_MODEL est essayé dans l'ordre :
+   * s'il échoue (429, erreur serveur, timeout…), le suivant prend le relais aussitôt. Un modèle
+   * qui a renvoyé un 429 est ignoré pendant le délai demandé par Mistral.
+   */
+  chat(messages: ChatMessage[]): Promise<string> {
+    const run = this.queue.then(() => this.callWithFallback(messages));
+    this.queue = run.catch(() => undefined);
+    return run;
+  }
+
+  private async callWithFallback(messages: ChatMessage[]): Promise<string> {
+    const models = this.models;
+    const maxRetries = this.config.get('MISTRAL_MAX_RETRIES', { infer: true }) ?? 2;
+
+    for (let attempt = 0; ; attempt++) {
+      // Premier tour : on saute les modèles saturés, sauf s'ils le sont tous
+      const now = Date.now();
+      const available = models.filter((m) => (this.cooldownUntil.get(m) ?? 0) <= now);
+      const order = attempt === 0 && available.length ? available : models;
+
+      const errors: { model: string; error: MistralError }[] = [];
+      for (const model of order) {
+        await this.waitTurn(model);
+        try {
+          const content = await this.call(messages, model);
+          this.cooldownUntil.delete(model);
+          if (errors.length) {
+            this.logger.warn(`${model} prend le relais (${describe(errors, true)})`);
+          }
+          this.lastModel = model;
+          return content;
+        } catch (e) {
+          if (!(e instanceof MistralError)) throw e;
+          errors.push({ model, error: e });
+          if (e instanceof MistralRateLimitError) {
+            this.cooldownUntil.set(model, Date.now() + (e.retryAfterMs ?? DEFAULT_COOLDOWN_MS));
+          }
+        }
+      }
+
+      // Tous en échec : on attend un peu si ce n'est qu'une question de débit, sinon on abandonne
+      const limited = errors.filter((x) => x.error instanceof MistralRateLimitError);
+      const wait = Math.min(
+        ...limited.map(
+          (x) => (x.error as MistralRateLimitError).retryAfterMs ?? 2000 * (attempt + 1),
+        ),
+      );
+      if (limited.length === 0 || attempt >= maxRetries || wait > MAX_RETRY_WAIT_MS) {
+        const last = errors[errors.length - 1].error;
+        const message = describe(errors, models.length > 1);
+        throw last instanceof MistralRateLimitError
+          ? new MistralRateLimitError(message, last.retryAfterMs)
+          : new MistralError(message);
+      }
+      await sleep(wait);
+    }
+  }
+
+  /** Espacement minimal entre deux appels au même modèle. */
+  private async waitTurn(model: string): Promise<void> {
+    const interval = this.config.get('MISTRAL_MIN_INTERVAL_MS', { infer: true }) ?? 1100;
+    const wait = (this.lastCallAt.get(model) ?? 0) + interval - Date.now();
+    if (wait > 0) await sleep(wait);
+    this.lastCallAt.set(model, Date.now());
+  }
+
+  private async call(messages: ChatMessage[], model: string): Promise<string> {
     const baseUrl = this.config.get('MISTRAL_BASE_URL', { infer: true });
     const controller = new AbortController();
     const timeout = setTimeout(
@@ -298,14 +407,26 @@ export class MistralGenerator implements PlanGenerator {
           Authorization: `Bearer ${this.config.get('MISTRAL_API_KEY', { infer: true })}`,
         },
         body: JSON.stringify({
-          model: this.config.get('MISTRAL_MODEL', { infer: true }),
+          model,
           temperature: 0.3,
           response_format: { type: 'json_object' },
           messages,
         }),
       });
 
-      if (!res.ok) throw new MistralError(`HTTP ${res.status}`);
+      if (!res.ok) {
+        // Le détail dit si c'est le débit (« rate limit ») ou le quota du compte qui bloque
+        const detail = (await res.text?.().catch(() => ''))?.replace(/\s+/g, ' ').trim();
+        const message = `HTTP ${res.status}${detail ? ` : ${detail.slice(0, 160)}` : ''}`;
+        if (res.status === 429) {
+          const retryAfter = Number(res.headers?.get?.('retry-after'));
+          throw new MistralRateLimitError(
+            message,
+            Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : undefined,
+          );
+        }
+        throw new MistralError(message);
+      }
       const body = (await res.json()) as { choices?: { message?: { content?: string } }[] };
       const content = body.choices?.[0]?.message?.content;
       if (!content) throw new MistralError('Réponse vide');
@@ -318,4 +439,11 @@ export class MistralGenerator implements PlanGenerator {
       clearTimeout(timeout);
     }
   }
+}
+
+/** « mistral-small-latest : HTTP 429 ; ministral-8b-2512 : Timeout » (sans le nom s'il n'y a qu'un modèle). */
+function describe(errors: { model: string; error: Error }[], withModel: boolean): string {
+  return errors
+    .map((x) => (withModel ? `${x.model} : ${x.error.message}` : x.error.message))
+    .join(' ; ');
 }

@@ -7,9 +7,17 @@ const EnvSchema = z.object({
 
   /** Sans clé, l'API n'utilise que le générateur à règles. */
   MISTRAL_API_KEY: z.string().optional(),
+  /**
+   * Un ou plusieurs modèles séparés par des virgules, par ordre de préférence :
+   * si le premier échoue (ex : HTTP 429), le suivant prend le relais.
+   */
   MISTRAL_MODEL: z.string().default('mistral-small-latest'),
   MISTRAL_BASE_URL: z.string().url().default('https://api.mistral.ai/v1'),
   MISTRAL_TIMEOUT_MS: z.coerce.number().int().positive().default(15000),
+  /** Écart minimal entre deux appels (l'offre gratuite limite à ~1 requête par seconde). */
+  MISTRAL_MIN_INTERVAL_MS: z.coerce.number().int().min(0).default(1100),
+  /** Nouvelles tentatives après un HTTP 429 (trop de requêtes). */
+  MISTRAL_MAX_RETRIES: z.coerce.number().int().min(0).max(5).default(2),
 });
 
 export type Env = z.infer<typeof EnvSchema>;
