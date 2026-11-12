@@ -32,6 +32,11 @@
   duration(b.durationMinutes) }}, le {{ dayDate(b.date) | date: 'EEEE d MMMM' }} · fatigue {{
   b.fatigue }}/5. Il se met à jour à chaque séance enregistrée.
 </p>
+} @if (schedule()!.advicePending) {
+<p class="muted small pending" data-testid="advice-pending">
+  <app-icon name="generate" [size]="14" [stroke]="2.6" />Mistral relit tes notes, le planning va se
+  mettre à jour…
+</p>
 } @if (schedule()!.fallbackReason; as r) {
 <p class="muted small">
   Mistral n'a pas pu relire tes notes ({{ r }}) : planning calculé par les règles seules.

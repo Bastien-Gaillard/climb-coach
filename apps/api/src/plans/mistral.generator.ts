@@ -53,6 +53,9 @@ export function extractJson(content: string): string {
   return start !== -1 && end > start ? content.slice(start, end + 1) : content;
 }
 
+/** « high » : un utilisateur attend (génération) ; « low » : tâche de fond (planning). */
+export type ChatPriority = 'high' | 'low';
+
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
@@ -212,8 +215,14 @@ export class MistralGenerator implements PlanGenerator {
   readonly name = 'mistral' as const;
 
   private readonly logger = new Logger('Mistral');
-  /** Appels mis en file : un seul à la fois (limites de débit de Mistral). */
-  private queue: Promise<unknown> = Promise.resolve();
+  /** Appels mis en file : un seul à la fois, la génération de séance avant le planning. */
+  private readonly jobs: {
+    messages: ChatMessage[];
+    priority: ChatPriority;
+    resolve: (content: string) => void;
+    reject: (e: unknown) => void;
+  }[] = [];
+  private pumping = false;
   /** Par modèle : dernier appel (pour l'espacement) et fin de mise à l'écart après un 429. */
   private readonly lastCallAt = new Map<string, number>();
   private readonly cooldownUntil = new Map<string, number>();
@@ -328,10 +337,39 @@ export class MistralGenerator implements PlanGenerator {
    * s'il échoue (429, erreur serveur, timeout…), le suivant prend le relais aussitôt. Un modèle
    * qui a renvoyé un 429 est ignoré pendant le délai demandé par Mistral.
    */
-  chat(messages: ChatMessage[]): Promise<string> {
-    const run = this.queue.then(() => this.callWithFallback(messages));
-    this.queue = run.catch(() => undefined);
-    return run;
+  chat(messages: ChatMessage[], priority: ChatPriority = 'high'): Promise<string> {
+    return new Promise((resolve, reject) => {
+      this.jobs.push({ messages, priority, resolve, reject });
+      void this.pump();
+    });
+  }
+
+  /** Traite la file : attend qu'un modèle soit libre, puis sert d'abord les appels prioritaires. */
+  private async pump(): Promise<void> {
+    if (this.pumping) return;
+    this.pumping = true;
+    try {
+      while (this.jobs.length) {
+        await this.waitForAnyModel();
+        const high = this.jobs.findIndex((j) => j.priority === 'high');
+        const [job] = this.jobs.splice(high >= 0 ? high : 0, 1);
+        try {
+          job.resolve(await this.callWithFallback(job.messages));
+        } catch (e) {
+          job.reject(e);
+        }
+      }
+    } finally {
+      this.pumping = false;
+    }
+  }
+
+  /** Attend que le premier modèle utilisable ait respecté son espacement minimal. */
+  private async waitForAnyModel(): Promise<void> {
+    const interval = this.config.get('MISTRAL_MIN_INTERVAL_MS', { infer: true }) ?? 1100;
+    const next = Math.min(...this.models.map((m) => (this.lastCallAt.get(m) ?? 0) + interval));
+    const wait = next - Date.now();
+    if (wait > 0) await sleep(wait);
   }
 
   private async callWithFallback(messages: ChatMessage[]): Promise<string> {

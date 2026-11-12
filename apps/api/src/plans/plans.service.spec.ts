@@ -39,7 +39,10 @@ function setup({
       },
     }),
   };
-  const sessions = { findRecent: jest.fn().mockResolvedValue([]) } as unknown as SessionsService;
+  const sessions = {
+    findRecent: jest.fn().mockResolvedValue([]),
+    onChange: jest.fn(),
+  } as unknown as SessionsService;
   const mistralGen = {
     enabled,
     generate: jest.fn(mistral ?? (async () => mistralPlan)),
@@ -145,34 +148,67 @@ describe('PlansService.schedule', () => {
     (sessions.findRecent as jest.Mock).mockResolvedValue(history);
     const s = await service.schedule('u1', 14);
     expect(s.source).toBe('rules');
+    expect(s.advicePending).toBeUndefined();
     expect(advisor.adviseNext).not.toHaveBeenCalled();
   });
 
-  it('Mistral décide de la prochaine séance, les règles enchaînent la suite', async () => {
+  it('répond tout de suite avec les règles, puis avec l’avis de Mistral', async () => {
     const { service, sessions } = setup({ enabled: true, advise: async () => ({ ...injury }) });
     (sessions.findRecent as jest.Mock).mockResolvedValue(history);
+
+    const first = await service.schedule('u1', 21);
+    expect(first).toMatchObject({ source: 'rules', advicePending: true });
+
+    await service.adviceSettled('u1');
     const s = await service.schedule('u1', 21);
     expect(s.source).toBe('mistral');
+    expect(s.advicePending).toBeUndefined();
     expect(s.sessions[0]).toMatchObject({ inDays: 10, focus: 'technique', intensity: 'light' });
     expect(s.sessions[0].reason).toContain('épaule');
     // Après la technique : force, 3 jours plus tard (rythme 3/semaine)
     expect(s.sessions[1]).toMatchObject({ inDays: 13, focus: 'strength' });
   });
 
-  it('garde l’avis en cache tant que rien ne change', async () => {
+  it('un seul appel à Mistral par historique, même le lendemain', async () => {
+    let today = now;
+    const { service, sessions, advisor } = setup({
+      enabled: true,
+      advise: async () => ({ ...injury }),
+    });
+    (service as unknown as { clock: () => Date }).clock = () => today;
+    (sessions.findRecent as jest.Mock).mockResolvedValue(history);
+    await service.schedule('u1');
+    await service.schedule('u1'); // pendant le calcul : pas de second appel
+    await service.adviceSettled('u1');
+    expect(advisor.adviseNext).toHaveBeenCalledTimes(1);
+
+    // Le lendemain : même avis, une journée plus proche
+    today = new Date(now.getTime() + 24 * 3600 * 1000);
+    const s = await service.schedule('u1');
+    expect(s.sessions[0].inDays).toBe(9);
+    expect(advisor.adviseNext).toHaveBeenCalledTimes(1);
+
+    // Nouvelle séance enregistrée : on redemande
+    (sessions.findRecent as jest.Mock).mockResolvedValue([session(0, today), ...history]);
+    await service.schedule('u1');
+    expect(advisor.adviseNext).toHaveBeenCalledTimes(2);
+  });
+
+  it('demande l’avis dès qu’une séance est enregistrée', async () => {
     const { service, sessions, advisor } = setup({
       enabled: true,
       advise: async () => ({ ...injury }),
     });
     (sessions.findRecent as jest.Mock).mockResolvedValue(history);
-    await service.schedule('u1');
-    await service.schedule('u1');
+    const listener = (sessions.onChange as jest.Mock).mock.calls[0][0];
+    listener({ id: 'u1', sessionsPerWeek: 3 });
+    await new Promise((r) => setTimeout(r, 0));
+    await service.adviceSettled('u1');
     expect(advisor.adviseNext).toHaveBeenCalledTimes(1);
 
-    // Nouvelle séance enregistrée : on redemande
-    (sessions.findRecent as jest.Mock).mockResolvedValue([session(0, now), ...history]);
-    await service.schedule('u1');
-    expect(advisor.adviseNext).toHaveBeenCalledTimes(2);
+    const s = await service.schedule('u1', 7, 3);
+    expect(s.source).toBe('mistral');
+    expect(advisor.adviseNext).toHaveBeenCalledTimes(1);
   });
 
   it('retombe sur les règles si Mistral échoue, en gardant la raison', async () => {
@@ -181,9 +217,12 @@ describe('PlansService.schedule', () => {
       advise: async () => Promise.reject(new MistralError('Timeout')),
     });
     (sessions.findRecent as jest.Mock).mockResolvedValue(history);
+    await service.schedule('u1');
+    await service.adviceSettled('u1');
     const s = await service.schedule('u1');
     expect(s.source).toBe('rules');
     expect(s.fallbackReason).toBe('Timeout');
+    expect(s.advicePending).toBeUndefined();
     expect(s.sessions[0]).toMatchObject({ focus: 'technique', intensity: 'light' });
   });
 });

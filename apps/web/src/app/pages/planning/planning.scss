@@ -123,6 +123,12 @@
   }
 }
 
+.pending {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .ai {
   gap: 3px;
 }

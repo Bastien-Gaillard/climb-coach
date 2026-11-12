@@ -122,7 +122,9 @@
     @if (a.intensity === 'light') { · légère }
   </p>
   <p class="muted small">{{ a.reason }}</p>
-  @if (a.inDays > 0) {
+  @if (advicePending()) {
+  <p class="muted small">Mistral relit tes notes, la suggestion peut encore changer…</p>
+  } @if (a.inDays > 0) {
   <p class="small">Aujourd'hui, c'est plutôt repos. Tu peux quand même générer une séance.</p>
   } @else if (minutes() !== a.durationMinutes) {
   <button type="button" class="ghost small use" (click)="useAdvice(a)">

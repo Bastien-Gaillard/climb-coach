@@ -1,5 +1,6 @@
 import { DatePipe } from '@angular/common';
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { Component, computed, DestroyRef, inject, OnInit, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router, RouterLink } from '@angular/router';
 import { ApiService } from '../../core/api.service';
 import {
@@ -54,6 +55,10 @@ export class GeneratePage implements OnInit {
   /** Prochaine séance conseillée par le planning (jour, type, durée idéale). */
   protected readonly advice = signal<PlannedSession | null>(null);
   protected readonly adviceSource = signal<Schedule['source']>('rules');
+  protected readonly advicePending = signal(false);
+  private readonly destroyRef = inject(DestroyRef);
+  /** Durée choisie à la main : la suggestion ne l'écrase plus. */
+  private touched = false;
   protected readonly durationLabel = durationLabel;
   protected readonly relativeDay = relativeDay;
   protected readonly dayDate = dayDate;
@@ -89,15 +94,19 @@ export class GeneratePage implements OnInit {
 
   ngOnInit(): void {
     this.api.listSessions(1).subscribe({ next: (list) => this.last.set(list[0] ?? null) });
-    this.api.schedule(7).subscribe({
-      next: (s) => {
-        const next = s.sessions[0] ?? null;
-        this.advice.set(next);
-        this.adviceSource.set(s.source);
-        // Séance conseillée aujourd'hui : on part sur sa durée idéale
-        if (next && next.inDays === 0 && !this.result()) this.useAdvice(next);
-      },
-    });
+    this.api
+      .liveSchedule(7)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (s) => {
+          const next = s.sessions[0] ?? null;
+          this.advice.set(next);
+          this.adviceSource.set(s.source);
+          this.advicePending.set(!!s.advicePending);
+          // Séance conseillée aujourd'hui : on part sur sa durée idéale, sauf choix déjà fait
+          if (next && next.inDays === 0 && !this.result() && !this.touched) this.useAdvice(next);
+        },
+      });
     this.api.listGyms().subscribe({
       next: (list) => {
         this.gyms.set(list);
@@ -114,6 +123,7 @@ export class GeneratePage implements OnInit {
   }
 
   protected pick(value: number): void {
+    this.touched = true;
     this.minutes.set(value);
   }
 
@@ -128,6 +138,7 @@ export class GeneratePage implements OnInit {
   }
 
   protected step(delta: number): void {
+    this.touched = true;
     const value = Math.min(MAX, Math.max(MIN, this.custom() + delta));
     this.custom.set(value);
     this.minutes.set(value);

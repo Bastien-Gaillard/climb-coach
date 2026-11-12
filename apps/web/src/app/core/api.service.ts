@@ -1,6 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
-import { Observable } from 'rxjs';
+import { EMPTY, expand, Observable, switchMap, timer } from 'rxjs';
 import {
   CreateSession,
   GeneratedPlan,
@@ -42,6 +42,20 @@ export class ApiService {
   /** Prochaines séances conseillées sur les `days` prochains jours. */
   schedule(days = 7): Observable<Schedule> {
     return this.http.get<Schedule>(`${this.base}/plans/schedule`, { params: { days } });
+  }
+
+  /**
+   * Planning, puis ses mises à jour tant que Mistral relit les notes en arrière-plan
+   * (il peut attendre son tour : le modèle gratuit n'accepte qu'un appel toutes les ~30 s).
+   */
+  liveSchedule(days = 7, everyMs = 6000, maxPolls = 25): Observable<Schedule> {
+    return this.schedule(days).pipe(
+      expand((s, i) =>
+        s.advicePending && i < maxPolls
+          ? timer(everyMs).pipe(switchMap(() => this.schedule(days)))
+          : EMPTY,
+      ),
+    );
   }
 
   /** Réglages du compte connecté. */

@@ -1,6 +1,6 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { ComponentFixture, fakeAsync, TestBed, tick } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { Schedule } from '../../core/models';
 import { PlanningPage } from './planning';
@@ -74,6 +74,29 @@ describe('PlanningPage', () => {
     expect(days.length).toBe(11);
     expect(days[10].textContent).toContain('Technique');
   });
+
+  it('se met à jour quand Mistral a fini de relire les notes', fakeAsync(() => {
+    fixture = TestBed.createComponent(PlanningPage);
+    el = fixture.nativeElement;
+    fixture.detectChanges();
+    http
+      .expectOne((r) => r.url === '/api/plans/schedule')
+      .flush({ ...schedule(3, 2), advicePending: true });
+    fixture.detectChanges();
+    expect(el.querySelector('[data-testid=advice-pending]')).not.toBeNull();
+
+    tick(6000);
+    http
+      .expectOne((r) => r.url === '/api/plans/schedule')
+      .flush({ ...schedule(3, 7), source: 'mistral' });
+    fixture.detectChanges();
+    expect(el.querySelector('[data-testid=advice-pending]')).toBeNull();
+    expect(
+      el.querySelectorAll('[data-testid=planning] > li')[7].querySelector('.ai'),
+    ).not.toBeNull();
+    tick(10000);
+    http.expectNone((r) => r.url === '/api/plans/schedule');
+  }));
 
   it('enregistre le rythme puis recalcule le planning', () => {
     const checked = () => el.querySelector('.seg [aria-checked=true]')?.textContent?.trim();

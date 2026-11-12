@@ -322,6 +322,20 @@ describe('plusieurs modèles', () => {
     await expect(gen.chat([])).resolves.toBe('{"ok":true}');
   });
 
+  it('sert la génération avant le planning en attente', async () => {
+    const gen = makeGenerator({ MISTRAL_MODEL: 'small', MISTRAL_MIN_INTERVAL_MS: 50 });
+    const order: string[] = [];
+    jest.spyOn(global, 'fetch').mockImplementation(async (_url, init) => {
+      order.push(JSON.parse((init as RequestInit).body as string).messages[0].content);
+      return ok();
+    });
+    const first = gen.chat([{ role: 'user', content: 'a' }]);
+    const low = gen.chat([{ role: 'user', content: 'planning' }], 'low');
+    const high = gen.chat([{ role: 'user', content: 'séance' }]);
+    await Promise.all([first, low, high]);
+    expect(order).toEqual(['a', 'séance', 'planning']);
+  });
+
   it('tous en échec : l’erreur cite chaque modèle', async () => {
     const gen = makeGenerator({ MISTRAL_MODEL: 'small,medium', MISTRAL_MAX_RETRIES: 0 });
     jest.spyOn(global, 'fetch').mockResolvedValue({

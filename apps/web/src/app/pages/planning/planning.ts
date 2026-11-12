@@ -1,5 +1,7 @@
 import { DatePipe } from '@angular/common';
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { Component, computed, DestroyRef, inject, OnInit, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { Subscription } from 'rxjs';
 import { RouterLink } from '@angular/router';
 import { ApiService } from '../../core/api.service';
 import { dayDate, durationLabel, errorMessage, FOCUS_LABEL, relativeDay } from '../../core/labels';
@@ -23,6 +25,8 @@ interface Day {
 })
 export class PlanningPage implements OnInit {
   private readonly api = inject(ApiService);
+  private readonly destroyRef = inject(DestroyRef);
+  private loading?: Subscription;
 
   protected readonly focusLabel = FOCUS_LABEL;
   protected readonly duration = durationLabel;
@@ -74,15 +78,19 @@ export class PlanningPage implements OnInit {
   }
 
   private load(): void {
-    this.api.schedule(HORIZON).subscribe({
-      next: (s) => {
-        this.schedule.set(s);
-        this.saving.set(false);
-      },
-      error: (err) => {
-        this.saving.set(false);
-        this.error.set(errorMessage(err));
-      },
-    });
+    this.loading?.unsubscribe();
+    this.loading = this.api
+      .liveSchedule(HORIZON)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (s) => {
+          this.schedule.set(s);
+          this.saving.set(false);
+        },
+        error: (err) => {
+          this.saving.set(false);
+          this.error.set(errorMessage(err));
+        },
+      });
   }
 }

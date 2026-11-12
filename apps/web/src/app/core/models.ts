@@ -109,6 +109,8 @@ export interface Schedule {
   source: 'mistral' | 'rules';
   /** Pourquoi Mistral n'a pas été utilisé, s'il était configuré. */
   fallbackReason?: string;
+  /** Mistral relit les notes en arrière-plan : le planning va être mis à jour. */
+  advicePending?: boolean;
   /** Rythme du compte (séances par semaine), qui espace les séances. */
   sessionsPerWeek: number;
   basedOn: { date: string; focus: Focus; durationMinutes: number; fatigue: number } | null;

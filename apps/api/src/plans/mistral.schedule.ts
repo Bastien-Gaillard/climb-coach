@@ -113,20 +113,23 @@ export class MistralScheduleAdvisor {
       { role: 'system', content: SCHEDULE_PROMPT },
       { role: 'user', content: buildScheduleUserPrompt(history, base) },
     ];
-    const content = await this.mistral.chat(messages);
+    const content = await this.mistral.chat(messages, 'low');
     let advice: NextSessionOverride;
     try {
       advice = parseNextSession(content);
     } catch (e) {
       if (!(e instanceof MistralError)) throw e;
-      const retry = await this.mistral.chat([
-        ...messages,
-        { role: 'assistant', content },
-        {
-          role: 'user',
-          content: `Ta réponse est invalide : ${e.message}. Renvoie uniquement le JSON corrigé.`,
-        },
-      ]);
+      const retry = await this.mistral.chat(
+        [
+          ...messages,
+          { role: 'assistant', content },
+          {
+            role: 'user',
+            content: `Ta réponse est invalide : ${e.message}. Renvoie uniquement le JSON corrigé.`,
+          },
+        ],
+        'low',
+      );
       advice = parseNextSession(retry);
     }
 
