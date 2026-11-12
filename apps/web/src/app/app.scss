@@ -46,7 +46,7 @@ nav {
   right: 0;
   bottom: 0;
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   align-items: start;
   height: calc(84px + env(safe-area-inset-bottom));
   padding: 8px 6px env(safe-area-inset-bottom);

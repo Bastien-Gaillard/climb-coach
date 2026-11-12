@@ -18,9 +18,10 @@ describe('App', () => {
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
     const links = (fixture.nativeElement as HTMLElement).querySelectorAll('nav a');
-    expect(links.length).toBe(5);
+    expect(links.length).toBe(6);
     expect(Array.from(links).map((a) => a.getAttribute('href'))).toEqual([
       '/generer',
+      '/planning',
       '/historique',
       '/seance',
       '/salles',

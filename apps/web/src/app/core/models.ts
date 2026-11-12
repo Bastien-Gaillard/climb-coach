@@ -91,3 +91,20 @@ export interface ProgressionPoint {
   grade: string;
   value: number;
 }
+
+export interface PlannedSession {
+  /** Jour conseillé, AAAA-MM-JJ. */
+  date: string;
+  /** Jours à partir d'aujourd'hui (0 = aujourd'hui). */
+  inDays: number;
+  focus: Focus;
+  durationMinutes: number;
+  intensity: 'light' | 'normal';
+  reason: string;
+}
+
+export interface Schedule {
+  today: string;
+  basedOn: { date: string; focus: Focus; durationMinutes: number; fatigue: number } | null;
+  sessions: PlannedSession[];
+}

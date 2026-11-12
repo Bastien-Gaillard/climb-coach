@@ -9,6 +9,7 @@ import { withGymColors } from './gym-colors';
 import { MistralGenerator } from './mistral.generator';
 import { Plan } from './plan.schema';
 import { RuleBasedGenerator } from './rule-based.generator';
+import { buildSchedule, Schedule } from './schedule';
 
 export const CLOCK = Symbol('CLOCK');
 export type Clock = () => Date;
@@ -81,6 +82,12 @@ export class PlansService {
       plan,
       createdAt: saved.createdAt,
     };
+  }
+
+  /** Prochaines séances conseillées (jour, type, durée), recalculées depuis la dernière séance. */
+  async schedule(userId: string, horizonDays = 7): Promise<Schedule> {
+    const history = await this.sessions.findRecent(userId, 5);
+    return buildSchedule(history, this.clock(), horizonDays);
   }
 
   async recent(userId: string, limit = 10) {

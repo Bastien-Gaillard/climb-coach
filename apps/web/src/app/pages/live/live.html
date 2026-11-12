@@ -4,12 +4,18 @@
     <a routerLink="/generer" class="btn icon close" aria-label="Fermer la séance">
       <app-icon name="close" [size]="22" [stroke]="2.4" />
     </a>
-    <span class="overline">Bloc {{ index() + 1 }} / {{ blocks().length }} · total {{ elapsed() }} min</span>
+    <span class="overline"
+      >Bloc {{ index() + 1 }} / {{ blocks().length }} · total {{ elapsed() }} min</span
+    >
     <span class="badge accent">{{ generated()!.source === 'mistral' ? 'IA' : 'Règles' }}</span>
   </div>
   <div class="segs" aria-hidden="true">
     @for (x of blocks(); track $index; let k = $index) {
-    <span [style.flex-grow]="x.minutes" [class.done]="k < index()" [class.cur]="k === index()"></span>
+    <span
+      [style.flex-grow]="x.minutes"
+      [class.done]="k < index()"
+      [class.cur]="k === index()"
+    ></span>
     }
   </div>
 </header>
@@ -38,7 +44,13 @@
 
   <ol class="steps">
     @for (st of b.instructions; track $index; let n = $index) {
-    <li><span class="num">{{ n + 1 }}</span><span>{{ st }}</span></li>
+    <li>
+      <span class="num">{{ n + 1 }}</span>
+      <span class="grow">{{ st }}</span>
+      @if (figures()[n]; as f) {
+      <app-figure [name]="f" class="fig" />
+      }
+    </li>
     }
   </ol>
 
@@ -47,12 +59,19 @@
     <span class="grow">
       @if (next(); as nx) { {{ nx.title }} · {{ nx.minutes }} min } @else { Fin de séance }
     </span>
-    <a routerLink="/seance" class="btn add"><app-icon name="plus" [size]="18" [stroke]="2.6" />Voie</a>
+    <a routerLink="/seance" class="btn add"
+      ><app-icon name="plus" [size]="18" [stroke]="2.6" />Voie</a
+    >
   </div>
 </section>
 
 <div class="controls">
-  <button type="button" (click)="go(index() - 1)" [disabled]="index() === 0" aria-label="Bloc précédent">
+  <button
+    type="button"
+    (click)="go(index() - 1)"
+    [disabled]="index() === 0"
+    aria-label="Bloc précédent"
+  >
     <app-icon name="prev" [size]="28" />
   </button>
   @if (isLast() && left() === 0) {

@@ -1,10 +1,20 @@
 import { DatePipe } from '@angular/common';
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { ApiService } from '../../core/api.service';
-import { BLOCK_LABEL, errorMessage, FOCUS_LABEL, STYLE_LABEL } from '../../core/labels';
-import { Gym, Session } from '../../core/models';
+import {
+  BLOCK_LABEL,
+  dayDate,
+  durationLabel,
+  errorMessage,
+  FOCUS_LABEL,
+  relativeDay,
+  STYLE_LABEL,
+} from '../../core/labels';
+import { Gym, PlannedSession, Session } from '../../core/models';
 import { PlanStore } from '../../core/plan.store';
+import { Figure } from '../../shared/figure';
+import { blockFigures } from '../../shared/figures';
 import { holdVars } from '../../shared/hold';
 import { Icon } from '../../shared/icon';
 
@@ -15,7 +25,7 @@ const MAX = 300;
 
 @Component({
   selector: 'app-generate',
-  imports: [DatePipe, Icon],
+  imports: [DatePipe, RouterLink, Icon, Figure],
   templateUrl: './generate.html',
   styleUrl: './generate.scss',
 })
@@ -41,6 +51,17 @@ export class GeneratePage implements OnInit {
   protected readonly error = signal<string | null>(null);
   protected readonly result = this.store.plan;
   protected readonly last = signal<Session | null>(null);
+  /** Prochaine séance conseillée par le planning (jour, type, durée idéale). */
+  protected readonly advice = signal<PlannedSession | null>(null);
+  protected readonly durationLabel = durationLabel;
+  protected readonly relativeDay = relativeDay;
+  protected readonly dayDate = dayDate;
+
+  /** Schéma de chaque consigne, bloc par bloc. */
+  protected readonly figures = computed(() => {
+    const p = this.result()?.plan;
+    return p ? p.blocks.map((b) => blockFigures(b, p.focus)) : [];
+  });
 
   protected readonly total = computed(
     () => this.result()?.plan.blocks.reduce((sum, b) => sum + b.minutes, 0) ?? 0,
@@ -67,6 +88,14 @@ export class GeneratePage implements OnInit {
 
   ngOnInit(): void {
     this.api.listSessions(1).subscribe({ next: (list) => this.last.set(list[0] ?? null) });
+    this.api.schedule(7).subscribe({
+      next: (s) => {
+        const next = s.sessions[0] ?? null;
+        this.advice.set(next);
+        // Séance conseillée aujourd'hui : on part sur sa durée idéale
+        if (next && next.inDays === 0 && !this.result()) this.useAdvice(next);
+      },
+    });
     this.api.listGyms().subscribe({
       next: (list) => {
         this.gyms.set(list);
@@ -74,6 +103,12 @@ export class GeneratePage implements OnInit {
         if (this.gymId() && !list.some((g) => g.id === this.gymId())) this.pickGym(null);
       },
     });
+  }
+
+  protected useAdvice(a: PlannedSession): void {
+    const value = Math.min(MAX, Math.max(MIN, a.durationMinutes));
+    if (!this.presets.includes(value)) this.custom.set(value);
+    this.minutes.set(value);
   }
 
   protected pick(value: number): void {

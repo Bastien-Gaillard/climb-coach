@@ -19,6 +19,11 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/generate/generate').then((m) => m.GeneratePage),
       },
       {
+        path: 'planning',
+        title: 'Planning',
+        loadComponent: () => import('./pages/planning/planning').then((m) => m.PlanningPage),
+      },
+      {
         path: 'seance-en-cours',
         title: 'Séance en cours',
         loadComponent: () => import('./pages/live/live').then((m) => m.LivePage),

@@ -1,0 +1,52 @@
+<header class="hero dots">
+  <span class="overline">7 prochains jours</span>
+  <h1>Planning</h1>
+</header>
+
+@if (error(); as e) {
+<p class="error">{{ e }}</p>
+} @else if (!schedule()) {
+<p class="muted">Chargement…</p>
+} @else { @if (schedule()!.basedOn; as b) {
+<p class="muted small based-on">
+  Calculé depuis ta dernière séance : {{ focusLabel[b.focus].toLowerCase() }}, {{
+  duration(b.durationMinutes) }}, le {{ dayDate(b.date) | date: 'EEEE d MMMM' }} · fatigue {{
+  b.fatigue }}/5. Il se met à jour à chaque séance enregistrée.
+</p>
+}
+
+<ol class="week" data-testid="planning">
+  @for (d of days(); track d.inDays) {
+  <li [class.today]="d.inDays === 0" [class.rest]="!d.session">
+    <div class="day">
+      <span class="overline">{{ d.date | date: 'EEE' }}</span>
+      <span class="num">{{ d.date | date: 'd' }}</span>
+    </div>
+
+    @if (d.session; as s) {
+    <div class="session" [class]="s.focus">
+      <div class="head">
+        <strong>{{ focusLabel[s.focus] }}</strong>
+        @if (s.intensity === 'light') {
+        <span class="badge">Légère</span>
+        }
+        <span class="num mins">{{ duration(s.durationMinutes) }}</span>
+      </div>
+      <p class="small">{{ s.reason }}</p>
+      @if (s.inDays === 0) {
+      <a routerLink="/generer" class="btn primary go">
+        <app-icon name="generate" [size]="18" [stroke]="2.4" />Générer cette séance
+      </a>
+      } @else {
+      <span class="muted small">{{ relative(s.inDays) }}</span>
+      }
+    </div>
+    } @else {
+    <div class="session rest">
+      <span class="muted">Repos</span>
+    </div>
+    }
+  </li>
+  }
+</ol>
+}

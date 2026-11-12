@@ -1,7 +1,15 @@
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
-import { CreateSession, GeneratedPlan, Gym, GymInput, ProgressionPoint, Session } from './models';
+import {
+  CreateSession,
+  GeneratedPlan,
+  Gym,
+  GymInput,
+  ProgressionPoint,
+  Schedule,
+  Session,
+} from './models';
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
@@ -29,6 +37,11 @@ export class ApiService {
       availableMinutes,
       ...(gymId && { gymId }),
     });
+  }
+
+  /** Prochaines séances conseillées sur les `days` prochains jours. */
+  schedule(days = 7): Observable<Schedule> {
+    return this.http.get<Schedule>(`${this.base}/plans/schedule`, { params: { days } });
   }
 
   listGyms(): Observable<Gym[]> {

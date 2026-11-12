@@ -3,9 +3,18 @@ import { Focus, GeneratedPlan } from './models';
 
 const KEY = 'climb-coach.plan';
 
+/** Position du minuteur : bloc en cours, secondes restantes à l'instant `at`. */
+export interface TimerState {
+  index: number;
+  left: number;
+  running: boolean;
+  at: number;
+}
+
 interface Saved {
   plan: GeneratedPlan;
   startedAt: number | null;
+  timer?: TimerState | null;
 }
 
 function read(): Saved | null {
@@ -29,15 +38,21 @@ export class PlanStore {
   /** Début de la séance guidée (ms), null tant qu'elle n'est pas démarrée. */
   readonly startedAt = signal<number | null>(this.saved?.startedAt ?? null);
 
-  /** Position du minuteur quand on quitte l'écran (ex. « + Voie »), pour reprendre au même endroit. */
-  readonly timer = signal<{ index: number; left: number; running: boolean; at: number } | null>(
-    null,
-  );
+  /**
+   * Position du minuteur, sauvegardée à chaque changement : on reprend au même endroit après
+   * « + Voie », un rechargement, ou un onglet tué par le téléphone pendant la veille.
+   */
+  readonly timer = signal<TimerState | null>(this.saved?.timer ?? null);
 
   set(plan: GeneratedPlan | null): void {
     this.plan.set(plan);
     this.startedAt.set(null);
     this.timer.set(null);
+    this.persist();
+  }
+
+  saveTimer(state: TimerState): void {
+    this.timer.set(state);
     this.persist();
   }
 
@@ -67,7 +82,11 @@ export class PlanStore {
   private persist(): void {
     try {
       const plan = this.plan();
-      if (plan) sessionStorage.setItem(KEY, JSON.stringify({ plan, startedAt: this.startedAt() }));
+      if (plan)
+        sessionStorage.setItem(
+          KEY,
+          JSON.stringify({ plan, startedAt: this.startedAt(), timer: this.timer() }),
+        );
       else sessionStorage.removeItem(KEY);
     } catch {
       // stockage indisponible (navigation privée) : on garde juste l'état en mémoire

@@ -18,6 +18,26 @@ export const BLOCK_LABEL: Record<PlanBlock['kind'], string> = {
   cooldown: 'Retour au calme',
 };
 
+/** « 90 min », « 2 h », « 1 h 30 ». */
+export function durationLabel(minutes: number): string {
+  if (minutes < 60) return `${minutes} min`;
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return m ? `${h} h ${String(m).padStart(2, '0')}` : `${h} h`;
+}
+
+/** Jour d'un planning (AAAA-MM-JJ) en date locale, à midi pour éviter les décalages. */
+export function dayDate(day: string): Date {
+  const [y, m, d] = day.split('-').map(Number);
+  return new Date(y, m - 1, d, 12);
+}
+
+export function relativeDay(inDays: number): string {
+  if (inDays <= 0) return 'Aujourd’hui';
+  if (inDays === 1) return 'Demain';
+  return `Dans ${inDays} jours`;
+}
+
 export const FATIGUE_LABEL = ['frais', 'léger', 'moyen', 'entamé', 'épuisé'];
 
 /** Message lisible à partir d'une erreur HTTP de l'API. */

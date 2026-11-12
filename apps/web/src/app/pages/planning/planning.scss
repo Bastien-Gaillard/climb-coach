@@ -1,0 +1,120 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.hero {
+  margin: -20px -16px 0;
+  padding: 32px 20px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  @media (min-width: 960px) {
+    margin: 0;
+    border-radius: var(--r-l);
+    padding: 28px;
+  }
+}
+
+.based-on {
+  line-height: 1.45;
+}
+
+.week {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+
+  > li {
+    display: flex;
+    gap: 12px;
+    align-items: stretch;
+  }
+}
+
+.day {
+  flex: 0 0 52px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+
+  .num {
+    font-size: 26px;
+    line-height: 1;
+  }
+
+  .today & {
+    background: var(--ink);
+    color: var(--bg);
+
+    .overline {
+      color: inherit;
+      opacity: 0.75;
+    }
+  }
+}
+
+.session {
+  flex: 1;
+  background: var(--surface);
+  border-radius: 16px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-shadow: var(--shadow-1);
+  border-left: 6px solid var(--line-strong);
+
+  &.strength {
+    border-left-color: var(--ink);
+  }
+
+  &.endurance {
+    border-left-color: var(--accent);
+  }
+
+  &.technique {
+    border-left-color: var(--muted);
+  }
+
+  &.rest {
+    background: none;
+    box-shadow: none;
+    border: 2px dashed var(--line);
+    justify-content: center;
+    padding: 10px 14px;
+  }
+
+  p {
+    color: var(--ink-2);
+    line-height: 1.4;
+  }
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  strong {
+    font-size: 19px;
+  }
+
+  .mins {
+    margin-left: auto;
+    font-size: 22px;
+  }
+}
+
+.go {
+  align-self: flex-start;
+  margin-top: 4px;
+  text-decoration: none;
+}

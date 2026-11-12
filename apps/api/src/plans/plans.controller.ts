@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query } from '@nestjs/common';
 import { z } from 'zod';
 import { CurrentUser } from '../auth/auth.decorators';
 import type { User } from '../auth/users.service';
@@ -11,6 +11,10 @@ const GeneratePlanSchema = z.object({
   gymId: z.string().min(1).optional(),
 });
 
+const ScheduleQuerySchema = z.object({
+  days: z.coerce.number().int().min(1).max(28).default(7),
+});
+
 @Controller('plans')
 export class PlansController {
   constructor(private readonly plans: PlansService) {}
@@ -21,6 +25,15 @@ export class PlansController {
     @Body(new ZodValidationPipe(GeneratePlanSchema)) body: z.infer<typeof GeneratePlanSchema>,
   ) {
     return this.plans.generate(user.id, body.availableMinutes, body.gymId);
+  }
+
+  /** Planning des prochains jours : quand grimper, quel type de séance, combien de temps. */
+  @Get('schedule')
+  schedule(
+    @CurrentUser() user: User,
+    @Query(new ZodValidationPipe(ScheduleQuerySchema)) query: z.infer<typeof ScheduleQuerySchema>,
+  ) {
+    return this.plans.schedule(user.id, query.days);
   }
 
   @Get()

@@ -68,8 +68,13 @@
       >
       } } @if (b.instructions.length) {
       <ul>
-        @for (step of b.instructions; track $index) {
-        <li>{{ step }}</li>
+        @for (step of b.instructions; track $index; let k = $index) {
+        <li [class.with-fig]="figures()[i]?.[k]">
+          @if (figures()[i]?.[k]; as f) {
+          <app-figure [name]="f" />
+          }
+          <span>{{ step }}</span>
+        </li>
         }
       </ul>
       }
@@ -103,6 +108,29 @@
   <span class="overline">{{ today | date: 'EEEE d MMMM' }}</span>
   <h1>Générer ma séance</h1>
 </header>
+
+@if (advice(); as a) {
+<section class="card advice" [class.later]="a.inDays > 0" data-testid="advice">
+  <span class="overline">
+    <app-icon name="calendar" [size]="14" [stroke]="2.4" />Conseillé · {{ relativeDay(a.inDays)
+    }}@if (a.inDays > 0) { ({{ dayDate(a.date) | date: 'EEEE' }}) }
+  </span>
+  <p>
+    <strong>{{ focusLabel[a.focus] }}</strong> ·
+    <strong>{{ durationLabel(a.durationMinutes) }}</strong>
+    @if (a.intensity === 'light') { · légère }
+  </p>
+  <p class="muted small">{{ a.reason }}</p>
+  @if (a.inDays > 0) {
+  <p class="small">Aujourd'hui, c'est plutôt repos. Tu peux quand même générer une séance.</p>
+  } @else if (minutes() !== a.durationMinutes) {
+  <button type="button" class="ghost small use" (click)="useAdvice(a)">
+    Reprendre {{ durationLabel(a.durationMinutes) }}
+  </button>
+  }
+  <a routerLink="/planning" class="small">Voir le planning</a>
+</section>
+}
 
 <section class="stack">
   <h2 class="overline">Temps disponible</h2>

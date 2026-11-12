@@ -145,7 +145,7 @@
   li {
     display: flex;
     gap: 12px;
-    align-items: baseline;
+    align-items: center;
     font-size: 21px;
     line-height: 1.3;
     font-weight: 500;
@@ -156,6 +156,14 @@
     width: 18px;
     font-size: 22px;
     color: var(--muted);
+  }
+
+  .grow {
+    flex: 1;
+  }
+
+  .fig {
+    width: 96px;
   }
 }
 

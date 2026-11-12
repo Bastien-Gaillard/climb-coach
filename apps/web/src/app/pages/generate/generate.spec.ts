@@ -2,7 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { GeneratedPlan } from '../../core/models';
+import { GeneratedPlan, Schedule } from '../../core/models';
 import { GeneratePage } from './generate';
 
 const response: GeneratedPlan = {
@@ -28,10 +28,16 @@ const response: GeneratedPlan = {
   },
 };
 
+const emptySchedule: Schedule = { today: '2026-11-12', basedOn: null, sessions: [] };
+
 describe('GeneratePage', () => {
   let fixture: ComponentFixture<GeneratePage>;
   let http: HttpTestingController;
   let el: HTMLElement;
+
+  /** Planning chargé à l'ouverture (vide par défaut : pas de suggestion). */
+  const flushSchedule = (schedule: Schedule = emptySchedule) =>
+    http.expectOne((r) => r.url === '/api/plans/schedule').flush(schedule);
 
   /** Bouton par son libellé visible (début du texte) ou son aria-label. */
   const click = (text: string) => {
@@ -58,6 +64,7 @@ describe('GeneratePage', () => {
     fixture.detectChanges();
     // Dernière séance, affichée dans « Pris en compte »
     http.expectOne((r) => r.url === '/api/sessions').flush([]);
+    flushSchedule();
     http.expectOne('/api/gyms').flush([]);
   });
 
@@ -145,6 +152,7 @@ describe('GeneratePage', () => {
           ],
         },
       ]);
+    flushSchedule();
     http.expectOne('/api/gyms').flush([]);
     fixture.detectChanges();
     const text = el.querySelector('.context')?.textContent?.replace(/\s+/g, ' ');
@@ -164,6 +172,7 @@ describe('GeneratePage', () => {
     el = fixture.nativeElement;
     fixture.detectChanges();
     http.expectOne((r) => r.url === '/api/sessions').flush([]);
+    flushSchedule();
     http.expectOne('/api/gyms').flush([
       {
         id: 'alpha-bloc',
@@ -192,6 +201,41 @@ describe('GeneratePage', () => {
     expect(el.querySelector('[data-testid=target-colors]')?.textContent).toContain('bleu');
     expect(el.querySelector('h1')?.textContent).toContain('Salle Alpha');
     expect(localStorage.getItem('climb-coach.gym')).toBe('alpha-bloc');
+  });
+
+  it('propose la durée idéale de la séance conseillée aujourd’hui', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [GeneratePage],
+      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
+    });
+    fixture = TestBed.createComponent(GeneratePage);
+    http = TestBed.inject(HttpTestingController);
+    el = fixture.nativeElement;
+    fixture.detectChanges();
+    http.expectOne((r) => r.url === '/api/sessions').flush([]);
+    flushSchedule({
+      today: '2026-11-12',
+      basedOn: null,
+      sessions: [
+        {
+          date: '2026-11-12',
+          inDays: 0,
+          focus: 'technique',
+          durationMinutes: 120,
+          intensity: 'normal',
+          reason: '2 jours de récup après l’endurance',
+        },
+      ],
+    });
+    http.expectOne('/api/gyms').flush([]);
+    fixture.detectChanges();
+
+    const advice = el.querySelector('[data-testid=advice]')?.textContent?.replace(/\s+/g, ' ');
+    expect(advice).toContain('Technique');
+    expect(advice).toContain('2 h');
+    click('Générer');
+    expect(http.expectOne('/api/plans/generate').request.body).toEqual({ availableMinutes: 120 });
   });
 
   it('affiche l’erreur de l’API', () => {
