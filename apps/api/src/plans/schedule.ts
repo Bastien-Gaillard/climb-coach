@@ -65,6 +65,12 @@ export interface Schedule {
   fallbackReason?: string;
   /** Mistral relit les notes en arrière-plan : redemander le planning dans quelques secondes. */
   advicePending?: boolean;
+  /** Date du planning de Mistral affiché (il ne change que sur demande). */
+  plannedAt?: string;
+  /** Rythme pour lequel ce planning a été fait, s'il diffère du rythme actuel. */
+  plannedForSessionsPerWeek?: number;
+  /** Toutes les séances du planning de Mistral sont passées : les règles ont pris le relais. */
+  planExpired?: boolean;
   /** Rythme du compte, utilisé pour espacer les séances. */
   sessionsPerWeek: number;
   basedOn: {

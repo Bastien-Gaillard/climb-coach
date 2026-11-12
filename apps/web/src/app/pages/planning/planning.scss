@@ -29,10 +29,32 @@
   }
 }
 
-.pending {
+.plan-bar {
   display: flex;
   align-items: center;
+  gap: 12px;
+}
+
+.plan-info {
+  flex: 1;
+  line-height: 1.4;
+}
+
+.pending {
+  display: inline-flex;
+  align-items: center;
   gap: 6px;
+}
+
+.regen {
+  flex: none;
+  gap: 6px;
+  min-height: 40px;
+  height: 40px;
+  padding: 0 14px;
+  font-size: 15px;
+  background: var(--surface);
+  box-shadow: var(--shadow-1);
 }
 
 .summary {

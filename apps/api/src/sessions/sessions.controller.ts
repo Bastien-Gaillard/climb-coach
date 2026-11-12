@@ -38,19 +38,16 @@ export class SessionsController {
   }
 
   @Post()
-  async create(
+  create(
     @CurrentUser() user: User,
     @Body(new ZodValidationPipe(CreateSessionSchema)) dto: CreateSessionDto,
   ) {
-    const session = await this.sessions.create(user.id, dto);
-    this.sessions.changed(user);
-    return session;
+    return this.sessions.create(user.id, dto);
   }
 
   @Delete(':id')
   @HttpCode(204)
-  async remove(@CurrentUser() user: User, @Param('id', ParseUUIDPipe) id: string) {
-    await this.sessions.remove(user.id, id);
-    this.sessions.changed(user);
+  remove(@CurrentUser() user: User, @Param('id', ParseUUIDPipe) id: string) {
+    return this.sessions.remove(user.id, id);
   }
 }

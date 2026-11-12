@@ -135,6 +135,17 @@ export class PlanningPage implements OnInit {
     });
   }
 
+  /** Bouton « Regénérer » : Mistral refait le planning du mois, puis la page se met à jour. */
+  protected regenerate(): void {
+    if (this.schedule()?.advicePending) return;
+    this.error.set(null);
+    this.schedule.update((s) => (s ? { ...s, advicePending: true, fallbackReason: undefined } : s));
+    this.api.regenerateSchedule(this.horizon()).subscribe({
+      next: () => this.load(),
+      error: (err) => this.error.set(errorMessage(err)),
+    });
+  }
+
   /** Clic sur un jour prévu du calendrier : on descend jusqu'à son détail. */
   protected show(day: CalendarDay): void {
     if (!day.planned) return;

@@ -92,6 +92,30 @@ export const generatedPlans = pgTable('generated_plans', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+/** Séance du planning mensuel de Mistral, datée (AAAA-MM-JJ) pour rester valable les jours suivants. */
+export interface StoredPlannedSession {
+  date: string;
+  focus: 'strength' | 'endurance' | 'technique';
+  durationMinutes: number;
+  intensity: 'light' | 'normal';
+  reason: string;
+}
+
+/**
+ * Dernier planning du mois fait par Mistral, un par compte. Il ne change que lorsque
+ * l'utilisateur demande de le regénérer.
+ */
+export const schedulePlans = pgTable('schedule_plans', {
+  userId: uuid('user_id')
+    .primaryKey()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  /** Rythme pour lequel le plan a été fait. */
+  sessionsPerWeek: smallint('sessions_per_week').notNull(),
+  summary: text('summary'),
+  sessions: jsonb('sessions').$type<StoredPlannedSession[]>().notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const sessionsRelations = relations(sessions, ({ many }) => ({ climbs: many(climbs) }));
 export const climbsRelations = relations(climbs, ({ one }) => ({
   session: one(sessions, { fields: [climbs.sessionId], references: [sessions.id] }),

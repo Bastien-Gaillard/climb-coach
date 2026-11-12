@@ -18,33 +18,12 @@ export interface ProgressionPoint {
   value: number;
 }
 
-/** Appelé quand l'historique d'un compte change (séance ajoutée ou supprimée). */
-export type SessionsChangeListener = (user: { id: string; sessionsPerWeek: number }) => void;
-
 @Injectable()
 export class SessionsService {
-  private readonly listeners: SessionsChangeListener[] = [];
-
   constructor(
     @Inject(DB) private readonly db: Database,
     private readonly gyms: GymsService,
   ) {}
-
-  /** S'abonne aux changements d'historique (le planning s'en sert pour prévenir Mistral). */
-  onChange(listener: SessionsChangeListener): void {
-    this.listeners.push(listener);
-  }
-
-  /** Prévient les abonnés ; une erreur chez l'un d'eux ne doit pas casser la requête. */
-  changed(user: { id: string; sessionsPerWeek: number }): void {
-    for (const listener of this.listeners) {
-      try {
-        listener(user);
-      } catch {
-        // tâche de fond : sans conséquence pour la séance enregistrée
-      }
-    }
-  }
 
   async create(userId: string, dto: CreateSessionDto): Promise<SessionWithClimbs> {
     const gymIds = [...new Set(dto.climbs.flatMap((c) => (c.gymId ? [c.gymId] : [])))];

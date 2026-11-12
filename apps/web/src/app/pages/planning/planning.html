@@ -26,14 +26,35 @@
   </div>
 </section>
 
-@if (schedule()!.advicePending) {
-<p class="muted small pending" data-testid="advice-pending">
-  <app-icon name="generate" [size]="14" [stroke]="2.6" />Mistral relit tes notes et prépare le mois,
-  le planning va se mettre à jour…
-</p>
-} @if (schedule()!.fallbackReason; as r) {
+<section class="plan-bar" data-testid="plan-bar">
+  <div class="plan-info muted small">
+    @if (schedule()!.advicePending) {
+    <span class="pending" data-testid="advice-pending">
+      <app-icon name="generate" [size]="14" [stroke]="2.6" />Mistral prépare le planning du mois…
+    </span>
+    } @else if (schedule()!.plannedAt; as at) {
+    <span>Planning Mistral du {{ at | date: "d MMMM 'à' HH:mm" }}</span>
+    @if (schedule()!.planExpired) {
+    <span> · terminé, les règles prennent le relais</span>
+    } } @else {
+    <span>Planning calculé par les règles</span>
+    }
+  </div>
+  <button
+    type="button"
+    class="regen"
+    (click)="regenerate()"
+    [disabled]="schedule()!.advicePending"
+    data-testid="regenerate"
+  >
+    <app-icon name="redo" [size]="18" [stroke]="2.4" />Regénérer
+  </button>
+</section>
+
+@if (schedule()!.fallbackReason; as r) {
 <p class="muted small">
-  Mistral n'a pas pu relire tes notes ({{ r }}) : planning calculé par les règles seules.
+  Mistral n'a pas pu faire le planning ({{ r }}) : @if (schedule()!.plannedAt) { le précédent est
+  gardé. } @else { planning calculé par les règles. } Réessaie avec « Regénérer ».
 </p>
 } @if (schedule()!.summary; as sum) {
 <p class="card summary" data-testid="summary">

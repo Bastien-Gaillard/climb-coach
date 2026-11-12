@@ -114,6 +114,44 @@ describe('PlanningPage', () => {
     http.expectNone((r) => r.url === '/api/plans/schedule');
   }));
 
+  it('affiche la date du planning Mistral et le regénère sur demande', fakeAsync(() => {
+    open(
+      schedule(3, [planned(2, { source: 'mistral' })], {
+        source: 'mistral',
+        plannedAt: '2026-11-10T17:30:00Z',
+      }),
+    );
+    expect(el.querySelector('[data-testid=plan-bar]')?.textContent).toContain(
+      'Planning Mistral du',
+    );
+
+    (el.querySelector('[data-testid=regenerate]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(el.querySelector('[data-testid=advice-pending]')).not.toBeNull();
+    expect((el.querySelector('[data-testid=regenerate]') as HTMLButtonElement).disabled).toBe(true);
+
+    const req = http.expectOne((r) => r.url === '/api/plans/schedule/regenerate');
+    expect(req.request.method).toBe('POST');
+    req.flush(schedule(3, [planned(2, { source: 'mistral' })], { advicePending: true }));
+    http
+      .expectOne((r) => r.url === '/api/plans/schedule')
+      .flush(schedule(3, [planned(2, { source: 'mistral' })], { advicePending: true }));
+    tick(6000);
+    http
+      .expectOne((r) => r.url === '/api/plans/schedule')
+      .flush(
+        schedule(3, [planned(3, { source: 'mistral' })], {
+          source: 'mistral',
+          plannedAt: new Date().toISOString(),
+        }),
+      );
+    fixture.detectChanges();
+    expect(el.querySelector('[data-testid=advice-pending]')).toBeNull();
+    expect((el.querySelector('[data-testid=regenerate]') as HTMLButtonElement).disabled).toBe(
+      false,
+    );
+  }));
+
   it('enregistre le rythme puis recalcule le planning', () => {
     open(schedule(3, [planned(2)]));
     const checked = () => el.querySelector('.seg [aria-checked=true]')?.textContent?.trim();

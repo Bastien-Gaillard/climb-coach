@@ -36,6 +36,15 @@ export class PlansController {
     return this.plans.schedule(user.id, query.days, user.sessionsPerWeek);
   }
 
+  /** Refait le planning du mois avec Mistral (sinon il ne change jamais tout seul). */
+  @Post('schedule/regenerate')
+  regenerateSchedule(
+    @CurrentUser() user: User,
+    @Query(new ZodValidationPipe(ScheduleQuerySchema)) query: z.infer<typeof ScheduleQuerySchema>,
+  ) {
+    return this.plans.regenerateSchedule(user.id, query.days, user.sessionsPerWeek);
+  }
+
   /** État de Mistral : l'appli affiche une bannière quand le quota est atteint. */
   @Get('ai-status')
   aiStatus() {

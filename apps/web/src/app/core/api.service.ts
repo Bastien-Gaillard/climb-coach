@@ -59,6 +59,13 @@ export class ApiService {
     );
   }
 
+  /** Refait le planning du mois avec Mistral (il ne change jamais tout seul). */
+  regenerateSchedule(days = 7): Observable<Schedule> {
+    return this.http.post<Schedule>(`${this.base}/plans/schedule/regenerate`, null, {
+      params: { days },
+    });
+  }
+
   /** État de Mistral (quota atteint, saturé, en panne). */
   aiStatus(): Observable<AiStatus> {
     return this.http.get<AiStatus>(`${this.base}/plans/ai-status`);

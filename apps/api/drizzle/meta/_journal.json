@@ -29,6 +29,13 @@
       "when": 1794501819586,
       "tag": "0003_sessions_per_week",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1794507910799,
+      "tag": "0004_schedule_plans",
+      "breakpoints": true
     }
   ]
 }
