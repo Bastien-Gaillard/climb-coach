@@ -1,4 +1,5 @@
 import { Focus, PlanBlock } from '../core/models';
+import { WARMUP_FIGURES, WarmupFigureId } from './warmup-anim';
 
 /**
  * Pictos des exercices, dessinés en SVG (viewBox 120×80) : bonhomme à traits épais,
@@ -10,7 +11,6 @@ export type FigureId =
   | 'side-plank'
   | 'leg-raise'
   | 'superman'
-  | 'mobility'
   | 'traverse'
   | 'limit'
   | 'circuit'
@@ -22,7 +22,17 @@ export type FigureId =
   | 'stretch'
   | 'hang'
   | 'climb'
-  | 'downclimb';
+  | 'downclimb'
+  | 'no-hands'
+  | 'one-arm'
+  | 'no-feet'
+  | 'pyramid'
+  | 'lock-off'
+  | 'drop-knee'
+  | 'heel-hook'
+  | 'mantle'
+  | 'dyno'
+  | WarmupFigureId;
 
 const limb = (d: string, cls = 'b') => `<path class="${cls}" d="${d}"/>`;
 const torso = (x1: number, y1: number, x2: number, y2: number) =>
@@ -73,6 +83,8 @@ function climber(
 }
 
 export const FIGURES: Record<FigureId, { label: string; svg: string }> = {
+  // Échauffement : schémas animés
+  ...WARMUP_FIGURES,
   plank: {
     label: 'Planche sur les avant-bras',
     svg:
@@ -114,16 +126,6 @@ export const FIGURES: Record<FigureId, { label: string; svg: string }> = {
       head(83, 60) +
       arrow(104, 46, 104, 32) +
       arrow(16, 48, 16, 34),
-  },
-  mobility: {
-    label: 'Mobilité épaules et poignets',
-    svg:
-      ground +
-      limb('M60 46L51 73M60 46L69 73') +
-      limb('M60 25L36 25M60 25L84 25') +
-      torso(60, 20, 60, 46) +
-      head(60, 11) +
-      '<circle class="a dash" cx="28" cy="25" r="9"/><circle class="a dash" cx="92" cy="25" r="9"/>',
   },
   traverse: {
     label: 'Traversée',
@@ -301,17 +303,149 @@ export const FIGURES: Record<FigureId, { label: string; svg: string }> = {
       ) +
       arrow(96, 14, 96, 60),
   },
+  'no-hands': {
+    label: 'Équilibre sans les mains',
+    svg:
+      wall +
+      holds([44, 70], [70, 62], [30, 40], [86, 30]) +
+      limb('M57 50L44 66M57 50L70 58') +
+      // bras croisés dans le dos
+      limb('M57 32L50 42L60 44', 'b ghost') +
+      torso(57, 30, 57, 50) +
+      head(57, 21) +
+      '<circle class="target" cx="94" cy="54" r="10"/><path class="target" d="M87 47L101 61"/>' +
+      '<path class="b" d="M91 52v4M94 50v6M97 52v4" style="stroke-width:2.5"/>',
+  },
+  'one-arm': {
+    label: 'Un bras en moins',
+    svg:
+      wall +
+      holds([46, 12], [44, 70], [70, 62], [86, 26]) +
+      limb('M57 32L46 12') +
+      limb('M57 34L66 44', 'b ghost') +
+      limb('M57 50L44 66M57 50L70 58') +
+      torso(57, 30, 57, 50) +
+      head(58, 22) +
+      text(96, 60, '1 main', 12),
+  },
+  'no-feet': {
+    label: 'Sans les pieds',
+    svg:
+      '<path class="w" d="M8 2H112V74L8 46Z"/>' +
+      holds([48, 10], [72, 14], [92, 22]) +
+      limb('M60 30L48 12M60 30L72 16', 'b hi') +
+      limb('M60 52L56 72M60 52L66 72') +
+      torso(60, 30, 60, 52) +
+      head(60, 21) +
+      text(96, 58, 'pas', 11) +
+      text(96, 70, 'de pieds', 11),
+  },
+  pyramid: {
+    label: 'Pyramide',
+    svg:
+      [14, 28, 42, 56, 70, 84, 98]
+        .map((x, i) => {
+          const h = [16, 28, 40, 52, 40, 28, 16][i];
+          return `<rect class="${i === 3 ? 'p hi-fill' : 'w'}" x="${x}" y="${66 - h}" width="11" height="${h}" rx="2"/>`;
+        })
+        .join('') +
+      '<path class="a" d="M14 70H109"/>' +
+      curve(18, 44, 40, 6, 61, 10) +
+      curve(66, 10, 86, 6, 104, 44),
+  },
+  'lock-off': {
+    label: 'Blocage 3 s',
+    svg:
+      wall +
+      holds([44, 30], [78, 8], [46, 70], [68, 64]) +
+      limb('M57 36L46 40L44 30', 'b hi') +
+      limb('M57 34L70 22', 'b') +
+      '<path class="a dash" d="M72 20L78 10"/>' +
+      limb('M57 54L46 66M57 54L68 60') +
+      torso(57, 34, 57, 54) +
+      head(57, 25) +
+      '<circle class="clock" cx="94" cy="50" r="12"/><path class="clock" d="M94 50V42M94 50L100 53"/>' +
+      text(94, 74, '3 s', 11),
+  },
+  'drop-knee': {
+    label: 'Lolotte',
+    svg:
+      wall +
+      holds([82, 14], [44, 34], [40, 66], [70, 50]) +
+      limb('M60 30L82 14') +
+      limb('M60 32L44 34') +
+      // jambe en lolotte : genou tourné vers le bas, pied sur la carre externe
+      limb('M58 52L72 64L70 50', 'b hi') +
+      limb('M58 52L42 64') +
+      torso(60, 30, 58, 52) +
+      head(64, 22),
+  },
+  'heel-hook': {
+    label: 'Crochet talon',
+    svg:
+      '<path class="w" d="M8 2H112V74L8 46Z"/>' +
+      holds([46, 16], [84, 26]) +
+      limb('M50 40L46 18') +
+      limb('M50 42L40 50L36 60') +
+      // talon posé sur la prise, jambe qui tire
+      limb('M52 58L70 40L82 30', 'b hi') +
+      '<path class="shoe" d="M80 32L88 26"/>' +
+      torso(50, 40, 52, 58) +
+      head(46, 32),
+  },
+  mantle: {
+    label: 'Rétablissement',
+    svg:
+      '<rect class="w" x="8" y="34" width="104" height="40" rx="4"/>' +
+      '<path class="g" d="M8 34H112"/>' +
+      // mains qui poussent sur le haut du bloc, pied monté haut
+      limb('M58 26L50 34M58 26L70 34', 'b hi') +
+      limb('M58 46L72 34L74 32') +
+      limb('M58 46L54 66') +
+      torso(58, 24, 58, 46) +
+      head(58, 15) +
+      arrow(96, 62, 96, 22),
+  },
+  dyno: {
+    label: 'Jeté',
+    svg:
+      wall +
+      holds([44, 58], [72, 58], [50, 70], [68, 70]) +
+      '<circle class="target" cx="80" cy="9" r="6"/>' +
+      limb('M58 34L66 20M58 34L72 24', 'b hi') +
+      limb('M58 52L48 62M58 52L68 62') +
+      torso(58, 32, 58, 52) +
+      head(56, 24) +
+      '<path class="a dash" d="M42 56Q40 26 72 12"/>',
+  },
 };
 
 /** Tests dans l'ordre : le plus précis d'abord (« gainage latéral » avant « planche »…). */
 const RULES: [RegExp, FigureId][] = [
+  // Échauffement (schémas animés)
+  [/cardio|sautillements?|jumping/, 'cardio'],
+  [/glissements tendineux|ouvertures-fermetures/, 'fingers'],
+  [/rotations externes|omoplates/, 'shoulders'],
+  [/recrutement/, 'recruit'],
+  [/traversee tres facile/, 'warmup-traverse'],
+  [/plus dur en .* mouvements dynamiques|^finir par/, 'finish'],
+  [/sur grosses prises/, 'easy-climb'],
   [/gainage lateral|planche laterale/, 'side-plank'],
-  [/\bplanche\b|gainage/, 'plank'],
+  [/\bplanche\b|\bs de gainage/, 'plank'],
   [/(releve|leve)e?s? de (jambes|genoux)/, 'leg-raise'],
   [/superman/, 'superman'],
   [/etirement|etirer/, 'stretch'],
   [/suspension/, 'hang'],
-  [/mobilite|rotations?|cercles?|poignets/, 'mobility'],
+  [/lolotte/, 'drop-knee'],
+  [/crochets? (talon|pointe)|talon sur la prise|dessus du pied/, 'heel-hook'],
+  [/retablissement|paume vers le bas|pousser sur les mains/, 'mantle'],
+  [/jete|point mort|saute attraper|lance l.autre main/, 'dyno'],
+  [/sans (utiliser )?les mains/, 'no-hands'],
+  [/sans les pieds|no ?foot|mains seules/, 'no-feet'],
+  [/une seule main|un bras en moins|a un bras/, 'one-arm'],
+  [/pyramide|en montant puis en redescendant/, 'pyramid'],
+  [/bloque 3 s|blocage/, 'lock-off'],
+  [/mobilite|cercles?|poignets/, 'mobility'],
   [/traversee/, 'traverse'],
   [/desescalade/, 'downclimb'],
   [/drapeau/, 'flag'],
@@ -331,6 +465,8 @@ function normalize(text: string): string {
 /** Picto qui illustre une consigne, ou null si aucun ne colle. */
 export function figureFor(instruction: string): FigureId | null {
   const t = normalize(instruction);
+  // Une consigne qui interdit quelque chose ne doit pas montrer le geste interdit
+  if (/^pas d/.test(t)) return null;
   return RULES.find(([re]) => re.test(t))?.[1] ?? null;
 }
 

@@ -143,6 +143,61 @@ describe('RuleBasedGenerator', () => {
     expect(main.instructions.some((i) => i.includes('Douleur signalée'))).toBe(true);
   });
 
+  describe('échauffement', () => {
+    const strengthHistory = [
+      session(3, now, {
+        focus: 'technique',
+        climbList: [
+          { grade: '6B', value: 6 },
+          { grade: '6B', value: 6 },
+        ],
+      }),
+    ];
+
+    it('va du général au spécifique : cardio, mobilité, doigts, épaules, traversée, blocs', async () => {
+      const plan = await generator.generate({ availableMinutes: 60, now, history: [] });
+      const w = plan.blocks[0];
+      expect(w.kind).toBe('warmup');
+      const text = w.instructions.join(' | ');
+      const order = ['cardio', 'Mobilité', 'Doigts', 'Épaules', 'Traversée', 'faciles'];
+      const positions = order.map((k) => text.indexOf(k));
+      expect(positions.every((p) => p >= 0)).toBe(true);
+      expect([...positions].sort((x, y) => x - y)).toEqual(positions);
+      expect(text).toContain('Pas d’étirements statiques');
+    });
+
+    it('ajoute le recrutement des doigts et un bloc plus dur avant une séance de force', async () => {
+      const plan = await generator.generate({
+        availableMinutes: 90,
+        now,
+        history: strengthHistory,
+      });
+      expect(plan.focus).toBe('strength');
+      const text = plan.blocks[0].instructions.join(' | ');
+      expect(text).toContain('Recrutement');
+      expect(text).toContain('1 bloc plus dur en 6A+');
+    });
+
+    it('reste doux quand une douleur est signalée', async () => {
+      const plan = await generator.generate({
+        availableMinutes: 90,
+        now,
+        history: [session(2, now, { focus: 'technique', notes: 'Mal au majeur' })],
+      });
+      const text = plan.blocks[0].instructions.join(' | ');
+      expect(text).not.toContain('Recrutement');
+      expect(text).toContain('Pas de petites prises ni de mouvements dynamiques');
+    });
+
+    it('raccourcit les étapes quand l’échauffement ne dure que 10 min', async () => {
+      const plan = await generator.generate({ availableMinutes: 30, now, history: [] });
+      const text = plan.blocks[0].instructions.join(' | ');
+      expect(plan.blocks[0].minutes).toBe(10);
+      expect(text).toContain('2 min de cardio');
+      expect(text).toMatch(/2 blocs faciles .* puis 1 en/);
+    });
+  });
+
   it('vise le niveau projet en séance de force', async () => {
     const history = [
       session(3, now, {
@@ -159,14 +214,29 @@ describe('RuleBasedGenerator', () => {
     expect(main?.target).toEqual({ style: 'boulder', grade: '6B+' });
   });
 
-  it('fait de l’endurance en 4x4 bien en dessous du max', async () => {
+  it('fait de l’endurance bien en dessous du max, avec des exercices du catalogue', async () => {
     const history = [
       session(2, now, { focus: 'strength', climbList: [{ grade: '6C', value: 8 }] }),
     ];
     const plan = await generator.generate({ availableMinutes: 60, now, history });
-    const main = plan.blocks.find((b) => b.kind === 'main');
-    expect(main?.title).toContain('4x4');
-    expect(main?.target?.grade).toBe('6A+');
+    const mains = plan.blocks.filter((b) => b.kind === 'main');
+    expect(mains.length).toBeGreaterThanOrEqual(1);
+    for (const m of mains) {
+      expect(m.title).toMatch(/^Endurance : /);
+      // Rien au-dessus de 6C+ (un cran sous le max au plus, pour le sommet d'une pyramide)
+      expect(['5', '5+', '6A', '6A+', '6B', '6B+', '6C']).toContain(m.target?.grade);
+    }
+  });
+
+  it('change d’exercices d’un jour à l’autre', async () => {
+    const history = [session(2, now, { focus: 'endurance' })];
+    const titles = new Set<string>();
+    for (let d = 0; d < 6; d++) {
+      const day = new Date(now.getTime() + d * 86_400_000);
+      const plan = await generator.generate({ availableMinutes: 60, now: day, history });
+      plan.blocks.filter((b) => b.kind === 'main').forEach((b) => titles.add(b.title));
+    }
+    expect(titles.size).toBeGreaterThan(3);
   });
 
   it('adapte le vocabulaire à la voie', async () => {

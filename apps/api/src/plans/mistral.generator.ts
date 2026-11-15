@@ -1,5 +1,6 @@
 import { gradeFromValue, gradeValue } from '@climb-coach/grades';
 import { Injectable, Logger } from '@nestjs/common';
+import { catalogForPrompt } from './exercises';
 import { ConfigService } from '@nestjs/config';
 import { Env } from '../config/env';
 import { REFERENCE_SYSTEM } from '../sessions/climb-normalizer';
@@ -207,15 +208,27 @@ Tes principes de coach :
 
 Spécificités du bloc :
 - Force : peu de blocs durs, essais courts et explosifs, 3 à 5 min de repos complet entre les essais.
-- Endurance : circuits de blocs faciles enchaînés (4x4, blocs à la suite, traversées), repos courts.
+- Endurance : circuits de blocs faciles enchaînés, repos courts. Un 4×4, c'est 4 blocs enchaînés sans pause = 1 série, répétée 2 à 5 fois avec 3 à 4 min de repos entre les séries (jamais 4 fois les 4 blocs d'affilée).
 - Technique : blocs sous le niveau max, avec une consigne de mouvement précise (pieds, hanches, lecture, équilibre).
 - Varie les styles de blocs d'une séance à l'autre : dalle, vertical, dévers, réglettes, plats, compression, mouvements dynamiques.
 - Pense à la désescalade ou à la chute contrôlée : jamais de chute non préparée sur les blocs hauts.
 
+Catalogue d'exercices (choisis dans cette liste, en variant d'une séance à l'autre) :
+${catalogForPrompt()}
+
+Le cœur de séance contient 1 à 3 exercices du catalogue (1 si le temps est court, 2 ou 3 au-delà de 25 min), chacun dans sa propre partie "main", dont le titre est le nom de l'exercice. Tu peux adapter un exercice, mais garde son principe.
+
 Structure de la séance :
 - Respecte le focus et l'intensité proposés, sauf raison évidente dans l'historique.
 - La séance est découpée en parties (le tableau "blocks" du JSON, à ne pas confondre avec les blocs d'escalade). La somme de leurs "minutes" doit être comprise entre (temps dispo - 10) et le temps dispo.
-- Échauffement progressif : toutes ses cotations restent au moins 2 crans sous le niveau à viser.
+- Échauffement progressif : toutes ses cotations restent au moins 2 crans sous le niveau à viser. Il va du général au spécifique, du lent au rapide, des grosses prises aux petites, dans cet ordre :
+  1. 2 à 4 min de cardio léger (sautillements, montées de genoux, jumping jacks) ;
+  2. mobilité articulaire dynamique sans forcer (cercles de poignets, de bras, de hanches, de chevilles) ;
+  3. doigts : glissements tendineux (poing, poing tendu, crochet) et ouvertures-fermetures rapides ;
+  4. épaules : rotations externes coudes au corps, tirages d'omoplates bras tendus à une grosse prise, pieds au sol ;
+  5. traversée très facile (pieds précis et silencieux, puis plus vite) ;
+  6. quelques blocs faciles sur grosses prises (3 à 4 crans sous le max), puis 1 ou 2 un peu plus durs.
+  Avant une séance de force, ajoute un recrutement des doigts (pieds au sol, tirer fort 5 s / relâcher 1 s, 5 fois par main) et finis par un bloc proche du max ou quelques mouvements dynamiques, sans aller à l'échec. Si une douleur est signalée, pas de petites prises ni de dynamique à l'échauffement. Jamais d'étirements statiques à l'échauffement : ils vont dans le retour au calme.
 - Le "grade" du "target" d'une partie est la cotation la plus dure demandée dans cette partie.
 
 Santé :

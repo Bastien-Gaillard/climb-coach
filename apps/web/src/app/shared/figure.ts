@@ -1,4 +1,13 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
+import {
+  afterRenderEffect,
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  ElementRef,
+  inject,
+  input,
+  viewChild,
+} from '@angular/core';
 import { DomSanitizer } from '@angular/platform-browser';
 import { FigureId, FIGURES } from './figures';
 
@@ -7,7 +16,7 @@ import { FigureId, FIGURES } from './figures';
   selector: 'app-figure',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { role: 'img', '[attr.aria-label]': 'label()', '[attr.title]': 'label()' },
-  template: `<svg viewBox="0 0 120 80" [innerHTML]="svg()"></svg>`,
+  template: `<svg #canvas viewBox="0 0 120 80" [innerHTML]="svg()"></svg>`,
   styles: `
     :host {
       --fig-ink: var(--ink);
@@ -51,6 +60,9 @@ import { FigureId, FIGURES } from './figures';
       }
       .p {
         fill: var(--fig-hold);
+      }
+      .hi-fill {
+        fill: var(--fig-hi);
       }
       .w {
         fill: var(--fig-wall);
@@ -97,4 +109,20 @@ export class Figure {
   protected readonly svg = computed(() =>
     this.sanitizer.bypassSecurityTrustHtml(FIGURES[this.name()].svg),
   );
+
+  private readonly svgEl = viewChild.required<ElementRef<SVGSVGElement>>('canvas');
+
+  constructor() {
+    // Schémas animés de l'échauffement : figés sur leur première pose si le téléphone
+    // demande de réduire les animations
+    afterRenderEffect(() => {
+      this.svg();
+      const el = this.svgEl().nativeElement;
+      if (typeof el.pauseAnimations !== 'function') return;
+      if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+        el.pauseAnimations();
+        el.setCurrentTime(0);
+      }
+    });
+  }
 }
