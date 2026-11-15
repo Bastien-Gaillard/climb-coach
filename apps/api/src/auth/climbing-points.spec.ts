@@ -1,10 +1,12 @@
-import { CLIMBING_POINTS, normalizePreferences, POINT_FOCUS, POINT_LABEL } from './climbing-points';
+import { CLIMBING_POINTS, normalizePreferences, POINT_GROUP, POINT_LABEL } from './climbing-points';
 
 describe('points du profil', () => {
-  it('chaque point a un libellé et un type de séance', () => {
+  it('chaque point a un libellé et un groupe', () => {
     for (const p of CLIMBING_POINTS) {
       expect(POINT_LABEL[p].length).toBeGreaterThan(2);
-      expect(['strength', 'endurance', 'technique']).toContain(POINT_FOCUS[p]);
+      expect(['strength', 'endurance', 'technique', 'mobility', 'mental']).toContain(
+        POINT_GROUP[p],
+      );
     }
   });
 

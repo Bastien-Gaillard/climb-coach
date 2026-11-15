@@ -13,6 +13,8 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 
+export const sessionFocus = pgEnum('session_focus', ['strength', 'endurance', 'technique']);
+
 /** Comptes de l'appli : identification par nom, sans mot de passe (accès déjà limité par Tailscale). */
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -25,10 +27,11 @@ export const users = pgTable('users', {
   weakPoints: text('weak_points').array().notNull().default([]),
   /** Ce que le grimpeur aime faire : chaque séance en garde un peu. */
   likedPoints: text('liked_points').array().notNull().default([]),
+  /** Objectif d'entraînement : son type de séance revient environ une fois sur deux (null : aucun). */
+  focusGoal: sessionFocus('focus_goal'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
-export const sessionFocus = pgEnum('session_focus', ['strength', 'endurance', 'technique']);
 export const climbStyle = pgEnum('climb_style', ['boulder', 'route']);
 
 export const sessions = pgTable(
@@ -119,6 +122,8 @@ export const schedulePlans = pgTable('schedule_plans', {
   sessionsPerWeek: smallint('sessions_per_week').notNull(),
   /** Points faibles pour lesquels le plan a été fait : le plan est refait s'ils changent. */
   weakPoints: text('weak_points').array().notNull().default([]),
+  /** Objectif pour lequel le plan a été fait : le plan est refait s'il change. */
+  focusGoal: sessionFocus('focus_goal'),
   summary: text('summary'),
   sessions: jsonb('sessions').$type<StoredPlannedSession[]>().notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

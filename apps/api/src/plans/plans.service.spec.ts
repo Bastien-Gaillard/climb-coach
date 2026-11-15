@@ -129,7 +129,16 @@ describe('PlansService.generate', () => {
       equipment: [],
       weakPoints: [],
       likedPoints: [],
+      focusGoal: null,
     });
+  });
+
+  it('passe l’objectif et le type choisi au générateur', async () => {
+    const { service, mistralGen } = setup({ enabled: true });
+    await service.generate('u1', 60, undefined, [], { focusGoal: 'strength' }, 'endurance');
+    expect(mistralGen.generate).toHaveBeenCalledWith(
+      expect.objectContaining({ focusGoal: 'strength', requestedFocus: 'endurance' }),
+    );
   });
 
   it('passe les points faibles et ce qu’il aime au générateur', async () => {
@@ -305,6 +314,26 @@ describe('PlansService.schedule', () => {
 
     // Mêmes points dans un autre ordre, ou seulement « ce qu'il aime » qui change : rien à refaire
     await service.schedule('u1', 7, 3, { weakPoints: ['crimps'], likedPoints: ['power'] });
+    expect(advisor.advisePlan).toHaveBeenCalledTimes(2);
+  });
+
+  it('un changement d’objectif refait le planning, une seule fois', async () => {
+    const { service, sessions, advisor, savedPlans } = setup({
+      enabled: true,
+      advise: async () => structuredClone(injury),
+    });
+    (sessions.findRecent as jest.Mock).mockResolvedValue(history);
+    await service.schedule('u1', 7, 3);
+    await service.adviceSettled('u1');
+    expect(savedPlans.get('u1')).toMatchObject({ focusGoal: null });
+
+    const s = await service.schedule('u1', 7, 3, { focusGoal: 'strength' });
+    expect(s.advicePending).toBe(true);
+    await service.adviceSettled('u1');
+    expect(savedPlans.get('u1')).toMatchObject({ focusGoal: 'strength' });
+    expect((advisor.advisePlan as jest.Mock).mock.calls[1][2]).toEqual({ focusGoal: 'strength' });
+
+    await service.schedule('u1', 7, 3, { focusGoal: 'strength' });
     expect(advisor.advisePlan).toHaveBeenCalledTimes(2);
   });
 

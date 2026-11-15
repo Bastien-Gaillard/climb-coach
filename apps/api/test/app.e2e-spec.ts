@@ -123,6 +123,37 @@ describe('API (e2e)', () => {
       await http('kuzimu').post('/api/plans/generate').send({ availableMinutes: 90 }).expect(201);
     });
 
+    it('enregistre l’objectif d’entraînement et dit quel type revient le plus', async () => {
+      const me = await http('tophe').get('/api/auth/me').expect(200);
+      expect(me.body).toMatchObject({ focusGoal: null, favoredFocus: null });
+      const { body } = await http('tophe')
+        .patch('/api/auth/me')
+        .send({ focusGoal: 'strength', weakPoints: ['resistance'] })
+        .expect(200);
+      expect(body).toMatchObject({
+        focusGoal: 'strength',
+        favoredFocus: { focus: 'strength', source: 'goal' },
+      });
+      const { body: cleared } = await http('tophe')
+        .patch('/api/auth/me')
+        .send({ focusGoal: null })
+        .expect(200);
+      expect(cleared.favoredFocus).toEqual({ focus: 'endurance', source: 'weak-points' });
+      await http('tophe').patch('/api/auth/me').send({ focusGoal: 'yoga' }).expect(400);
+    });
+
+    it('génère le type de séance choisi à la place du planning', async () => {
+      const { body } = await http('tophe')
+        .post('/api/plans/generate')
+        .send({ availableMinutes: 90, focus: 'endurance' })
+        .expect(201);
+      expect(body.plan.focus).toBe('endurance');
+      await http('tophe')
+        .post('/api/plans/generate')
+        .send({ availableMinutes: 90, focus: 'yoga' })
+        .expect(400);
+    });
+
     it('refuse un compte inconnu', async () => {
       await anonymous().post('/api/auth/login').send({ username: 'inconnu' }).expect(401);
       await http('inconnu').get('/api/sessions').expect(401);

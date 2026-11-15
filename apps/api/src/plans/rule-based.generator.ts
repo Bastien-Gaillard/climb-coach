@@ -63,13 +63,14 @@ export class RuleBasedGenerator implements PlanGenerator {
   ): PlanBlock[] {
     const max = FONT.grades.length - 1;
     const clamp = (v: number) => Math.min(max, Math.max(0, Math.round(v)));
+    // Un jour, une sélection : la séance du lendemain ne propose pas les mêmes exercices
+    const seed = Math.floor(ctx.now.getTime() / 86_400_000) + ctx.history.length;
     const picks = pickExercises({
       focus: a.focus,
       minutes,
       maxSent: a.maxSent,
       careful: !!a.pain || light === 1,
-      // Un jour, une sélection : la séance du lendemain ne propose pas les mêmes exercices
-      seed: Math.floor(ctx.now.getTime() / 86_400_000) + ctx.history.length,
+      seed,
       weakPoints: ctx.weakPoints,
       likedPoints: ctx.likedPoints,
     });
@@ -79,6 +80,8 @@ export class RuleBasedGenerator implements PlanGenerator {
         project: a.project,
         light,
         minutes: m,
+        // Les variantes (4×4 sur un même bloc, sans les pieds en protocole) changent d'une séance à l'autre
+        variant: seed,
         grade: (v) => this.label(ctx, 'boulder', this.grade('boulder', clamp(v))),
       });
       return {

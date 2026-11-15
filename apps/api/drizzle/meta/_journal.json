@@ -57,6 +57,13 @@
       "when": 1794761544368,
       "tag": "0007_profile_points",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1794779615458,
+      "tag": "0008_focus_goal",
+      "breakpoints": true
     }
   ]
 }

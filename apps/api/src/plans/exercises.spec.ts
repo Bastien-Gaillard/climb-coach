@@ -35,6 +35,38 @@ describe('catalogue d’exercices', () => {
     expect(text).toContain('Repos 3 min entre les séries');
   });
 
+  it('4×4 et sans les pieds : une seule fiche, deux variantes qui alternent', () => {
+    const titles = (id: string) =>
+      [0, 1].map(
+        (variant) =>
+          EXERCISES.find((e) => e.id === id)!.build({
+            maxSent: 6,
+            project: 7,
+            light: 0,
+            minutes: 30,
+            grade,
+            variant,
+          }).title,
+      );
+    expect(titles('4x4')).toEqual(['4×4 · 4 séries', '4×4 sur un même bloc · 4 séries']);
+    expect(titles('no-feet')).toEqual(['Sans les pieds', 'Sans les pieds (protocole) · 3 séries']);
+    expect(EXERCISES.map((e) => e.id)).not.toContain('4x4-same');
+    expect(EXERCISES.map((e) => e.id)).not.toContain('boulder-campus');
+  });
+
+  it('chaque exercice d’endurance dit sa filière, et seulement eux', () => {
+    for (const e of EXERCISES) expect(!!e.energy).toBe(e.focus === 'endurance');
+    expect(EXERCISES.find((e) => e.id === '4x4')!.energy).toBe('resistance');
+    expect(EXERCISES.find((e) => e.id === 'continuous-traverse')!.energy).toBe('fond');
+  });
+
+  it('résumé et consigne du 30/30 donnent le même repos', () => {
+    const e = EXERCISES.find((x) => x.id === 'intervals-30-30')!;
+    expect(e.summary).toContain('5 min de repos entre les séries');
+    const lines = e.build({ maxSent: 6, project: 7, light: 0, minutes: 30, grade }).instructions;
+    expect(lines[lines.length - 1]).toBe('Repos 5 min entre les séries');
+  });
+
   it('le drapeau est expliqué clairement', () => {
     const flag = EXERCISES.find((e) => e.id === 'flag')!;
     const text = flag
@@ -83,6 +115,69 @@ describe('pickExercises', () => {
     expect(ids(ADVANCED_LEVEL + 2, false)).toContain('no-feet');
     expect(ids(ADVANCED_LEVEL + 2, true)).not.toContain('no-feet');
     expect(ids(ADVANCED_LEVEL + 2, true)).not.toContain('power');
+  });
+});
+
+describe('filières d’endurance', () => {
+  const energies = (o: Partial<Parameters<typeof pickExercises>[0]>) =>
+    Array.from({ length: 30 }, (_, seed) =>
+      pickExercises({
+        focus: 'endurance',
+        minutes: 70,
+        maxSent: 6,
+        careful: false,
+        seed,
+        ...o,
+      }).map((p) => p.exercise.energy),
+    );
+
+  it('ne mélange jamais fond et résistance dans une séance', () => {
+    const sessions = [
+      ...energies({}),
+      ...energies({ minutes: 33 }),
+      ...energies({ weakPoints: ['volume'] }),
+      ...energies({ likedPoints: ['resistance'] }),
+      ...energies({ weakPoints: ['recovery'], likedPoints: ['volume'] }),
+    ];
+    for (const s of sessions) expect(new Set(s).size).toBe(1);
+    // Les deux filières sortent selon les jours
+    expect(new Set(energies({}).map((s) => s[0])).size).toBe(2);
+  });
+
+  it('la filière suit le point faible', () => {
+    for (const seed of [0, 1, 2, 3, 4]) {
+      const picks = pickExercises({
+        focus: 'endurance',
+        minutes: 70,
+        maxSent: 6,
+        careful: false,
+        seed,
+        weakPoints: ['volume'],
+      });
+      expect(picks[0].role).toBe('weak');
+      expect(picks.every((p) => p.exercise.energy === picks[0].exercise.energy)).toBe(true);
+    }
+  });
+});
+
+describe('mode prudent en force', () => {
+  it('bloc au max, blocages et intervalles de force sont marqués éprouvants', () => {
+    for (const id of ['limit', 'lock-offs', 'strength-intervals'])
+      expect(EXERCISES.find((e) => e.id === id)!.stressful).toBe(true);
+    const careful = Array.from({ length: 20 }, (_, seed) =>
+      pickExercises({ focus: 'strength', minutes: 70, maxSent: 6, careful: true, seed }),
+    ).flat();
+    expect(careful.map((p) => p.exercise.id)).not.toContain('limit');
+    expect(careful.every((p) => !p.exercise.stressful)).toBe(true);
+  });
+
+  it('le catalogue de Mistral le dit', () => {
+    const line = catalogForPrompt()
+      .split('\n')
+      .find((l) => l.startsWith('- Bloc au max :'))!;
+    expect(line).toContain('(jamais en cas de douleur)');
+    expect(catalogForPrompt()).toContain('- 4×4 (résistance) :');
+    expect(catalogForPrompt()).toContain('- Traversée continue (fond) :');
   });
 });
 

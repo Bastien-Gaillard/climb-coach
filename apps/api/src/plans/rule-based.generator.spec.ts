@@ -60,6 +60,65 @@ describe('analyzeHistory', () => {
     expect(after.focus).not.toBe('strength');
   });
 
+  it('objectif force : la force revient une séance sur deux, même avec des points faibles ailleurs', () => {
+    const history = [
+      session(3, now, { focus: 'endurance' }),
+      session(5, now, { focus: 'strength' }),
+      session(7, now, { focus: 'technique' }),
+    ];
+    const a = analyzeHistory({
+      ...ctx(history),
+      focusGoal: 'strength',
+      weakPoints: ['resistance', 'recovery', 'volume'],
+    });
+    expect(a.focus).toBe('strength');
+    expect(a.reasons.join(' ')).toContain('Objectif force');
+    // Sans objectif, ces points faibles d'endurance auraient favorisé l'endurance
+    expect(
+      analyzeHistory({ ...ctx(history), weakPoints: ['resistance', 'recovery', 'volume'] }).focus,
+    ).not.toBe('strength');
+  });
+
+  describe('type choisi à la place du planning', () => {
+    const history = [session(3, now, { focus: 'technique' })];
+
+    it('est respecté, avec la raison', () => {
+      const a = analyzeHistory({ ...ctx(history), requestedFocus: 'endurance' });
+      expect(a.focus).toBe('endurance');
+      expect(a.reasons[0]).toBe('Séance d’endurance choisie à la place du planning');
+    });
+
+    it('même sans historique', () => {
+      expect(analyzeHistory({ ...ctx([]), requestedFocus: 'strength' }).focus).toBe('strength');
+    });
+
+    it('force moins de 48 h après une autre : gardée, avec un avertissement', () => {
+      const a = analyzeHistory({
+        ...ctx([session(1, now, { focus: 'strength' })]),
+        requestedFocus: 'strength',
+      });
+      expect(a.focus).toBe('strength');
+      expect(a.reasons.join(' ')).toContain('moins de 48 h');
+    });
+
+    it('fatigue : gardé mais allégé', () => {
+      const a = analyzeHistory({
+        ...ctx([session(1, now, { focus: 'technique', fatigue: 5 })]),
+        requestedFocus: 'strength',
+      });
+      expect(a).toMatchObject({ focus: 'strength', intensity: 'light' });
+    });
+
+    it('jamais de force avec une douleur', () => {
+      const a = analyzeHistory({
+        ...ctx([session(3, now, { focus: 'technique', notes: 'douleur au doigt' })]),
+        requestedFocus: 'strength',
+      });
+      expect(a.focus).toBe('technique');
+      expect(a.reasons.join(' ')).toContain('Pas de force avec une douleur, même choisie');
+    });
+  });
+
   it('jamais deux séances de force à moins de 48 h', () => {
     const a = analyzeHistory(
       ctx([

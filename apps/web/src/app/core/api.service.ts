@@ -6,6 +6,7 @@ import {
   ClimbingPoint,
   CreateSession,
   Equipment,
+  Focus,
   GeneratedPlan,
   Gym,
   GymInput,
@@ -36,10 +37,16 @@ export class ApiService {
     return this.http.get<ProgressionPoint[]>(`${this.base}/sessions/stats/progression`);
   }
 
-  generatePlan(availableMinutes: number, gymId?: string | null): Observable<GeneratedPlan> {
+  /** `focus` : type de séance choisi à la place du planning. */
+  generatePlan(
+    availableMinutes: number,
+    gymId?: string | null,
+    focus?: Focus | null,
+  ): Observable<GeneratedPlan> {
     return this.http.post<GeneratedPlan>(`${this.base}/plans/generate`, {
       availableMinutes,
       ...(gymId && { gymId }),
+      ...(focus && { focus }),
     });
   }
 
@@ -85,6 +92,7 @@ export class ApiService {
     equipment?: Equipment[];
     weakPoints?: ClimbingPoint[];
     likedPoints?: ClimbingPoint[];
+    focusGoal?: Focus | null;
   }): Observable<Profile> {
     return this.http.patch<Profile>(`${this.base}/auth/me`, body);
   }

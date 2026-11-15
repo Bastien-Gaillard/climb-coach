@@ -1,6 +1,6 @@
 import { ClimbingPoint } from '../auth/climbing-points';
 import { SessionWithClimbs } from '../sessions/sessions.service';
-import { focusWeights, FocusWeights, nextFocus } from './focus-balance';
+import { favoredFocus, focusWeights, FocusWeights, nextFocus } from './focus-balance';
 import { FOCUS_LABEL } from './history-analysis';
 import { mentionsPain } from './pain-notes';
 import { Focus } from './plan.schema';
@@ -90,17 +90,20 @@ export function buildSchedule(
     advised,
     summary,
     weakPoints = [],
+    focusGoal = null,
   }: {
     horizonDays?: number;
     sessionsPerWeek?: number;
     /** Plan de Mistral : remplace celui des règles, qui ne servent plus qu'à le prolonger. */
     advised?: AdvisedSession[];
     summary?: string;
-    /** Points faibles du profil : leur type de séance revient plus souvent. */
+    /** Points faibles du profil : sans objectif, ils désignent le type qui revient plus souvent. */
     weakPoints?: ClimbingPoint[];
+    /** Objectif d'entraînement du profil : son type revient environ une séance sur deux. */
+    focusGoal?: Focus | null;
   } = {},
 ): Schedule {
-  const weights = focusWeights(weakPoints);
+  const weights = focusWeights(favoredFocus(focusGoal, weakPoints)?.focus);
   const pastFoci = history.map((s) => s.focus);
   const today = localDay(now);
   const perWeek = Math.min(7, Math.max(1, Math.round(sessionsPerWeek)));

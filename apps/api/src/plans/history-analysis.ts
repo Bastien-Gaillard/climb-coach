@@ -1,6 +1,6 @@
 import { FONT, FRENCH } from '@climb-coach/grades';
-import { pointLabels, POINT_FOCUS } from '../auth/climbing-points';
-import { focusWeights, nextFocus, weakFocus } from './focus-balance';
+import { pointLabels, POINT_GROUP } from '../auth/climbing-points';
+import { favoredFocus, focusWeights, nextFocus } from './focus-balance';
 import { GeneratorContext } from './generator';
 import { mentionsPain } from './pain-notes';
 import { Focus } from './plan.schema';
@@ -46,6 +46,9 @@ export const FOCUS_LABEL: Record<Focus, string> = {
   technique: 'technique',
 };
 
+/** « de force », « de technique », « d’endurance ». */
+export const ofFocus = (f: Focus) => (f === 'endurance' ? 'd’endurance' : `de ${FOCUS_LABEL[f]}`);
+
 export function analyzeHistory(ctx: GeneratorContext): HistoryAnalysis {
   const recent = ctx.history.slice(0, RECENT_SESSIONS);
   const last = recent[0];
@@ -62,10 +65,14 @@ export function analyzeHistory(ctx: GeneratorContext): HistoryAnalysis {
       style,
       maxSent: DEFAULT_LEVEL[style],
       project: DEFAULT_LEVEL[style],
-      focus: 'technique',
+      focus: ctx.requestedFocus ?? 'technique',
       intensity: 'normal',
       pain: null,
-      reasons: ['Pas encore d’historique : séance technique pour prendre ses repères'],
+      reasons: [
+        ctx.requestedFocus
+          ? `Pas encore d’historique : séance ${ofFocus(ctx.requestedFocus)} choisie`
+          : 'Pas encore d’historique : séance technique pour prendre ses repères',
+      ],
     };
   }
 
@@ -87,26 +94,31 @@ export function analyzeHistory(ctx: GeneratorContext): HistoryAnalysis {
     reasons.push('2 réussites au niveau max la dernière fois : on monte d’un cran');
 
   const daysSinceLast = Math.floor((ctx.now.getTime() - last.date.getTime()) / DAY_MS);
-  let focus = nextFocus(
-    ctx.history.map((s) => s.focus),
-    focusWeights(ctx.weakPoints),
-  );
+  const favored = favoredFocus(ctx.focusGoal, ctx.weakPoints);
+  const requested = ctx.requestedFocus;
+  let focus =
+    requested ??
+    nextFocus(
+      ctx.history.map((s) => s.focus),
+      focusWeights(favored?.focus),
+    );
   const lastStrength = ctx.history.find((s) => s.focus === 'strength');
   const strengthTooSoon =
     focus === 'strength' &&
     !!lastStrength &&
     ctx.now.getTime() - lastStrength.date.getTime() < STRENGTH_SPACING_MS;
-  if (strengthTooSoon) focus = last.focus === 'technique' ? 'endurance' : 'technique';
-  const targeted = weakFocus(ctx.weakPoints);
+  // Type choisi à la main : on le garde, et on prévient seulement
+  if (strengthTooSoon && !requested) focus = last.focus === 'technique' ? 'endurance' : 'technique';
   let intensity: HistoryAnalysis['intensity'] = 'normal';
 
+  if (requested) reasons.push(`Séance ${ofFocus(requested)} choisie à la place du planning`);
   if (daysSinceLast >= 14) {
-    focus = 'technique';
+    if (!requested) focus = 'technique';
     intensity = 'light';
     reasons.push(`${daysSinceLast} jours sans grimper : reprise en douceur`);
   } else if (daysSinceLast < 1 || (last.fatigue >= 4 && daysSinceLast < 2)) {
     intensity = 'light';
-    if (focus === 'strength') focus = 'technique';
+    if (focus === 'strength' && !requested) focus = 'technique';
     reasons.push(
       daysSinceLast < 1
         ? 'Dernière séance il y a moins de 24 h : séance légère'
@@ -114,12 +126,18 @@ export function analyzeHistory(ctx: GeneratorContext): HistoryAnalysis {
     );
   } else if (strengthTooSoon) {
     reasons.push(
-      `Force il y a moins de 48 h : on attend avant la suivante, séance de ${FOCUS_LABEL[focus]}`,
+      requested
+        ? 'Force il y a moins de 48 h : les doigts n’ont pas fini de récupérer, écoute-les'
+        : `Force il y a moins de 48 h : on attend avant la suivante, séance ${ofFocus(focus)}`,
     );
-  } else if (targeted === focus) {
-    const points = (ctx.weakPoints ?? []).filter((p) => POINT_FOCUS[p] === focus);
+  } else if (requested) {
+    // Rien à ajouter : la raison est le choix lui-même
+  } else if (favored?.focus === focus && favored.source === 'goal') {
+    reasons.push(`Objectif ${FOCUS_LABEL[focus]} : séance ${ofFocus(focus)}, environ une sur deux`);
+  } else if (favored?.focus === focus) {
+    const points = (ctx.weakPoints ?? []).filter((p) => POINT_GROUP[p] === focus);
     reasons.push(
-      `Point faible (${pointLabels(points)}) : séance de ${FOCUS_LABEL[focus]}, environ une sur deux`,
+      `Point faible (${pointLabels(points)}) : séance ${ofFocus(focus)}, environ une sur deux`,
     );
   } else {
     reasons.push(
@@ -136,6 +154,8 @@ export function analyzeHistory(ctx: GeneratorContext): HistoryAnalysis {
     reasons.push(
       `Douleur signalée ${when} (« ${pain.notes} ») : séance légère, sans forcer sur la zone`,
     );
+    if (requested === 'strength')
+      reasons.push('Pas de force avec une douleur, même choisie : séance de technique');
   }
 
   return {

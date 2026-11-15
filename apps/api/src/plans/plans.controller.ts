@@ -5,19 +5,25 @@ import { normalizePreferences } from '../auth/climbing-points';
 import { normalizeEquipment } from '../auth/equipment';
 import type { User } from '../auth/users.service';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
+import { FocusSchema } from './plan.schema';
 import { PlansService } from './plans.service';
 
 const GeneratePlanSchema = z.object({
   availableMinutes: z.number().int().min(30).max(300),
   /** Salle du jour (optionnelle) : la séance parle alors en couleurs. */
   gymId: z.string().min(1).optional(),
+  /** Type de séance choisi à la place du planning (sinon, celui du planning). */
+  focus: FocusSchema.optional(),
 });
 
 const ScheduleQuerySchema = z.object({
   days: z.coerce.number().int().min(1).max(42).default(7),
 });
 
-const profilePoints = (user: User) => normalizePreferences(user.weakPoints, user.likedPoints);
+const profilePoints = (user: User) => ({
+  ...normalizePreferences(user.weakPoints, user.likedPoints),
+  focusGoal: user.focusGoal,
+});
 
 @Controller('plans')
 export class PlansController {
@@ -34,6 +40,7 @@ export class PlansController {
       body.gymId,
       normalizeEquipment(user.equipment),
       profilePoints(user),
+      body.focus,
     );
   }
 

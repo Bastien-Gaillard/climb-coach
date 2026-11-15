@@ -1,4 +1,4 @@
-import { focusWeights, nextFocus, weakFocus } from './focus-balance';
+import { favoredFocus, focusWeights, nextFocus, weakFocus } from './focus-balance';
 import { Focus } from './plan.schema';
 
 /** Enchaîne `n` séances à partir d'une première, comme le ferait le grimpeur. */
@@ -9,18 +9,54 @@ function run(first: Focus, n: number, weights = focusWeights()): Focus[] {
 }
 
 describe('focusWeights', () => {
-  it('sans point faible : poids égaux', () => {
-    expect(focusWeights([])).toEqual({ strength: 1, endurance: 1, technique: 1 });
+  it('sans type favorisé : poids égaux', () => {
+    expect(focusWeights()).toEqual({ strength: 1, endurance: 1, technique: 1 });
   });
 
-  it('double le type qui travaille le plus de points faibles', () => {
-    expect(focusWeights(['crimps', 'footwork', 'slopers'])).toEqual({
-      strength: 2,
-      endurance: 1,
-      technique: 1,
+  it('double le type favorisé', () => {
+    expect(focusWeights('strength')).toEqual({ strength: 2, endurance: 1, technique: 1 });
+  });
+});
+
+describe('weakFocus', () => {
+  it('compte la part de chaque groupe, pas le nombre brut de points', () => {
+    // 2 sur 3 en endurance pèse plus que 4 sur 8 en force
+    expect(weakFocus(['crimps', 'slopers', 'pinches', 'lock-off', 'resistance', 'recovery'])).toBe(
+      'endurance',
+    );
+    expect(weakFocus(['crimps', 'footwork', 'slopers'])).toBe('strength');
+  });
+
+  it('à égalité, aucun type favorisé, quel que soit l’ordre', () => {
+    expect(weakFocus(['slab', 'crimps'])).toBeNull();
+    expect(weakFocus(['crimps', 'slab'])).toBeNull();
+  });
+
+  it('mobilité et mental ne votent pas', () => {
+    expect(weakFocus(['fall', 'commitment', 'hip-mobility'])).toBeNull();
+    expect(weakFocus(['fall', 'commitment', 'footwork'])).toBe('technique');
+    expect(weakFocus([])).toBeNull();
+  });
+
+  it('les crochets comptent pour la technique, comme dans le profil', () => {
+    expect(weakFocus(['hooks'])).toBe('technique');
+  });
+});
+
+describe('favoredFocus', () => {
+  it('l’objectif l’emporte sur les points faibles', () => {
+    expect(favoredFocus('strength', ['resistance', 'recovery', 'volume'])).toEqual({
+      focus: 'strength',
+      source: 'goal',
     });
-    expect(weakFocus(['slab', 'resistance'])).toBe('technique');
-    expect(weakFocus(['resistance', 'slab'])).toBe('endurance');
+  });
+
+  it('sans objectif : les points faibles, sinon rien', () => {
+    expect(favoredFocus(null, ['resistance'])).toEqual({
+      focus: 'endurance',
+      source: 'weak-points',
+    });
+    expect(favoredFocus(undefined, [])).toBeNull();
   });
 });
 
@@ -32,7 +68,7 @@ describe('nextFocus', () => {
   });
 
   it('point faible en force : environ une séance sur deux, jamais deux de suite', () => {
-    const played = run('technique', 24, focusWeights(['crimps']));
+    const played = run('technique', 24, focusWeights('strength'));
     const strength = played.filter((f) => f === 'strength').length;
     expect(strength / played.length).toBeGreaterThanOrEqual(0.4);
     expect(strength / played.length).toBeLessThanOrEqual(0.55);
@@ -45,6 +81,6 @@ describe('nextFocus', () => {
   });
 
   it('sans historique : technique pour commencer', () => {
-    expect(nextFocus([], focusWeights(['crimps']))).toBe('technique');
+    expect(nextFocus([], focusWeights('strength'))).toBe('technique');
   });
 });

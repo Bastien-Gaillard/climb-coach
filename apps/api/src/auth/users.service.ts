@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm';
 import { Database, DB } from '../db/db.module';
 import { users } from '../db/schema';
 import { ClimbingPoint, normalizePoints, normalizePreferences } from './climbing-points';
+import { Focus } from '../plans/plan.schema';
 import { Equipment, normalizeEquipment } from './equipment';
 
 export type User = typeof users.$inferSelect;
@@ -33,6 +34,7 @@ export class UsersService {
       equipment?: Equipment[];
       weakPoints?: ClimbingPoint[];
       likedPoints?: ClimbingPoint[];
+      focusGoal?: Focus | null;
     },
   ): Promise<User> {
     let points: { weakPoints?: ClimbingPoint[]; likedPoints?: ClimbingPoint[] } = {};
@@ -53,6 +55,7 @@ export class UsersService {
           sessionsPerWeek: settings.sessionsPerWeek,
         }),
         ...(settings.equipment && { equipment: normalizeEquipment(settings.equipment) }),
+        ...(settings.focusGoal !== undefined && { focusGoal: settings.focusGoal }),
       })
       .where(eq(users.id, id))
       .returning();

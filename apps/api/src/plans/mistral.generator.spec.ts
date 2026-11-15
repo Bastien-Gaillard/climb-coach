@@ -164,6 +164,28 @@ describe('MistralGenerator.generate', () => {
     expect(body.messages.at(-1).content).toContain('Réponse non JSON');
   });
 
+  it('type choisi par le grimpeur : refuse puis relance une séance d’un autre type', async () => {
+    const strength = { ...validPlan, focus: 'strength' as const };
+    const fetchMock = jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ choices: [{ message: { content: JSON.stringify(validPlan) } }] }),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ choices: [{ message: { content: JSON.stringify(strength) } }] }),
+      } as Response);
+
+    await expect(makeGenerator().generate({ ...ctx, requestedFocus: 'strength' })).resolves.toEqual(
+      strength,
+    );
+    const body = JSON.parse((fetchMock.mock.calls[1][1] as RequestInit).body as string);
+    expect(body.messages.at(-1).content).toContain('le type choisi par le grimpeur');
+  });
+
   it('abandonne après une relance invalide', async () => {
     const fetchMock = mockFetch({ content: 'pas du JSON' });
     await expect(makeGenerator().generate(ctx)).rejects.toThrow('Réponse non JSON');
@@ -261,6 +283,18 @@ describe('MistralGenerator.buildUserPrompt', () => {
     expect(prompt).toMatch(
       /Exercices proposés par les règles, dans l'ordre : .+ \(point faible\), .+, .+ \(ce qu’il aime\)\./,
     );
+  });
+
+  it('donne l’objectif, et impose le type choisi pour aujourd’hui', () => {
+    const prompt = makeGenerator().buildUserPrompt({
+      availableMinutes: 90,
+      now,
+      history: [session(3, now, { focus: 'technique' })],
+      focusGoal: 'strength',
+      requestedFocus: 'endurance',
+    });
+    expect(prompt).toContain("Objectif d'entraînement : force.");
+    expect(prompt).toContain('focus endurance (imposé)');
   });
 
   it('résume l’historique et la proposition des règles', () => {

@@ -2,7 +2,7 @@ import { Gym } from '@climb-coach/grades';
 import { ClimbingPoint } from '../auth/climbing-points';
 import { Equipment } from '../auth/equipment';
 import { SessionWithClimbs } from '../sessions/sessions.service';
-import { Plan } from './plan.schema';
+import { Focus, Plan } from './plan.schema';
 
 export interface GeneratorContext {
   availableMinutes: number;
@@ -13,7 +13,14 @@ export interface GeneratorContext {
   gym?: Gym;
   /** Matériel coché dans le profil : l'échauffement s'en sert s'il est là. */
   equipment?: Equipment[];
-  /** Points faibles du profil : plus de séances de leur type, un exercice par séance. */
+  /** Objectif d'entraînement du profil : son type de séance revient environ une fois sur deux. */
+  focusGoal?: Focus | null;
+  /**
+   * Type de séance choisi pour aujourd'hui, à la place du planning. Respecté, sauf la force
+   * quand une douleur est signalée.
+   */
+  requestedFocus?: Focus;
+  /** Points faibles du profil : un exercice par séance, et le type favorisé sans objectif. */
   weakPoints?: ClimbingPoint[];
   /** Ce que le grimpeur aime : au moins un exercice par séance, en dernier. */
   likedPoints?: ClimbingPoint[];

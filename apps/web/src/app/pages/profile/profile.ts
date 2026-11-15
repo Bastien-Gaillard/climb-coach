@@ -2,8 +2,8 @@ import { NgTemplateOutlet } from '@angular/common';
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { ApiService } from '../../core/api.service';
 import { AuthService } from '../../core/auth.service';
-import { errorMessage } from '../../core/labels';
-import { ClimbingPoint, Equipment, Profile } from '../../core/models';
+import { errorMessage, FOCUS_LABEL } from '../../core/labels';
+import { ClimbingPoint, Equipment, Focus, Profile } from '../../core/models';
 import { Icon } from '../../shared/icon';
 
 interface EquipmentOption {
@@ -123,6 +123,14 @@ const POINT_ORDER: ClimbingPoint[] = [
 
 export type PointList = 'weakPoints' | 'likedPoints';
 
+/** Choix de l'objectif d'entraînement, « Aucun » d'abord. */
+export const GOAL_OPTIONS: { id: Focus | null; label: string }[] = [
+  { id: null, label: 'Aucun' },
+  { id: 'strength', label: 'Force' },
+  { id: 'endurance', label: 'Endurance' },
+  { id: 'technique', label: 'Technique' },
+];
+
 /**
  * Profil : le matériel disponible, que l'échauffement utilise quand il est coché, puis les points
  * faibles (travaillés en premier) et ce qu'on aime faire (gardé dans chaque séance).
@@ -139,6 +147,8 @@ export class ProfilePage implements OnInit {
 
   protected readonly options = EQUIPMENT_OPTIONS;
   protected readonly groups = POINT_GROUPS;
+  protected readonly goals = GOAL_OPTIONS;
+  protected readonly focusLabel = FOCUS_LABEL;
   protected readonly profile = signal<Profile | null>(null);
   protected readonly error = signal<string | null>(null);
   protected readonly saving = signal(false);
@@ -163,6 +173,17 @@ export class ProfilePage implements OnInit {
     else set.add(id);
     const equipment = EQUIPMENT_OPTIONS.map((o) => o.id).filter((e) => set.has(e));
     this.save(p, { ...p, equipment }, { equipment });
+  }
+
+  /**
+   * Choisit l'objectif d'entraînement. Son type s'affiche tout de suite comme favorisé ; sans
+   * objectif, on attend l'API, qui dit ce que désignent les points faibles.
+   */
+  protected pickGoal(goal: Focus | null): void {
+    const p = this.profile();
+    if (!p || this.saving() || p.focusGoal === goal) return;
+    const favoredFocus = goal ? { focus: goal, source: 'goal' as const } : p.favoredFocus;
+    this.save(p, { ...p, focusGoal: goal, favoredFocus }, { focusGoal: goal });
   }
 
   protected checked(list: PointList, id: ClimbingPoint): boolean {

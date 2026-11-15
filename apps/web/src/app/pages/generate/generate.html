@@ -167,6 +167,29 @@
   </div>
 </section>
 
+<section class="stack">
+  <h2 class="overline" id="focus-label">Type de séance</h2>
+  <div class="focus-pick" role="radiogroup" aria-labelledby="focus-label">
+    @for (o of focusOptions; track o.label) {
+    <button
+      type="button"
+      role="radio"
+      [attr.aria-checked]="focus() === o.id"
+      [attr.data-testid]="'focus-' + (o.id ?? 'auto')"
+      (click)="focus.set(o.id)"
+    >
+      {{ o.label }}
+    </button>
+    }
+  </div>
+  @if (focus(); as f) {
+  <p class="muted small">
+    Séance {{ ofFocus(f) }} à la place de celle du planning, qui ne change pas. Avec une douleur
+    notée, jamais de force.
+  </p>
+  }
+</section>
+
 @if (gyms().length) {
 <section class="stack">
   <h2 class="overline">Salle</h2>
@@ -199,7 +222,8 @@
 <div class="action-bar">
   <button type="button" class="primary big grow" (click)="generate()" [disabled]="loading()">
     <app-icon name="generate" [size]="22" [stroke]="2.4" />
-    {{ loading() ? 'Génération…' : 'Générer · ' + minutes() + ' min' }}
+    {{ loading() ? 'Génération…' : 'Générer · ' + minutes() + ' min' + (focus() ? ' · ' +
+    focusLabel[focus()!].toLowerCase() : '') }}
   </button>
 </div>
 }

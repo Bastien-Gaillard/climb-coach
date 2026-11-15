@@ -10,7 +10,7 @@ import { GeneratorContext } from './generator';
 import { withGymColors } from './gym-colors';
 import { MistralGenerator } from './mistral.generator';
 import { ADVICE_HORIZON_DAYS, MistralScheduleAdvisor } from './mistral.schedule';
-import { Plan } from './plan.schema';
+import { Focus, Plan } from './plan.schema';
 import { RuleBasedGenerator } from './rule-based.generator';
 import { addDays, buildSchedule, diffDays, Schedule } from './schedule';
 
@@ -29,20 +29,25 @@ export interface GeneratedPlanResult {
   createdAt: Date;
 }
 
-/** Points du profil qui orientent les séances et le planning. */
+/** Ce qui, dans le profil, oriente les séances et le planning. */
 export interface ProfilePoints {
   weakPoints?: ClimbingPoint[];
   likedPoints?: ClimbingPoint[];
+  focusGoal?: Focus | null;
 }
 
-/** Ce qui, s'il change, rend le planning du mois périmé : le rythme et les points faibles. */
-const planKey = (sessionsPerWeek: number, weakPoints: readonly string[] = []) =>
-  `${sessionsPerWeek}|${[...weakPoints].sort().join(',')}`;
+/** Ce qui, s'il change, rend le planning du mois périmé : rythme, points faibles et objectif. */
+const planKey = (
+  sessionsPerWeek: number,
+  weakPoints: readonly string[] = [],
+  focusGoal: Focus | null = null,
+) => `${sessionsPerWeek}|${[...weakPoints].sort().join(',')}|${focusGoal ?? ''}`;
 
 /** Planning du mois enregistré pour un compte. */
 interface StoredPlan {
   sessionsPerWeek: number;
   weakPoints: string[];
+  focusGoal: Focus | null;
   summary: string | null;
   sessions: StoredPlannedSession[];
   createdAt: Date;
@@ -73,6 +78,8 @@ export class PlansService {
     gymId?: string,
     equipment: Equipment[] = [],
     points: ProfilePoints = {},
+    /** Type choisi à la place du planning. */
+    requestedFocus?: Focus,
   ): Promise<GeneratedPlanResult> {
     const [history, gym] = await Promise.all([
       this.sessions.findRecent(userId, 10),
@@ -85,8 +92,10 @@ export class PlansService {
       equipment,
       weakPoints: points.weakPoints ?? [],
       likedPoints: points.likedPoints ?? [],
+      focusGoal: points.focusGoal ?? null,
     };
     if (gym) ctx.gym = gym;
+    if (requestedFocus) ctx.requestedFocus = requestedFocus;
 
     let source: GeneratedPlanResult['source'] = 'rules';
     let fallbackReason: string | undefined;
@@ -136,8 +145,14 @@ export class PlansService {
     const now = this.clock();
     const history = await this.sessions.findRecent(userId, 5);
     const weakPoints = points.weakPoints ?? [];
-    const base = buildSchedule(history, now, { horizonDays, sessionsPerWeek, weakPoints });
-    const key = planKey(base.sessionsPerWeek, weakPoints);
+    const focusGoal = points.focusGoal ?? null;
+    const base = buildSchedule(history, now, {
+      horizonDays,
+      sessionsPerWeek,
+      weakPoints,
+      focusGoal,
+    });
+    const key = planKey(base.sessionsPerWeek, weakPoints, focusGoal);
     if (!this.advisor.enabled || history.length === 0) return base;
 
     const pending = this.adviceInFlight.has(userId);
@@ -156,10 +171,11 @@ export class PlansService {
       return { ...base, ...(failure ? { fallbackReason: failure } : { advicePending: true }) };
     }
 
-    // Rythme ou points faibles changés depuis le planning : on en refait un, une seule fois
+    // Rythme, points faibles ou objectif changés depuis le planning : on en refait un, une seule fois
     // (pas en boucle si échec)
     const rhythmChanged = stored.sessionsPerWeek !== base.sessionsPerWeek;
-    const profileChanged = planKey(stored.sessionsPerWeek, stored.weakPoints) !== key;
+    const profileChanged =
+      planKey(stored.sessionsPerWeek, stored.weakPoints, stored.focusGoal) !== key;
     if (profileChanged && !pending && !failure) {
       this.requestAdvice(userId, history, now, sessionsPerWeek, points);
       status.advicePending = true;
@@ -181,6 +197,7 @@ export class PlansService {
         advised: upcoming,
         summary: stored.summary ?? undefined,
         weakPoints,
+        focusGoal,
       }),
       ...plan,
       ...status,
@@ -219,11 +236,13 @@ export class PlansService {
   ): void {
     if (this.adviceInFlight.has(userId)) return;
     const weakPoints = points.weakPoints ?? [];
+    const focusGoal = points.focusGoal ?? null;
     // Mistral reçoit la proposition des règles sur tout son horizon
     const base = buildSchedule(history, now, {
       horizonDays: ADVICE_HORIZON_DAYS,
       sessionsPerWeek,
       weakPoints,
+      focusGoal,
     });
     const done = this.advisor
       .advisePlan(history, base, points)
@@ -231,6 +250,7 @@ export class PlansService {
         this.savePlan(userId, {
           sessionsPerWeek: base.sessionsPerWeek,
           weakPoints,
+          focusGoal,
           summary: plan.summary ?? null,
           sessions: plan.sessions.map(({ inDays, ...rest }) => ({
             ...rest,
@@ -247,7 +267,7 @@ export class PlansService {
         );
         this.adviceFailure.set(userId, {
           message: e.message,
-          key: planKey(base.sessionsPerWeek, weakPoints),
+          key: planKey(base.sessionsPerWeek, weakPoints, focusGoal),
         });
       })
       .finally(() => this.adviceInFlight.delete(userId));

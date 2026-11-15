@@ -10,7 +10,9 @@ import {
 import { z } from 'zod';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { CurrentUser, Public } from './auth.decorators';
-import { CLIMBING_POINTS, normalizePreferences } from './climbing-points';
+import { FocusSchema } from '../plans/plan.schema';
+import { favoredFocus } from '../plans/focus-balance';
+import { CLIMBING_POINTS, normalizePoints, normalizePreferences } from './climbing-points';
 import { EQUIPMENT, normalizeEquipment } from './equipment';
 import { User, UsersService } from './users.service';
 
@@ -26,6 +28,8 @@ const SettingsSchema = z
     weakPoints: z.array(z.enum(CLIMBING_POINTS)).max(CLIMBING_POINTS.length).optional(),
     /** Ce que le grimpeur aime : chaque séance en garde un peu. */
     likedPoints: z.array(z.enum(CLIMBING_POINTS)).max(CLIMBING_POINTS.length).optional(),
+    /** Objectif d'entraînement : son type revient environ une séance sur deux (null : aucun). */
+    focusGoal: FocusSchema.nullable().optional(),
   })
   .refine((b) => Object.values(b).some((v) => v !== undefined), {
     message: 'Rien à modifier',
@@ -37,6 +41,9 @@ const toDto = (u: User) => ({
   sessionsPerWeek: u.sessionsPerWeek,
   equipment: normalizeEquipment(u.equipment),
   ...normalizePreferences(u.weakPoints, u.likedPoints),
+  focusGoal: u.focusGoal,
+  /** Type qui revient environ une séance sur deux, et pourquoi (objectif ou points faibles). */
+  favoredFocus: favoredFocus(u.focusGoal, normalizePoints(u.weakPoints)),
 });
 
 @Controller('auth')

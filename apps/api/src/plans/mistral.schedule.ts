@@ -2,11 +2,18 @@ import { Injectable } from '@nestjs/common';
 import { z } from 'zod';
 import { ClimbingPoint, pointLabels } from '../auth/climbing-points';
 import { SessionWithClimbs } from '../sessions/sessions.service';
-import { weakFocus } from './focus-balance';
+import { favoredFocus } from './focus-balance';
 import { FOCUS_LABEL } from './history-analysis';
 import { ChatMessage, extractJson, MistralError, MistralGenerator } from './mistral.generator';
-import { FocusSchema } from './plan.schema';
+import { Focus, FocusSchema } from './plan.schema';
 import { AdvisedSession, diffDays, localDay, Schedule } from './schedule';
+
+/** Ce que le planning lit du profil. */
+export interface ScheduleProfile {
+  weakPoints?: ClimbingPoint[];
+  likedPoints?: ClimbingPoint[];
+  focusGoal?: Focus | null;
+}
 
 /** Mistral planifie les 4 prochaines semaines. */
 export const ADVICE_HORIZON_DAYS = 28;
@@ -39,15 +46,15 @@ Ton rôle : planifier ses séances des 4 prochaines semaines (28 jours, jour 0 =
 
 Ce que tu reçois :
 - la date du jour et le rythme visé (séances par semaine) ;
-- ses points faibles et ce qu'il aime faire, s'il les a indiqués ;
-- une proposition calculée par des règles fixes (rotation force → endurance → technique, ou plus de séances du type de son point faible, jours de récup) ;
+- son objectif d'entraînement, ses points faibles et ce qu'il aime faire, s'il les a indiqués ;
+- une proposition calculée par des règles fixes (rotation force → endurance → technique, ou plus de séances du type favorisé, jours de récup) ;
 - ses dernières séances : date, type, durée, fatigue ressentie (1 = frais, 5 = épuisé), blocs tentés et ses NOTES libres, avec sa durée habituelle.
 
 Rythme :
 - Vise le rythme demandé : N séances par semaine, donc environ 4 × N séances sur les 28 jours, réparties régulièrement. Ne planifie pas moins sans raison de santé, ni plus.
 - Jamais deux séances le même jour. Pas de force la veille ou le lendemain d'une autre séance de force.
 - Alterne les types (force, endurance, technique) ; la technique se place bien entre deux séances dures.
-- Point faible indiqué : environ une séance sur deux de son type (le type ciblé est donné), sans jamais deux séances de force à moins de 48 h, et au moins une séance de chacun des autres types par semaine.
+- Type favorisé (donné : il vient de l'objectif d'entraînement, sinon des points faibles) : environ une séance sur deux de ce type, sans jamais deux séances de force à moins de 48 h, et au moins une séance de chacun des autres types par semaine.
 - Ce qu'il aime : garde chaque semaine des séances qui lui font plaisir, la motivation compte autant que le point faible.
 
 Ta valeur ajoutée : lire et interpréter les notes et l'historique, ce que les règles ne savent pas faire.
@@ -95,11 +102,11 @@ function dayLabel(day: string): string {
 export function buildScheduleUserPrompt(
   history: SessionWithClimbs[],
   base: Schedule,
-  profile: { weakPoints?: ClimbingPoint[]; likedPoints?: ClimbingPoint[] } = {},
+  profile: ScheduleProfile = {},
 ): string {
   const weak = profile.weakPoints ?? [];
   const liked = profile.likedPoints ?? [];
-  const targeted = weakFocus(weak);
+  const favored = favoredFocus(profile.focusGoal, weak);
   const lines = history.slice(0, 5).map((s) => {
     const day = localDay(s.date);
     const ago = diffDays(day, base.today);
@@ -118,7 +125,8 @@ export function buildScheduleUserPrompt(
   return [
     `Aujourd'hui (jour 0) : ${dayLabel(base.today)}.`,
     `Rythme visé : ${base.sessionsPerWeek} séance${base.sessionsPerWeek > 1 ? 's' : ''} par semaine, soit environ ${base.sessionsPerWeek * 4} séances sur 28 jours.`,
-    `Points faibles : ${weak.length ? `${pointLabels(weak)} (type ciblé : ${FOCUS_LABEL[targeted!]})` : 'aucun indiqué'}.`,
+    `Type favorisé : ${favored ? `${FOCUS_LABEL[favored.focus]} (${favored.source === 'goal' ? 'objectif d’entraînement' : 'd’après les points faibles'})` : 'aucun, rotation égale'}.`,
+    `Points faibles : ${weak.length ? pointLabels(weak) : 'aucun indiqué'}.`,
     `Ce qu'il aime faire : ${liked.length ? pointLabels(liked) : 'rien d’indiqué'}.`,
     proposal.length
       ? `Proposition des règles :\n${proposal.join('\n')}`
@@ -195,7 +203,7 @@ export class MistralScheduleAdvisor {
   async advisePlan(
     history: SessionWithClimbs[],
     base: Schedule,
-    profile: { weakPoints?: ClimbingPoint[]; likedPoints?: ClimbingPoint[] } = {},
+    profile: ScheduleProfile = {},
   ): Promise<MonthPlan> {
     const messages: ChatMessage[] = [
       { role: 'system', content: SCHEDULE_PROMPT },

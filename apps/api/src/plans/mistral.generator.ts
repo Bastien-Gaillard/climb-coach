@@ -210,7 +210,7 @@ Tes principes de coach :
 
 Spécificités du bloc :
 - Force : peu de blocs durs, essais courts et explosifs, 3 à 5 min de repos complet entre les essais.
-- Endurance : circuits de blocs faciles enchaînés, repos courts. Un 4×4, c'est 4 blocs enchaînés sans pause = 1 série, répétée 2 à 5 fois avec 3 à 4 min de repos entre les séries (jamais 4 fois les 4 blocs d'affilée).
+- Endurance : circuits de blocs faciles enchaînés, repos courts. Un 4×4, c'est 4 blocs enchaînés sans pause = 1 série, répétée 2 à 5 fois avec 3 min de repos entre les séries (jamais 4 fois les 4 blocs d'affilée). Une séance d'endurance travaille une seule filière : soit le fond (effort long et continu, peu intense), soit la résistance (effort court et intense, avant-bras qui gonflent), jamais les deux. Le catalogue indique la filière de chaque exercice.
 - Technique : blocs sous le niveau max, avec une consigne de mouvement précise (pieds, hanches, lecture, équilibre).
 - Varie les styles de blocs d'une séance à l'autre : dalle, vertical, dévers, réglettes, plats, compression, mouvements dynamiques.
 - Pense à la désescalade ou à la chute contrôlée : jamais de chute non préparée sur les blocs hauts.
@@ -223,7 +223,7 @@ ${catalogForPrompt()}
 Le cœur de séance contient 1 à 3 exercices du catalogue (1 si le temps est court, 2 ou 3 au-delà de 25 min), chacun dans sa propre partie "main", dont le titre est le nom de l'exercice. Tu peux adapter un exercice, mais garde son principe.
 
 Structure de la séance :
-- Respecte le focus et l'intensité proposés, sauf raison évidente dans l'historique.
+- Respecte le focus et l'intensité proposés, sauf raison évidente dans l'historique. Quand le grimpeur a choisi lui-même le type de la séance, ce focus est imposé : garde-le toujours.
 - La séance est découpée en parties (le tableau "blocks" du JSON, à ne pas confondre avec les blocs d'escalade). La somme de leurs "minutes" doit être comprise entre (temps dispo - 10) et le temps dispo.
 - Échauffement progressif : toutes ses cotations restent au moins 2 crans sous le niveau à viser. Il va du général au spécifique, du lent au rapide, des grosses prises aux petites, dans cet ordre :
   1. 2 à 4 min de cardio léger (sautillements, montées de genoux, jumping jacks) ;
@@ -328,8 +328,18 @@ export class MistralGenerator implements PlanGenerator {
       { role: 'user', content: this.buildUserPrompt(ctx) },
     ];
     const content = await this.chat(messages);
+    // Type choisi par le grimpeur : une séance d'un autre type est refusée (puis relancée)
+    const wanted = ctx.requestedFocus ? analyzeHistory(ctx).focus : undefined;
+    const parse = (raw: string) => {
+      const plan = this.parse(raw, ctx.availableMinutes);
+      if (wanted && plan.focus !== wanted)
+        throw new MistralError(
+          `focus "${plan.focus}" au lieu de "${wanted}", le type choisi par le grimpeur`,
+        );
+      return plan;
+    };
     try {
-      return this.parse(content, ctx.availableMinutes);
+      return parse(content);
     } catch (e) {
       if (!(e instanceof MistralError)) throw e;
       // Une seule relance : on renvoie l'erreur au modèle pour qu'il corrige sa réponse.
@@ -341,7 +351,7 @@ export class MistralGenerator implements PlanGenerator {
           content: `Ta réponse est invalide : ${e.message}. Renvoie la séance corrigée, uniquement le JSON complet au format demandé.`,
         },
       ]);
-      return this.parse(retry, ctx.availableMinutes);
+      return parse(retry);
     }
   }
 
@@ -386,9 +396,12 @@ export class MistralGenerator implements PlanGenerator {
           ]
         : []),
       `Meilleure réussite récente : ${gradeFromValue(a.maxSent, system)}. Niveau à viser : ${gradeFromValue(a.project, system)}.`,
+      ...(ctx.focusGoal ? [`Objectif d'entraînement : ${FOCUS_LABEL[ctx.focusGoal]}.`] : []),
       `Points faibles : ${weak.length ? pointLabels(weak) : 'aucun indiqué'}.`,
       `Ce qu'il aime faire : ${liked.length ? pointLabels(liked) : 'rien d’indiqué'}.`,
-      `Proposition : focus ${a.focus}, intensité ${a.intensity}.`,
+      ctx.requestedFocus
+        ? `Type choisi par le grimpeur pour aujourd'hui, à la place du planning : focus ${a.focus} (imposé), intensité ${a.intensity}.`
+        : `Proposition : focus ${a.focus}, intensité ${a.intensity}.`,
       ...(picks.length
         ? [
             `Exercices proposés par les règles, dans l'ordre : ${picks.map((p) => `${p.exercise.name}${roleLabel[p.role]}`).join(', ')}.`,

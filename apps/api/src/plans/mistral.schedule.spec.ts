@@ -61,18 +61,34 @@ describe('parseMonthPlan', () => {
 });
 
 describe('buildScheduleUserPrompt', () => {
-  it('donne les points faibles, le type ciblé et ce qu’il aime', () => {
+  it('donne les points faibles, le type favorisé et ce qu’il aime', () => {
     const history = [session(3, now, { focus: 'strength' })];
     const prompt = buildScheduleUserPrompt(
       history,
       buildSchedule(history, now, { horizonDays: 28, weakPoints: ['crimps', 'slopers'] }),
       { weakPoints: ['crimps', 'slopers'], likedPoints: ['slab'] },
     );
-    expect(prompt).toContain('Points faibles : réglettes, plats (type ciblé : force).');
+    expect(prompt).toContain('Type favorisé : force (d’après les points faibles).');
+    expect(prompt).toContain('Points faibles : réglettes, plats.');
     expect(prompt).toContain("Ce qu'il aime faire : dalle et adhérence.");
     expect(buildScheduleUserPrompt(history, buildSchedule(history, now))).toContain(
       'Points faibles : aucun indiqué.',
     );
+  });
+
+  it('l’objectif d’entraînement passe avant les points faibles', () => {
+    const history = [session(3, now, { focus: 'strength' })];
+    const prompt = buildScheduleUserPrompt(history, buildSchedule(history, now), {
+      weakPoints: ['resistance'],
+      focusGoal: 'strength',
+    });
+    expect(prompt).toContain('Type favorisé : force (objectif d’entraînement).');
+    // Égalité entre groupes : aucun type favorisé, sans planter
+    expect(
+      buildScheduleUserPrompt(history, buildSchedule(history, now), {
+        weakPoints: ['crimps', 'slab'],
+      }),
+    ).toContain('Type favorisé : aucun, rotation égale.');
   });
 
   it('donne à Mistral la proposition des règles sur 28 jours, le rythme et les notes', () => {

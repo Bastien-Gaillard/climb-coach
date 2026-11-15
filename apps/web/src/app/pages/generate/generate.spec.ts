@@ -99,6 +99,20 @@ describe('GeneratePage', () => {
     expect(plan.textContent).toContain('Total : 60 min');
   });
 
+  it('par défaut le planning décide, sinon envoie le type choisi', () => {
+    const radio = (id: string) => el.querySelector<HTMLButtonElement>(`[data-testid=focus-${id}]`)!;
+    expect(radio('auto').getAttribute('aria-checked')).toBe('true');
+
+    radio('endurance').click();
+    fixture.detectChanges();
+    expect(radio('endurance').getAttribute('aria-checked')).toBe('true');
+    expect(el.textContent).toContain('Séance d’endurance à la place de celle du planning');
+    click('Générer');
+    const req = http.expectOne('/api/plans/generate');
+    expect(req.request.body).toEqual({ availableMinutes: 90, focus: 'endurance' });
+    req.flush(response);
+  });
+
   it('signale quand les règles ont pris le relais de Mistral', () => {
     click('Générer');
     http.expectOne('/api/plans/generate').flush(response);

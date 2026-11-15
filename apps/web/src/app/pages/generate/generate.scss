@@ -67,6 +67,29 @@ h2.overline {
   }
 }
 
+.focus-pick {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+
+  button {
+    min-height: 44px;
+    padding: 6px 4px;
+    border-radius: 999px;
+    background: var(--surface);
+    box-shadow: inset 0 0 0 1.5px var(--line);
+    color: var(--ink);
+    font-weight: 500;
+
+    &[aria-checked='true'] {
+      background: var(--accent);
+      color: var(--on-accent);
+      box-shadow: none;
+      font-weight: 600;
+    }
+  }
+}
+
 .custom {
   display: flex;
   align-items: center;

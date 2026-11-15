@@ -12,6 +12,8 @@ const profile: Profile = {
   equipment: ['elastic'],
   weakPoints: ['crimps'],
   likedPoints: ['power'],
+  focusGoal: null,
+  favoredFocus: { focus: 'strength', source: 'weak-points' },
 };
 
 describe('ProfilePage', () => {
@@ -62,6 +64,40 @@ describe('ProfilePage', () => {
     fixture.detectChanges();
     expect(box('elastic').getAttribute('aria-checked')).toBe('true');
     expect(el.querySelector('.error')).not.toBeNull();
+  });
+
+  describe('objectif d’entraînement', () => {
+    const goal = (id: string) => el.querySelector<HTMLButtonElement>(`[data-testid=goal-${id}]`)!;
+    const favored = () =>
+      el.querySelector('[data-testid=favored]')!.textContent!.replace(/\s+/g, ' ');
+
+    it('dit quel type revient le plus, et pourquoi', () => {
+      expect(goal('none').getAttribute('aria-checked')).toBe('true');
+      expect(favored()).toContain('Séances favorisées : force, environ une sur deux');
+      expect(favored()).toContain("(d'après tes points faibles)");
+    });
+
+    it('choisit un objectif, l’affiche tout de suite et l’enregistre', () => {
+      goal('endurance').click();
+      fixture.detectChanges();
+      expect(goal('endurance').getAttribute('aria-checked')).toBe('true');
+      expect(favored()).toContain('endurance, environ une sur deux (ton objectif)');
+      const req = http.expectOne('/api/auth/me');
+      expect(req.request.method).toBe('PATCH');
+      expect(req.request.body).toEqual({ focusGoal: 'endurance' });
+      req.flush({
+        ...profile,
+        focusGoal: 'endurance',
+        favoredFocus: { focus: 'endurance', source: 'goal' },
+      });
+    });
+
+    it('sans type favorisé, le dit aussi', () => {
+      goal('strength').click();
+      http.expectOne('/api/auth/me').flush({ ...profile, focusGoal: null, favoredFocus: null });
+      fixture.detectChanges();
+      expect(favored()).toContain('Aucun type favorisé');
+    });
   });
 
   describe('points faibles et ce qu’il aime', () => {

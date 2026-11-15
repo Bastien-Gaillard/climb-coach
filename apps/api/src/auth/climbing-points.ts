@@ -2,7 +2,7 @@ import { Focus } from '../plans/plan.schema';
 
 /**
  * Ce qu'un grimpeur de bloc peut cocher dans son profil, comme point faible ou comme ce qu'il
- * aime faire. Chaque point est rattaché au type de séance qui le travaille le plus.
+ * aime faire, rangé par groupe comme dans l'écran Profil.
  */
 export const CLIMBING_POINTS = [
   // Force
@@ -14,6 +14,7 @@ export const CLIMBING_POINTS = [
   'tension',
   'pushing',
   'compression',
+  // Technique (les crochets sont affichés avec la technique)
   'hooks',
   // Endurance
   'resistance',
@@ -64,7 +65,10 @@ export const POINT_LABEL: Record<ClimbingPoint, string> = {
   projecting: 'persévérance sur un bloc dur',
 };
 
-export const POINT_FOCUS: Record<ClimbingPoint, Focus> = {
+/** Groupes de l'écran Profil. Seuls force, endurance et technique désignent un type de séance. */
+export type PointGroup = Focus | 'mobility' | 'mental';
+
+export const POINT_GROUP: Record<ClimbingPoint, PointGroup> = {
   crimps: 'strength',
   slopers: 'strength',
   pinches: 'strength',
@@ -84,11 +88,11 @@ export const POINT_FOCUS: Record<ClimbingPoint, Focus> = {
   reading: 'technique',
   coordination: 'technique',
   'wall-styles': 'technique',
-  'hip-mobility': 'technique',
-  'shoulder-mobility': 'technique',
-  fall: 'technique',
-  commitment: 'strength',
-  projecting: 'strength',
+  'hip-mobility': 'mobility',
+  'shoulder-mobility': 'mobility',
+  fall: 'mental',
+  commitment: 'mental',
+  projecting: 'mental',
 };
 
 /** Points sans exercice de cœur de séance : ils se travaillent à l'échauffement et au calme. */

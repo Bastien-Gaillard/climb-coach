@@ -38,12 +38,43 @@
   }
 </section>
 
-@if (profile()) {
+@if (profile(); as p) {
+<section class="stack">
+  <h2 class="overline" id="goal-label">Objectif d'entraînement</h2>
+  <p class="muted small">
+    Son type de séance revient environ une fois sur deux, les deux autres au moins une fois par
+    semaine. Le changer refait le planning.
+  </p>
+  <div class="chips" role="radiogroup" aria-labelledby="goal-label">
+    @for (g of goals; track g.label) {
+    <button
+      type="button"
+      role="radio"
+      class="chip"
+      [attr.aria-checked]="p.focusGoal === g.id"
+      [attr.data-testid]="'goal-' + (g.id ?? 'none')"
+      [disabled]="saving()"
+      (click)="pickGoal(g.id)"
+    >
+      @if (p.focusGoal === g.id) {
+      <app-icon name="check" [size]="14" [stroke]="3" />
+      } {{ g.label }}
+    </button>
+    }
+  </div>
+  <p class="small favored" data-testid="favored">
+    @if (p.favoredFocus; as f) { Séances favorisées :
+    <strong>{{ focusLabel[f.focus].toLowerCase() }}</strong>, environ une sur deux @if (f.source ===
+    'goal') { (ton objectif). } @else { (d'après tes points faibles). } } @else { Aucun type
+    favorisé : force, endurance et technique tournent à parts égales. }
+  </p>
+</section>
+
 <section class="stack">
   <h2 class="overline" id="weak-label">Mes points faibles</h2>
   <p class="muted small">
-    Leur type de séance revient plus souvent, et chaque séance commence par un exercice qui les
-    travaille.
+    Chaque séance commence par un exercice qui les travaille. Sans objectif, le type dont tu coches
+    la plus grande part (force, endurance ou technique) revient plus souvent.
   </p>
   <ng-container
     [ngTemplateOutlet]="points"

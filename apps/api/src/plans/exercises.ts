@@ -22,6 +22,8 @@ export interface ExerciseContext {
   light: number;
   /** Minutes accordées à l'exercice. */
   minutes: number;
+  /** Fait alterner les variantes d'un exercice d'une séance à l'autre (ex. numéro du jour). */
+  variant?: number;
   /** Cotation affichée pour une valeur (avec la couleur de la salle si elle est connue). */
   grade: (value: number) => string;
 }
@@ -33,9 +35,19 @@ export interface ExerciseBlock {
   instructions: string[];
 }
 
+/**
+ * Filière d'un exercice d'endurance. Fond : effort long et continu, peu intense. Résistance :
+ * effort court et intense, les avant-bras gonflent. Une séance ne mélange pas les deux.
+ */
+export type Energy = 'fond' | 'resistance';
+
+export const ENERGY_LABEL: Record<Energy, string> = { fond: 'fond', resistance: 'résistance' };
+
 export interface Exercise {
   id: string;
   focus: Focus;
+  /** Endurance seulement : la filière travaillée. */
+  energy?: Energy;
   /** Points faibles qu'il travaille (ou plaisirs qu'il offre), pour le profil du grimpeur. */
   points: ClimbingPoint[];
   name: string;
@@ -966,13 +978,28 @@ export const EXERCISES: Exercise[] = [
     id: '4x4',
     source: 'https://gripped.com/?p=46491',
     focus: 'endurance',
+    energy: 'resistance',
     points: ['resistance', 'volume'],
     name: '4×4',
-    summary: '4 blocs enchaînés sans pause = 1 série ; 2 à 5 séries, 3 à 4 min de repos entre.',
+    summary:
+      '4 blocs enchaînés sans pause = 1 série (variante : le même bloc 4 fois) ; 2 à 5 séries, 3 min de repos entre.',
     minMinutes: 15,
     build: (c) => {
       const v = c.maxSent - 3 - c.light;
       const sets = count(c.minutes + 3, 8, 2, 5);
+      // Une séance sur deux : le même bloc 4 fois par série
+      if ((c.variant ?? 0) % 2 === 1)
+        return {
+          title: `4×4 sur un même bloc · ${plural(sets, 'série')}`,
+          target: v,
+          instructions: [
+            `${plural(sets, 'bloc')} en ${c.grade(v)}, un par série`,
+            'Objectif : tenir des mouvements connus sous la fatigue',
+            'Une série = le même bloc 4 fois de suite, juste le temps de redescendre entre deux passages',
+            'Repère : le 4e passage reste propre, même s’il est plus dur',
+            'Repos 3 min entre les séries',
+          ],
+        };
       return {
         title: `4×4 · ${plural(sets, 'série')}`,
         target: v,
@@ -991,6 +1018,7 @@ export const EXERCISES: Exercise[] = [
     source:
       'https://blog.movementgyms.com/improve-your-climbing-endurance-with-a-quick-and-effective-4x4-workout',
     focus: 'endurance',
+    energy: 'resistance',
     points: ['resistance', 'recovery'],
     name: 'Pyramide',
     summary: 'Monter en cotation bloc après bloc jusqu’au sommet, puis redescendre, repos courts.',
@@ -1017,6 +1045,7 @@ export const EXERCISES: Exercise[] = [
     id: '20-in-20',
     source: 'https://trainingforclimbing.com/?p=12701',
     focus: 'endurance',
+    energy: 'fond',
     points: ['recovery', 'volume'],
     name: 'Un bloc par minute',
     summary:
@@ -1041,6 +1070,7 @@ export const EXERCISES: Exercise[] = [
     id: 'up-down-up',
     source: 'https://climbinghouse.com/18-week-free-training-program/',
     focus: 'endurance',
+    energy: 'resistance',
     points: ['resistance', 'footwork'],
     name: 'Monter-descendre-monter',
     summary: 'Monter un bloc, le désescalader, le remonter sans poser le pied au sol.',
@@ -1065,6 +1095,7 @@ export const EXERCISES: Exercise[] = [
     id: 'linked',
     source: 'https://www.climbstrong.com/resource-posts/progressing-endurance-training-ii',
     focus: 'endurance',
+    energy: 'resistance',
     points: ['resistance'],
     name: 'Blocs enchaînés',
     summary: 'Enchaîner 3 blocs voisins sans toucher le sol, en désescaladant entre eux.',
@@ -1089,6 +1120,7 @@ export const EXERCISES: Exercise[] = [
     id: 'continuous-traverse',
     source: 'https://www.99boulders.com/?p=170',
     focus: 'endurance',
+    energy: 'fond',
     points: ['resistance'],
     name: 'Traversée continue',
     summary:
@@ -1114,10 +1146,10 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'intervals-30-30',
     focus: 'endurance',
+    energy: 'resistance',
     points: ['recovery', 'resistance'],
     name: 'Intervalles 30/30',
-    summary:
-      '30 s de grimpe continue, 30 s de repos, 6 fois ; 5 à 10 min de repos entre les séries.',
+    summary: '30 s de grimpe continue, 30 s de repos, 6 fois ; 5 min de repos entre les séries.',
     source: 'https://trainingforclimbing.com/?p=12701',
     minMinutes: 12,
     build: (c) => {
@@ -1139,6 +1171,7 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'points',
     focus: 'endurance',
+    energy: 'fond',
     points: ['volume', 'recovery'],
     name: 'Course aux points',
     summary:
@@ -1164,6 +1197,7 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'grade-tour',
     focus: 'endurance',
+    energy: 'fond',
     points: ['volume'],
     name: 'Tour d’une cotation',
     summary: 'Faire tous les blocs d’une même cotation de la salle, à la suite, repos courts.',
@@ -1183,32 +1217,6 @@ export const EXERCISES: Exercise[] = [
       };
     },
   },
-  {
-    id: '4x4-same',
-    focus: 'endurance',
-    points: ['resistance'],
-    name: '4×4 sur un même bloc',
-    summary:
-      'Variante du 4×4 : un même bloc 4 fois d’affilée par série, un bloc différent à chaque série.',
-    source: 'https://gripped.com/?p=46491',
-    minMinutes: 15,
-    build: (c) => {
-      const v = c.maxSent - 3 - c.light;
-      const sets = count(c.minutes + 3, 8, 2, 5);
-      return {
-        title: `4×4 sur un même bloc · ${plural(sets, 'série')}`,
-        target: v,
-        instructions: [
-          `${plural(sets, 'bloc')} en ${c.grade(v)}, un par série`,
-          'Objectif : tenir des mouvements connus sous la fatigue',
-          'Une série = le même bloc 4 fois de suite, juste le temps de redescendre entre deux passages',
-          'Repère : le 4e passage reste propre, même s’il est plus dur',
-          'Repos 3 min entre les séries',
-        ],
-      };
-    },
-  },
-
   // ---------- Force : peu de mouvements, intensité maximale, repos complets
   {
     id: 'limit',
@@ -1218,6 +1226,7 @@ export const EXERCISES: Exercise[] = [
     name: 'Bloc au max',
     summary: 'Quelques blocs au niveau max, essais courts à 100 %, 3 à 5 min de repos complet.',
     minMinutes: 15,
+    stressful: true,
     build: (c) => {
       // Un essai à fond + son repos : environ 4 min
       const attempts = Math.max(3, Math.floor(c.minutes / 4));
@@ -1298,6 +1307,7 @@ export const EXERCISES: Exercise[] = [
     name: 'Blocages',
     summary: 'Bloquer 3 s bras plié avant chaque prise : force de traction et de verrouillage.',
     minMinutes: 10,
+    stressful: true,
     build: (c) => {
       const v = c.maxSent - 1;
       const n = count(c.minutes, 4, 3, 6);
@@ -1321,11 +1331,27 @@ export const EXERCISES: Exercise[] = [
     points: ['tension', 'power'],
     name: 'Sans les pieds',
     summary:
-      'Grimper un dévers à bonnes prises avec les mains seules (« no foot ») : puissance de bras.',
+      'Grimper un dévers à bonnes prises avec les mains seules (« no foot ») ; variante : un bloc facile 3 fois par série, 4 séries.',
     minMinutes: 10,
     advanced: true,
     stressful: true,
     build: (c) => {
+      // Une séance sur deux : le protocole de Lattice, un même bloc facile répété
+      if ((c.variant ?? 0) % 2 === 1) {
+        const v = c.maxSent - 5;
+        const sets = count(c.minutes, 10, 1, 4);
+        return {
+          title: `Sans les pieds (protocole) · ${plural(sets, 'série')}`,
+          target: v,
+          instructions: [
+            `1 bloc en dévers à bonnes prises, en ${c.grade(v)}, grimpé sans les pieds : ${plural(sets, 'série')} de 3 passages`,
+            'Objectif : de la puissance de bras sur un bloc facile, répétée',
+            'Mains seules, et rattrape chaque prise bras légèrement fléchi, épaules engagées',
+            'Repère : le 3e passage d’une série reste aussi propre que le 1er',
+            'Repos 3 min entre chaque passage et entre les séries',
+          ],
+        };
+      }
       const v = c.maxSent - 3;
       const n = count(c.minutes, 3, 3, 6);
       return {
@@ -1378,6 +1404,7 @@ export const EXERCISES: Exercise[] = [
     source:
       'https://www.ukclimbing.com/articles/features/lattice_training_series_with_tom_randall_-_part_3_strength+power-11368',
     minMinutes: 15,
+    stressful: true,
     build: (c) => {
       const v = c.maxSent - 1;
       const sets = count(c.minutes, 10, 1, 6);
@@ -1389,34 +1416,6 @@ export const EXERCISES: Exercise[] = [
           'Objectif : de la force de qualité, sans fatigue qui s’accumule',
           `${plural(sets, 'série')} de 3 blocs, 1 passage par bloc`,
           'Repère : chaque passage reste propre. Arrête si la qualité baisse',
-          'Repos 3 min entre chaque passage et entre les séries',
-        ],
-      };
-    },
-  },
-  {
-    id: 'boulder-campus',
-    focus: 'strength',
-    points: ['power', 'tension'],
-    name: 'Bloc sans les pieds (protocole)',
-    summary:
-      'Un bloc facile (5 à 6 crans sous le max) grimpé sans les pieds, 3 fois par série, 4 séries.',
-    source:
-      'https://www.ukclimbing.com/articles/features/lattice_training_series_with_tom_randall_-_part_3_strength+power-11368',
-    minMinutes: 15,
-    advanced: true,
-    stressful: true,
-    build: (c) => {
-      const v = c.maxSent - 5;
-      const sets = count(c.minutes, 10, 1, 4);
-      return {
-        title: `Bloc sans les pieds · ${plural(sets, 'série')}`,
-        target: v,
-        instructions: [
-          `1 bloc en dévers à bonnes prises, en ${c.grade(v)}, grimpé sans les pieds : ${plural(sets, 'série')} de 3 passages`,
-          'Objectif : de la puissance de bras sur un bloc facile, répétée',
-          'Mains seules, et rattrape chaque prise bras légèrement fléchi, épaules engagées',
-          'Repère : le 3e passage d’une série reste aussi propre que le 1er',
           'Repos 3 min entre chaque passage et entre les séries',
         ],
       };
@@ -1645,6 +1644,9 @@ export interface Pick {
  * Avec un profil : au plus un exercice sur un point faible, en premier (quand on est frais), et
  * au moins un exercice qu'on aime, en dernier (pour finir sur une bonne sensation). Avec un seul
  * exercice, on alterne d'une séance à l'autre. Sans profil, en force, le bloc au max passe d'abord.
+ *
+ * En endurance, tous les exercices d'une séance travaillent la même filière (fond ou résistance) :
+ * celle du point faible s'il y en a un, sinon celle de l'exercice aimé, sinon celle du jour.
  */
 export function pickExercises(o: PickOptions): Pick[] {
   const pool = EXERCISES.filter(
@@ -1657,13 +1659,19 @@ export function pickExercises(o: PickOptions): Pick[] {
 
   const howMany = o.minutes >= 45 ? 3 : o.minutes >= 25 ? 2 : 1;
   const start = ((o.seed % pool.length) + pool.length) % pool.length;
-  const ordered = [...pool.slice(start), ...pool.slice(0, start)];
+  let ordered = [...pool.slice(start), ...pool.slice(0, start)];
 
   const weak = new Set(o.weakPoints ?? []);
   const liked = new Set(o.likedPoints ?? []);
   const isWeak = (e: Exercise) => e.points.some((p) => weak.has(p));
   const isLiked = (e: Exercise) => !isWeak(e) && e.points.some((p) => liked.has(p));
   const fits = (e: Exercise) => Math.floor(o.minutes / howMany) >= e.minMinutes;
+
+  if (howMany > 1 && o.focus === 'endurance') {
+    // Fond et résistance ne se mélangent pas dans une même séance
+    const anchor = ordered.find(isWeak) ?? ordered.find(isLiked) ?? ordered[0];
+    if (anchor.energy) ordered = ordered.filter((e) => e.energy === anchor.energy);
+  }
   const first = (test: (e: Exercise) => boolean) =>
     ordered.find((e) => test(e) && fits(e)) ?? ordered.find(test);
 
@@ -1719,14 +1727,14 @@ export function pickExercises(o: PickOptions): Pick[] {
 export function catalogForPrompt(): string {
   const label: Record<Focus, string> = {
     technique: 'Technique',
-    endurance: 'Endurance (résistance)',
+    endurance: 'Endurance (fond ou résistance, jamais les deux dans une séance)',
     strength: 'Force',
   };
   return (['technique', 'endurance', 'strength'] as Focus[])
     .map((f) => {
       const lines = EXERCISES.filter((e) => e.focus === f).map(
         (e) =>
-          `- ${e.name} : ${e.summary} Travaille : ${e.points.map((p) => POINT_LABEL[p]).join(', ')}.${e.advanced ? ' (seulement à partir de 6C, jamais en cas de douleur)' : e.stressful ? ' (jamais en cas de douleur)' : ''}`,
+          `- ${e.name}${e.energy ? ` (${ENERGY_LABEL[e.energy]})` : ''} : ${e.summary} Travaille : ${e.points.map((p) => POINT_LABEL[p]).join(', ')}.${e.advanced ? ' (seulement à partir de 6C, jamais en cas de douleur)' : e.stressful ? ' (jamais en cas de douleur)' : ''}`,
       );
       return `${label[f]} :\n${lines.join('\n')}`;
     })

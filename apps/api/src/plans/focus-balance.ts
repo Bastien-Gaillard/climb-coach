@@ -1,4 +1,4 @@
-import { ClimbingPoint, POINT_FOCUS } from '../auth/climbing-points';
+import { CLIMBING_POINTS, ClimbingPoint, POINT_GROUP } from '../auth/climbing-points';
 import { Focus } from './plan.schema';
 
 const FOCI: Focus[] = ['strength', 'endurance', 'technique'];
@@ -14,24 +14,54 @@ export type FocusWeights = Record<Focus, number>;
 
 export const EVEN_WEIGHTS: FocusWeights = { strength: 1, endurance: 1, technique: 1 };
 
-/**
- * Poids de chaque type de séance : 1 chacun, et 2 pour le type qui travaille le plus de points
- * faibles (à égalité, celui du premier point coché). Sur 4 séances, ça donne environ 2 séances
- * du point faible et 1 de chacun des autres types, qui restent donc présents chaque semaine.
- */
-export function focusWeights(weakPoints: readonly ClimbingPoint[] = []): FocusWeights {
-  const weak = weakFocus(weakPoints);
-  return weak ? { ...EVEN_WEIGHTS, [weak]: 2 } : { ...EVEN_WEIGHTS };
+/** Type de séance favorisé, et d'où il vient : l'objectif du profil ou les points faibles. */
+export interface FavoredFocus {
+  focus: Focus;
+  source: 'goal' | 'weak-points';
 }
 
-/** Type de séance qui travaille le plus de points faibles (null sans point faible). */
+/**
+ * Le type favorisé : l'objectif d'entraînement s'il est choisi, sinon celui que désignent les
+ * points faibles ({@link weakFocus}), sinon aucun.
+ */
+export function favoredFocus(
+  goal: Focus | null | undefined,
+  weakPoints: readonly ClimbingPoint[] = [],
+): FavoredFocus | null {
+  if (goal) return { focus: goal, source: 'goal' };
+  const weak = weakFocus(weakPoints);
+  return weak ? { focus: weak, source: 'weak-points' } : null;
+}
+
+/**
+ * Poids de chaque type de séance : 1 chacun, et 2 pour le type favorisé. Sur 4 séances, ça donne
+ * environ 2 séances du type favorisé et 1 de chacun des autres, qui restent présents chaque semaine.
+ */
+export function focusWeights(favored: Focus | null = null): FocusWeights {
+  return favored ? { ...EVEN_WEIGHTS, [favored]: 2 } : { ...EVEN_WEIGHTS };
+}
+
+/** Nombre de points de chaque groupe de type de séance (8 en force, 3 en endurance, 8 en technique). */
+const GROUP_SIZE: FocusWeights = { strength: 0, endurance: 0, technique: 0 };
+for (const p of CLIMBING_POINTS) {
+  const g = POINT_GROUP[p];
+  if (g in GROUP_SIZE) GROUP_SIZE[g as Focus]++;
+}
+
+/**
+ * Type de séance que désignent les points faibles : celui dont la plus grande part des points
+ * est cochée (2 sur 3 en endurance pèse plus que 4 sur 8 en force). Les points de mobilité et de
+ * mental ne votent pas. À égalité, aucun type n'est favorisé (null), comme sans point faible.
+ */
 export function weakFocus(weakPoints: readonly ClimbingPoint[] = []): Focus | null {
-  if (!weakPoints.length) return null;
-  const count = { strength: 0, endurance: 0, technique: 0 };
-  for (const p of weakPoints) count[POINT_FOCUS[p]]++;
-  const best = Math.max(...Object.values(count));
-  // À égalité : le type du premier point coché
-  return POINT_FOCUS[weakPoints.find((p) => count[POINT_FOCUS[p]] === best)!];
+  const share: FocusWeights = { strength: 0, endurance: 0, technique: 0 };
+  for (const p of weakPoints) {
+    const g = POINT_GROUP[p];
+    if (g in share) share[g as Focus] += 1 / GROUP_SIZE[g as Focus];
+  }
+  const best = Math.max(...FOCI.map((f) => share[f]));
+  const top = FOCI.filter((f) => Math.abs(share[f] - best) < 1e-9);
+  return best > 0 && top.length === 1 ? top[0] : null;
 }
 
 const isEven = (w: FocusWeights) => FOCI.every((f) => w[f] === w.strength);

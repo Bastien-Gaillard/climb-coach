@@ -12,7 +12,7 @@ import {
   relativeDay,
   STYLE_LABEL,
 } from '../../core/labels';
-import { Gym, PlannedSession, Schedule, Session } from '../../core/models';
+import { Focus, Gym, PlannedSession, Schedule, Session } from '../../core/models';
 import { AiStatusStore } from '../../core/ai-status.store';
 import { PlanStore } from '../../core/plan.store';
 import { holdVars } from '../../shared/hold';
@@ -46,6 +46,17 @@ export class GeneratePage implements OnInit {
   protected readonly gymId = signal<string | null>(readGym());
 
   protected readonly minutes = signal(90);
+  /** Type choisi à la place du planning (null : celui du planning). */
+  protected readonly focus = signal<Focus | null>(null);
+  /** « de force », « de technique », « d'endurance ». */
+  protected readonly ofFocus = (f: Focus) =>
+    f === 'endurance' ? 'd’endurance' : `de ${FOCUS_LABEL[f].toLowerCase()}`;
+  protected readonly focusOptions: { id: Focus | null; label: string }[] = [
+    { id: null, label: 'Planning' },
+    { id: 'strength', label: 'Force' },
+    { id: 'endurance', label: 'Endurance' },
+    { id: 'technique', label: 'Technique' },
+  ];
   /** Valeur du champ « Autre durée » (n'écrase pas les préréglages tant qu'on n'y touche pas). */
   protected readonly custom = signal(75);
   protected readonly loading = signal(false);
@@ -141,7 +152,7 @@ export class GeneratePage implements OnInit {
   protected generate(): void {
     this.loading.set(true);
     this.error.set(null);
-    this.api.generatePlan(this.minutes(), this.gymId()).subscribe({
+    this.api.generatePlan(this.minutes(), this.gymId(), this.focus()).subscribe({
       next: (res) => {
         this.store.set(res);
         // Règles au lieu de Mistral : on vérifie tout de suite si c'est le quota

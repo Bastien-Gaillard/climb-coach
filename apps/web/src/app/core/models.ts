@@ -179,4 +179,8 @@ export interface Profile {
   weakPoints: ClimbingPoint[];
   /** Ce que le grimpeur aime : chaque séance en garde un peu. */
   likedPoints: ClimbingPoint[];
+  /** Objectif d'entraînement : son type revient environ une séance sur deux (null : aucun). */
+  focusGoal: Focus | null;
+  /** Type qui revient environ une séance sur deux, et pourquoi (null : rotation égale). */
+  favoredFocus: { focus: Focus; source: 'goal' | 'weak-points' } | null;
 }
