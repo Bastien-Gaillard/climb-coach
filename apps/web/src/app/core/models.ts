@@ -142,10 +142,41 @@ export interface AiStatus {
 /** Matériel qu'on peut cocher dans le profil (même liste que l'API). */
 export type Equipment = 'elastic' | 'ball' | 'hangboard' | 'pullup-bar';
 
+/** Points qu'on coche dans le profil, comme point faible ou comme plaisir (même liste que l'API). */
+export type ClimbingPoint =
+  | 'crimps'
+  | 'slopers'
+  | 'pinches'
+  | 'lock-off'
+  | 'power'
+  | 'tension'
+  | 'pushing'
+  | 'compression'
+  | 'hooks'
+  | 'resistance'
+  | 'recovery'
+  | 'volume'
+  | 'footwork'
+  | 'slab'
+  | 'hips'
+  | 'balance'
+  | 'reading'
+  | 'coordination'
+  | 'wall-styles'
+  | 'hip-mobility'
+  | 'shoulder-mobility'
+  | 'fall'
+  | 'commitment'
+  | 'projecting';
+
 /** Compte connecté et ses réglages. */
 export interface Profile {
   id: string;
   username: string;
   sessionsPerWeek: number;
   equipment: Equipment[];
+  /** Points faibles : les séances et le planning les ciblent. */
+  weakPoints: ClimbingPoint[];
+  /** Ce que le grimpeur aime : chaque séance en garde un peu. */
+  likedPoints: ClimbingPoint[];
 }

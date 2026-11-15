@@ -1,4 +1,5 @@
 import { Gym } from '@climb-coach/grades';
+import { ClimbingPoint } from '../auth/climbing-points';
 import { Equipment } from '../auth/equipment';
 import { SessionWithClimbs } from '../sessions/sessions.service';
 import { Plan } from './plan.schema';
@@ -12,6 +13,10 @@ export interface GeneratorContext {
   gym?: Gym;
   /** Matériel coché dans le profil : l'échauffement s'en sert s'il est là. */
   equipment?: Equipment[];
+  /** Points faibles du profil : plus de séances de leur type, un exercice par séance. */
+  weakPoints?: ClimbingPoint[];
+  /** Ce que le grimpeur aime : au moins un exercice par séance, en dernier. */
+  likedPoints?: ClimbingPoint[];
 }
 
 export interface PlanGenerator {

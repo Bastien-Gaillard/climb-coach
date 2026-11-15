@@ -40,6 +40,37 @@ describe('analyzeHistory', () => {
     expect(analyzeHistory(ctx([session(3, now, { focus: 'technique' })])).focus).toBe('strength');
   });
 
+  it('point faible en force : la force revient une séance sur deux, avec la raison', () => {
+    const a = analyzeHistory({
+      ...ctx([
+        session(3, now, { focus: 'endurance' }),
+        session(5, now, { focus: 'strength' }),
+        session(7, now, { focus: 'technique' }),
+      ]),
+      weakPoints: ['crimps'],
+    });
+    // La rotation seule donnerait de la technique après l'endurance
+    expect(a.focus).toBe('strength');
+    expect(a.reasons.join(' ')).toContain('Point faible (réglettes)');
+    // Juste après une force, on passe à autre chose
+    const after = analyzeHistory({
+      ...ctx([session(3, now, { focus: 'strength' }), session(5, now, { focus: 'technique' })]),
+      weakPoints: ['crimps'],
+    });
+    expect(after.focus).not.toBe('strength');
+  });
+
+  it('jamais deux séances de force à moins de 48 h', () => {
+    const a = analyzeHistory(
+      ctx([
+        session(1.2, now, { focus: 'technique', fatigue: 2 }),
+        session(1.8, now, { focus: 'strength', fatigue: 2 }),
+      ]),
+    );
+    expect(a.focus).not.toBe('strength');
+    expect(a.reasons.join(' ')).toContain('moins de 48 h');
+  });
+
   it('allège après une séance très fatigante la veille, et évite la force', () => {
     const a = analyzeHistory(ctx([session(1, now, { focus: 'technique', fatigue: 5 })]));
     expect(a.intensity).toBe('light');
@@ -164,6 +195,27 @@ describe('RuleBasedGenerator', () => {
       expect(positions.every((p) => p >= 0)).toBe(true);
       expect([...positions].sort((x, y) => x - y)).toEqual(positions);
       expect(text).toContain('Pas d’étirements statiques');
+      expect(text).toContain('rotations de hanche');
+      expect(text).toContain('squats cosaques');
+      expect(text).not.toContain('grenouille');
+    });
+
+    it('point faible de mobilité : plus de temps au retour au calme', async () => {
+      const plan = await generator.generate({
+        availableMinutes: 90,
+        now,
+        history: [],
+        weakPoints: ['hip-mobility'],
+      });
+      const text = plan.blocks.find((b) => b.kind === 'cooldown')!.instructions.join(' | ');
+      expect(text).toContain('Point faible (mobilité des hanches)');
+    });
+
+    it('la mobilité statique (grenouille, floor angels) va au retour au calme', async () => {
+      const plan = await generator.generate({ availableMinutes: 90, now, history: [] });
+      const text = plan.blocks.find((b) => b.kind === 'cooldown')!.instructions.join(' | ');
+      expect(text).toContain('grenouille');
+      expect(text).toContain('floor angels');
     });
 
     it('ajoute le recrutement des doigts et un bloc plus dur avant une séance de force', async () => {
@@ -304,5 +356,23 @@ describe('RuleBasedGenerator', () => {
     const plan = await generator.generate({ availableMinutes: 60, now, history });
     expect(plan.summary).toContain('légère');
     expect(plan.summary).toContain('Fatigue 5/5');
+  });
+});
+
+describe('séance avec le profil', () => {
+  it('le point faible ouvre le cœur de séance, ce qu’il aime le ferme', async () => {
+    const plan = await generator.generate({
+      availableMinutes: 90,
+      now,
+      history: [session(3, now, { focus: 'endurance' })],
+      weakPoints: ['footwork'],
+      likedPoints: ['coordination'],
+    });
+    expect(plan.focus).toBe('technique');
+    const mains = plan.blocks.filter((b) => b.kind === 'main');
+    expect(mains.length).toBe(3);
+    expect(mains[0].instructions.join(' ')).toContain('Ton point faible (placement des pieds)');
+    expect(mains[2].instructions.join(' ')).toContain('Pour le plaisir (coordination)');
+    expect(PlanSchema.safeParse(plan).success).toBe(true);
   });
 });

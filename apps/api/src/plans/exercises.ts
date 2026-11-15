@@ -1,3 +1,4 @@
+import { ClimbingPoint, POINT_LABEL } from '../auth/climbing-points';
 import { Focus } from './plan.schema';
 
 /**
@@ -6,7 +7,9 @@ import { Focus } from './plan.schema';
  *
  * Sources principales : protocoles du 4×4 et des circuits de résistance (Gripped, ClimbStrong),
  * exercices de mouvement de Kris Hampton (TrainingBeta), exercices de placement de pieds
- * (99Boulders, Climbing), protocole du bloc au max (TrainingBeta).
+ * (99Boulders, Climbing), protocole du bloc au max (TrainingBeta). Points faibles (types de prise,
+ * compression, tension, coordination, style de mur, chute) : Lattice, Neil Gresham, Climbing
+ * Canada, Gripped, ClimbStrong, Brooklyn Boulders, Strong Mind Climbing.
  */
 
 /** De quoi rédiger un exercice : niveau du grimpeur et temps alloué. */
@@ -33,6 +36,8 @@ export interface ExerciseBlock {
 export interface Exercise {
   id: string;
   focus: Focus;
+  /** Points faibles qu'il travaille (ou plaisirs qu'il offre), pour le profil du grimpeur. */
+  points: ClimbingPoint[];
   name: string;
   /** Une phrase : le but et le principe, pour Mistral et pour s'y retrouver. */
   summary: string;
@@ -61,6 +66,7 @@ export const EXERCISES: Exercise[] = [
     id: 'silent-feet',
     source: 'https://www.99boulders.com/?p=170',
     focus: 'technique',
+    points: ['footwork'],
     name: 'Pieds silencieux',
     summary: 'Poser chaque pied sans aucun bruit, en le regardant jusqu’au contact : précision.',
     minMinutes: 10,
@@ -82,6 +88,7 @@ export const EXERCISES: Exercise[] = [
     source:
       'https://www.climbstrong.com/resource-posts/fundamental-skills-precision-execution-and-balance',
     focus: 'technique',
+    points: ['footwork', 'balance'],
     name: 'Pieds en survol',
     summary: 'Garder chaque pied 3 s au-dessus de la prise avant de le poser, sans réajuster.',
     minMinutes: 10,
@@ -101,6 +108,7 @@ export const EXERCISES: Exercise[] = [
     id: 'hover-hands',
     source: 'https://www.trainingbeta.com/?p=23718',
     focus: 'technique',
+    points: ['tension', 'balance'],
     name: 'Mains en survol',
     summary:
       'Garder chaque main 2 à 3 s au-dessus de la prise avant de la prendre : gainage et placement.',
@@ -121,6 +129,7 @@ export const EXERCISES: Exercise[] = [
     id: 'one-touch',
     source: 'https://www.trainingbeta.com/?p=23718',
     focus: 'technique',
+    points: ['footwork', 'reading'],
     name: 'Une seule touche',
     summary: 'Chaque main et chaque pied se posent une seule fois : interdit de réajuster.',
     minMinutes: 10,
@@ -140,6 +149,7 @@ export const EXERCISES: Exercise[] = [
     id: 'no-hands',
     source: 'https://www.mountainproject.com/forum/message/114032041',
     focus: 'technique',
+    points: ['slab', 'balance'],
     name: 'Équilibre sans les mains',
     summary:
       'Monter une dalle facile sans les mains : confiance dans les pieds et placement du bassin.',
@@ -163,6 +173,7 @@ export const EXERCISES: Exercise[] = [
     source:
       'https://assets01.sdd1.ch/assets/lbwp-cdn/mobilesport/files/1677975093/mobilesport-escalade-a-lecole--bloc-technique-manchot.pdf',
     focus: 'technique',
+    points: ['balance', 'hips'],
     name: 'Un bras en moins',
     summary:
       'Grimper un bloc facile avec une seule main : équilibre, pieds et rotations du bassin.',
@@ -185,6 +196,7 @@ export const EXERCISES: Exercise[] = [
     id: 'flag',
     source: 'https://sendedition.com/22-climbing-techniques-and-how-to-do-them',
     focus: 'technique',
+    points: ['balance', 'hips'],
     name: 'Drapeaux',
     summary:
       'Un mouvement sur deux, un seul pied sur une prise et l’autre jambe tendue en contrepoids.',
@@ -205,6 +217,7 @@ export const EXERCISES: Exercise[] = [
     id: 'straight-arms',
     source: 'https://www.mountainproject.com/v/108661904',
     focus: 'technique',
+    points: ['hips', 'resistance'],
     name: 'Bras tendus',
     summary: 'Rester bras tendus, monter avec les jambes et la rotation des hanches.',
     minMinutes: 10,
@@ -225,6 +238,7 @@ export const EXERCISES: Exercise[] = [
     id: 'downclimb',
     source: 'https://www.99boulders.com/?p=170',
     focus: 'technique',
+    points: ['footwork', 'fall'],
     name: 'Désescalade',
     summary: 'Redescendre chaque bloc par le même chemin : lecture et placement des pieds.',
     minMinutes: 10,
@@ -244,6 +258,7 @@ export const EXERCISES: Exercise[] = [
     id: 'sloth-monkey',
     source: 'https://www.trainingbeta.com/?p=23718',
     focus: 'technique',
+    points: ['coordination'],
     name: 'Paresseux / singe',
     summary: 'Grimper un même bloc très lentement, puis vite et fluide : maîtriser le rythme.',
     minMinutes: 12,
@@ -265,6 +280,7 @@ export const EXERCISES: Exercise[] = [
     id: 'dead-stops',
     source: 'https://www.trainingbeta.com/?p=23718',
     focus: 'technique',
+    points: ['coordination', 'lock-off'],
     name: 'Arrêts nets',
     summary: 'Freiner l’élan juste avant chaque prise pour la prendre sans à-coup : gainage.',
     minMinutes: 10,
@@ -284,6 +300,7 @@ export const EXERCISES: Exercise[] = [
     id: 'backstep',
     source: 'https://www.climbing.com/skills/how-to-improve-footwork-climbing/',
     focus: 'technique',
+    points: ['hips'],
     name: 'Carre externe et hanche au mur',
     summary: 'Pied sur la carre externe et hanche collée au mur sur les grands mouvements.',
     minMinutes: 10,
@@ -303,6 +320,7 @@ export const EXERCISES: Exercise[] = [
     id: 'heavy-feet',
     source: 'https://www.trainingbeta.com/?p=23718',
     focus: 'technique',
+    points: ['footwork', 'tension'],
     name: 'Pieds lourds',
     summary:
       'Laisser le poids descendre dans les pieds et monter par les jambes : économiser les bras.',
@@ -323,6 +341,7 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'toes',
     focus: 'technique',
+    points: ['footwork'],
     name: 'Sur la pointe des pieds',
     summary: 'Poser uniquement la pointe du chausson, talon haut, pour pouvoir pivoter.',
     source: 'https://sendedition.com/22-climbing-techniques-and-how-to-do-them',
@@ -342,6 +361,7 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'drop-knee',
     focus: 'technique',
+    points: ['hips'],
     name: 'Lolottes',
     summary:
       'Genou tourné vers le bas et hanche au mur pour allonger le bras, à placer le plus souvent possible.',
@@ -362,6 +382,7 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'heel-hook',
     focus: 'technique',
+    points: ['hooks'],
     name: 'Crochets talon',
     summary:
       'Accrocher le talon et tirer avec l’arrière de la cuisse, sur des blocs qui s’y prêtent.',
@@ -382,6 +403,7 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'toe-hook',
     focus: 'technique',
+    points: ['hooks', 'tension'],
     name: 'Crochets pointe',
     summary: 'Accrocher le dessus du pied pour empêcher le corps de partir en dévers.',
     source: 'https://blog.movementgyms.com/7-more-moves-every-climber-should-know',
@@ -401,6 +423,7 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'one-foot-type',
     focus: 'technique',
+    points: ['footwork'],
     name: 'Un seul type de pied',
     summary:
       'Monter un même bloc plusieurs fois en s’imposant à chaque fois un seul placement de pied.',
@@ -422,6 +445,7 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'smearing',
     focus: 'technique',
+    points: ['slab'],
     name: 'Adhérence',
     summary:
       'Sur une dalle, poser les pieds à plat sur le mur, sans prise, et faire confiance au frottement.',
@@ -442,6 +466,7 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'mantle',
     focus: 'technique',
+    points: ['pushing'],
     name: 'Rétablissements',
     summary: 'Passer au-dessus d’une prise ou d’un volume en poussant sur les mains, pied haut.',
     source: 'https://www.vdiffclimbing.com/sport-technique-movement/',
@@ -462,6 +487,7 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'stemming',
     focus: 'technique',
+    points: ['pushing'],
     name: 'Oppositions',
     summary:
       'Dièdres et dulfers : pousser avec les pieds contre le tirer des mains, ou s’écarter entre deux pans.',
@@ -482,6 +508,7 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'deadpoint',
     focus: 'technique',
+    points: ['coordination', 'power'],
     name: 'Lancés contrôlés',
     summary:
       'Aller chercher une prise hors d’atteinte d’un élan des jambes, pieds au mur, et la saisir au point mort.',
@@ -504,6 +531,7 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'touched-holds',
     focus: 'technique',
+    points: ['reading'],
     name: 'Prises touchées',
     summary:
       'Depuis le sol, sauter attraper une prise avec une main sans la réajuster : précision du geste.',
@@ -526,6 +554,7 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'beta-reading',
     focus: 'technique',
+    points: ['reading'],
     name: 'Lecture du bloc',
     summary: 'Prévoir chaque mouvement et chaque pied depuis le sol, puis vérifier sur le mur.',
     source: 'https://www.lacrux.com/fr/?p=57206',
@@ -546,6 +575,7 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'flash',
     focus: 'technique',
+    points: ['reading', 'commitment'],
     name: 'Blocs à vue',
     summary: 'Enchaîner des blocs jamais essayés, un seul essai chacun : lecture et engagement.',
     source: 'https://www.lacrux.com/fr/?p=57206',
@@ -565,6 +595,7 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'touch-holds',
     focus: 'technique',
+    points: ['recovery'],
     name: 'Caresses',
     summary: 'Toucher toute la prise avant de la saisir pour trouver où elle se tient le mieux.',
     source:
@@ -585,6 +616,7 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'soft-grip',
     focus: 'technique',
+    points: ['recovery'],
     name: 'Prises en douceur',
     summary:
       'Serrer chaque prise juste ce qu’il faut : comparer un passage en serrant fort et un passage relâché.',
@@ -607,6 +639,7 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'tripod',
     focus: 'technique',
+    points: ['balance'],
     name: 'Se figer',
     summary:
       'Avant chaque mouvement, se stabiliser sur trois appuis et ne bouger qu’un membre à la fois.',
@@ -628,6 +661,7 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'one-foot',
     focus: 'technique',
+    points: ['balance'],
     name: 'Un seul pied',
     summary:
       'Grimper avec un seul pied (l’autre jambe libre) : équilibre et précision du pied d’appui.',
@@ -649,6 +683,7 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'same-side',
     focus: 'technique',
+    points: ['hips'],
     name: 'Traversée de profil',
     summary:
       'Traverser en gardant toujours le même côté du corps contre le mur : hanches, carres, rotations.',
@@ -669,6 +704,7 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'lemon-lime',
     focus: 'technique',
+    points: ['footwork', 'resistance'],
     name: 'Aller-retour progressif',
     summary:
       'Ajouter un mouvement à la fois puis redescendre au départ à chaque fois : contrôle et désescalade.',
@@ -687,12 +723,139 @@ export const EXERCISES: Exercise[] = [
       };
     },
   },
+  {
+    id: 'sloper-plumb',
+    source: 'https://www.trainingbeta.com/how-to-train-for-compression/',
+    focus: 'technique',
+    points: ['slopers'],
+    name: 'Plats : ligne d’aplomb',
+    summary:
+      'Sur des blocs à plats, placer le bassin sous la prise, bras tendus : les plats tiennent par la position.',
+    minMinutes: 10,
+    build: (c) => {
+      const v = c.maxSent - 2 - c.light;
+      return {
+        title: 'Plats : ligne d’aplomb',
+        target: v,
+        instructions: [
+          `${plural(count(c.minutes, 5, 2, 6), 'bloc')} en ${c.grade(v)}, 2 passages par bloc`,
+          'Choisis des blocs à plats. Sur chaque plat, place le bassin sous la prise, bras tendus, et pousse dans les pieds : plus tu es sous le plat, mieux il tient',
+          'Repos 2 min avant de changer de bloc',
+        ],
+      };
+    },
+  },
+  {
+    id: 'wall-tour',
+    source: 'https://www.climbstrong.com/resource-posts/boulder-strength-skill-sessions',
+    focus: 'technique',
+    points: ['wall-styles', 'slab'],
+    name: 'Tour des inclinaisons',
+    summary:
+      'La même cotation en dalle, en vertical et en dévers, pour repérer et travailler le style où l’on casse.',
+    minMinutes: 10,
+    build: (c) => {
+      const v = c.maxSent - 2 - c.light;
+      const rounds = count(c.minutes, 10, 1, 3);
+      return {
+        title: 'Tour des inclinaisons',
+        target: v,
+        instructions: [
+          `${3 * rounds} blocs en ${c.grade(v)}, 1 passage par bloc`,
+          `${rounds > 1 ? `${rounds} tours, chacun` : 'Un tour'} : un bloc en dalle, un en vertical, un en dévers`,
+          'Repos 2 min avant de changer de bloc',
+          'Note l’inclinaison où tu tombes ou bloques le plus : c’est elle qu’il faut travailler',
+        ],
+      };
+    },
+  },
+  {
+    id: 'build-the-move',
+    source: 'https://climbingcanada.ca/coaches-tool-box/technical-tactical-series-part-1/',
+    focus: 'technique',
+    points: ['coordination'],
+    name: 'Construis-moi le mouvement',
+    summary:
+      'Reproduire et répéter des mouvements de compétition sur prises faciles : coordination et confiance.',
+    minMinutes: 10,
+    stressful: true,
+    build: (c) => {
+      const v = c.maxSent - 3 - c.light;
+      const moves = [
+        'pas croisé façon « skate »',
+        'saut avec accroche d’un pied',
+        'allonge latérale dynamique avec crochet de pointe opposé',
+        'rétablissement jusqu’à pousser bras tendu au-dessus de la tête',
+      ];
+      const n = count(c.minutes, 6, 2, moves.length);
+      return {
+        title: 'Construis-moi le mouvement',
+        target: v,
+        instructions: [
+          `Sur des prises faciles (${c.grade(v)} ou moins), reproduis ces mouvements de compétition : ${moves.slice(0, n).join(', ')}`,
+          '5 passages sur chaque mouvement, repos 1 min entre chaque passage',
+          'Même réussi, refais-le : c’est la répétition qui donne confiance',
+        ],
+      };
+    },
+  },
+  {
+    id: 'rapid-fire',
+    source: 'https://climbingcanada.ca/coaches-tool-box/technical-tactical-series-part-1/',
+    focus: 'technique',
+    points: ['reading', 'projecting'],
+    name: 'Blocs en rafale',
+    summary:
+      'Plusieurs blocs nouveaux dont un à son max : 30 s de lecture, 3 passages chacun, puis on passe au suivant.',
+    minMinutes: 15,
+    stressful: true,
+    build: (c) => {
+      const top = c.maxSent - c.light;
+      const n = count(c.minutes, 6, 3, 5);
+      return {
+        title: 'Blocs en rafale',
+        target: top,
+        instructions: [
+          `${n} blocs que tu n’as jamais faits : ${n - 1} entre ${c.grade(top - 3)} et ${c.grade(top - 1)}, et 1 en ${c.grade(top)}`,
+          '30 s pour lire chaque bloc depuis le sol, puis 3 passages par bloc, même si tu le réussis au premier',
+          'Change de méthode entre deux passages si besoin. Après le 3e, passe au suivant sans y revenir, réussi ou non',
+          'Repos 2 min entre chaque passage',
+        ],
+      };
+    },
+  },
+  {
+    id: 'fall-practice',
+    source: 'https://brooklynboulders.com/how-to-overcome-your-fear-of-falling-while-climbing/',
+    focus: 'technique',
+    points: ['fall'],
+    name: 'Chutes volontaires',
+    summary:
+      'Lâcher volontairement en pleine grimpe, en partant bas et en montant peu à peu : apprivoiser la chute.',
+    minMinutes: 10,
+    stressful: true,
+    build: (c) => {
+      const v = c.maxSent - 4 - c.light;
+      const n = count(c.minutes, 2, 5, 10);
+      return {
+        title: 'Chutes volontaires',
+        target: v,
+        instructions: [
+          `Sur un bloc facile (${c.grade(v)} ou moins), au-dessus d’un tapis épais, lâche volontairement en pleine grimpe`,
+          'Commence les pieds à 50 cm du sol, puis monte d’une prise à chaque chute tant que tu restes à l’aise, jamais au-delà de la mi-hauteur',
+          'Lâche en position de grimpe, sans regarder en bas. Réception sur les pieds, genoux fléchis, puis fesses et dos, bras près du corps',
+          `${plural(n, 'chute')}, repos 1 min entre chaque chute`,
+        ],
+      };
+    },
+  },
 
   // ---------- Endurance (résistance) : enchaîner sous le niveau max, repos courts
   {
     id: '4x4',
     source: 'https://gripped.com/?p=46491',
     focus: 'endurance',
+    points: ['resistance', 'volume'],
     name: '4×4',
     summary: '4 blocs enchaînés sans pause = 1 série ; 2 à 5 séries, 3 à 4 min de repos entre.',
     minMinutes: 15,
@@ -715,6 +878,7 @@ export const EXERCISES: Exercise[] = [
     source:
       'https://blog.movementgyms.com/improve-your-climbing-endurance-with-a-quick-and-effective-4x4-workout',
     focus: 'endurance',
+    points: ['resistance', 'recovery'],
     name: 'Pyramide',
     summary: 'Monter en cotation bloc après bloc jusqu’au sommet, puis redescendre, repos courts.',
     minMinutes: 12,
@@ -737,6 +901,7 @@ export const EXERCISES: Exercise[] = [
     id: '20-in-20',
     source: 'https://trainingforclimbing.com/?p=12701',
     focus: 'endurance',
+    points: ['recovery', 'volume'],
     name: 'Un bloc par minute',
     summary:
       'Un bloc à chaque minute (ex. 20 blocs en 20 min), le reste de la minute sert de repos.',
@@ -758,6 +923,7 @@ export const EXERCISES: Exercise[] = [
     id: 'up-down-up',
     source: 'https://climbinghouse.com/18-week-free-training-program/',
     focus: 'endurance',
+    points: ['resistance', 'footwork'],
     name: 'Monter-descendre-monter',
     summary: 'Monter un bloc, le désescalader, le remonter sans poser le pied au sol.',
     minMinutes: 12,
@@ -779,6 +945,7 @@ export const EXERCISES: Exercise[] = [
     id: 'linked',
     source: 'https://www.climbstrong.com/resource-posts/progressing-endurance-training-ii',
     focus: 'endurance',
+    points: ['resistance'],
     name: 'Blocs enchaînés',
     summary: 'Enchaîner 3 blocs voisins sans toucher le sol, en désescaladant entre eux.',
     minMinutes: 12,
@@ -800,6 +967,7 @@ export const EXERCISES: Exercise[] = [
     id: 'continuous-traverse',
     source: 'https://www.99boulders.com/?p=170',
     focus: 'endurance',
+    points: ['resistance'],
     name: 'Traversée continue',
     summary:
       'Grimper sans s’arrêter plusieurs minutes sur des prises faciles, sans jamais être daubé.',
@@ -821,6 +989,7 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'intervals-30-30',
     focus: 'endurance',
+    points: ['recovery', 'resistance'],
     name: 'Intervalles 30/30',
     summary:
       '30 s de grimpe continue, 30 s de repos, 6 fois ; 5 à 10 min de repos entre les séries.',
@@ -842,6 +1011,7 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'points',
     focus: 'endurance',
+    points: ['volume', 'recovery'],
     name: 'Course aux points',
     summary:
       'Pendant 30 à 45 min, chaque bloc se grimpe 2 fois d’affilée ; il rapporte des points selon sa cotation.',
@@ -864,6 +1034,7 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'grade-tour',
     focus: 'endurance',
+    points: ['volume'],
     name: 'Tour d’une cotation',
     summary: 'Faire tous les blocs d’une même cotation de la salle, à la suite, repos courts.',
     source: 'https://mojagear.com/?p=2345',
@@ -883,6 +1054,7 @@ export const EXERCISES: Exercise[] = [
   {
     id: '4x4-same',
     focus: 'endurance',
+    points: ['resistance'],
     name: '4×4 sur un même bloc',
     summary:
       'Variante du 4×4 : un même bloc 4 fois d’affilée par série, un bloc différent à chaque série.',
@@ -908,6 +1080,7 @@ export const EXERCISES: Exercise[] = [
     id: 'limit',
     source: 'https://trainingbeta.com/?p=21508',
     focus: 'strength',
+    points: ['projecting', 'commitment'],
     name: 'Bloc au max',
     summary: 'Quelques blocs au niveau max, essais courts à 100 %, 3 à 5 min de repos complet.',
     minMinutes: 15,
@@ -931,6 +1104,7 @@ export const EXERCISES: Exercise[] = [
     id: 'sections',
     source: 'https://trainingbeta.com/?p=21508',
     focus: 'strength',
+    points: ['projecting'],
     name: 'Travail par sections',
     summary:
       'Découper un bloc au-dessus de son niveau et travailler ses 3 à 4 mouvements les plus durs.',
@@ -953,6 +1127,7 @@ export const EXERCISES: Exercise[] = [
     id: 'power',
     source: 'https://trainingforclimbing.com/?p=12288',
     focus: 'strength',
+    points: ['power', 'commitment'],
     name: 'Mouvements puissants',
     summary: 'Blocs à grands mouvements dynamiques sur bonnes prises : explosivité et engagement.',
     minMinutes: 12,
@@ -976,6 +1151,7 @@ export const EXERCISES: Exercise[] = [
     id: 'lock-offs',
     source: 'https://gripped.com/?p=48148',
     focus: 'strength',
+    points: ['lock-off'],
     name: 'Blocages',
     summary: 'Bloquer 3 s bras plié avant chaque prise : force de traction et de verrouillage.',
     minMinutes: 10,
@@ -997,6 +1173,7 @@ export const EXERCISES: Exercise[] = [
     id: 'no-feet',
     source: 'https://www.trainingbeta.com/?p=18674',
     focus: 'strength',
+    points: ['tension', 'power'],
     name: 'Sans les pieds',
     summary:
       'Grimper un dévers à bonnes prises avec les mains seules (« no foot ») : puissance de bras.',
@@ -1021,6 +1198,7 @@ export const EXERCISES: Exercise[] = [
     id: 'one-arm-traverse',
     source: 'https://nicros.com/author/brynk/page/27',
     focus: 'strength',
+    points: ['power', 'lock-off'],
     name: 'Traversée à un bras',
     summary:
       'Traverser des grosses prises avec une seule main en lâchant-rattrapant : force de contact.',
@@ -1043,6 +1221,7 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'strength-intervals',
     focus: 'strength',
+    points: ['lock-off', 'crimps'],
     name: 'Intervalles de force',
     summary: 'Séries de 3 blocs durs (1 à 2 crans sous le max), 3 min de repos entre chaque bloc.',
     source:
@@ -1065,6 +1244,7 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'boulder-campus',
     focus: 'strength',
+    points: ['power', 'tension'],
     name: 'Bloc sans les pieds (protocole)',
     summary:
       'Un bloc facile (5 à 6 crans sous le max) grimpé sans les pieds, 3 fois par série, 4 séries.',
@@ -1090,6 +1270,7 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'one-arm-lunge',
     focus: 'strength',
+    points: ['power'],
     name: 'Lancés à un bras',
     summary:
       'Depuis une bonne prise, lancer une seule main vers une prise plus haute : vitesse de contact.',
@@ -1112,6 +1293,7 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'dyno',
     focus: 'strength',
+    points: ['power', 'coordination', 'commitment'],
     name: 'Jetés',
     summary:
       'Sauter des deux mains vers une prise lointaine : coordination et puissance de tout le corps.',
@@ -1132,6 +1314,126 @@ export const EXERCISES: Exercise[] = [
       };
     },
   },
+  {
+    id: 'grip-limit',
+    focus: 'strength',
+    points: ['crimps', 'slopers', 'pinches'],
+    name: 'Bloc au max sur un type de prise',
+    summary:
+      'Blocs au niveau max dont le pas dur se fait sur un type de prise qu’on évite (réglettes, plats ou pinces).',
+    source: 'https://latticetraining.com/blog/why-do-we-train-half-crimp',
+    minMinutes: 12,
+    stressful: true,
+    build: (c) => {
+      const n = count(c.minutes, 12, 1, 3);
+      return {
+        title: 'Bloc au max sur un type de prise',
+        target: c.project,
+        instructions: [
+          `${plural(n, 'bloc')} en ${c.grade(c.project)}, 4 essais max par bloc`,
+          'Choisis des blocs dont le pas dur se fait sur le type de prise que tu évites d’habitude : réglettes, plats ou pinces',
+          'Repos 3 à 5 min entre chaque essai : chaque essai à fond',
+        ],
+      };
+    },
+  },
+  {
+    id: 'compression',
+    focus: 'strength',
+    points: ['compression', 'tension'],
+    name: 'Blocs de compression',
+    summary:
+      'Blocs où il faut serrer (volumes, arêtes, prises opposées) : force de compression et gainage.',
+    source: 'https://www.trainingbeta.com/how-to-train-for-compression/',
+    minMinutes: 10,
+    stressful: true,
+    build: (c) => {
+      const v = c.project - 1;
+      const n = count(c.minutes, 10, 1, 4);
+      return {
+        title: 'Blocs de compression',
+        target: v,
+        instructions: [
+          `${plural(n, 'bloc')} en ${c.grade(v)}, 4 essais max par bloc`,
+          'Choisis des blocs où il faut serrer : volumes, arêtes, prises opposées. Pousse vers l’intérieur avec les deux mains et garde les hanches près du mur',
+          'Repos 3 min entre chaque essai',
+        ],
+      };
+    },
+  },
+  {
+    id: 'steep-poor-feet',
+    focus: 'strength',
+    points: ['tension'],
+    name: 'Dévers pieds fuyants',
+    summary:
+      'En dévers, bonnes prises de main mais mauvais pieds : tenir les pieds au mur, c’est la tension du corps.',
+    source: 'https://ukbouldering.com/board/index.php/topic,23121.0.html',
+    minMinutes: 10,
+    build: (c) => {
+      const v = c.maxSent - 2;
+      const n = count(c.minutes, 6, 2, 5);
+      return {
+        title: 'Dévers pieds fuyants',
+        target: v,
+        instructions: [
+          `${plural(n, 'bloc')} en ${c.grade(v)}, 3 essais max par bloc`,
+          'Choisis-les en dévers, avec de bonnes prises de main et de mauvais pieds : si les pieds partent, tu tombes',
+          'Pousse sur les pointes et tire les pieds vers le mur avec le ventre, hanches près du mur',
+          'Repos 3 min entre chaque essai',
+        ],
+      };
+    },
+  },
+  {
+    id: 'varied-dynos',
+    focus: 'strength',
+    points: ['power', 'coordination'],
+    name: 'Lancés variés',
+    summary:
+      'Lancés et jetés sur des prises, inclinaisons et distances différentes : coordination dynamique.',
+    source: 'https://gripped.com/?p=46803',
+    minMinutes: 10,
+    stressful: true,
+    build: (c) => {
+      const v = c.maxSent - 2;
+      return {
+        title: 'Lancés variés',
+        target: v,
+        instructions: [
+          `Prépare 3 lancés différents en ${c.grade(v)} ou moins : change à chaque fois de type de prise, d’inclinaison ou de distance`,
+          'Si tu trouves un crochet de pointe à prendre en dynamique, ajoute-le',
+          '4 essais max par lancé, repos 2 min entre chaque essai',
+          'Charge avec les jambes, regarde la cible, attrape-la bras légèrement fléchis',
+        ],
+      };
+    },
+  },
+  {
+    id: 'fall-in-move',
+    focus: 'strength',
+    points: ['commitment', 'fall'],
+    name: 'Chuter dans le mouvement',
+    summary:
+      'Sur des blocs à son max, s’engager dans le pas dur jusqu’au bout plutôt que de renoncer, quitte à tomber.',
+    source:
+      'https://www.strongmindclimbing.com/news-resources/where-do-people-go-wrong-with-fall-practice',
+    minMinutes: 12,
+    stressful: true,
+    build: (c) => {
+      const n = count(c.minutes, 12, 1, 3);
+      return {
+        title: 'Chuter dans le mouvement',
+        target: c.project,
+        instructions: [
+          `${plural(n, 'bloc')} en ${c.grade(c.project)}, 4 essais max par bloc`,
+          'Choisis des blocs où l’on tombe sur les pieds, au-dessus d’un tapis épais',
+          'À chaque essai, engage-toi dans le pas dur jusqu’au bout, quitte à tomber : ne redescends pas avant d’avoir essayé',
+          'Repos 3 min entre chaque essai',
+        ],
+      };
+    },
+  },
 ];
 
 export interface PickOptions {
@@ -1142,13 +1444,32 @@ export interface PickOptions {
   careful: boolean;
   /** Fait varier les exercices d'une séance à l'autre (ex. numéro du jour). */
   seed: number;
+  /** Points faibles du profil : au plus un exercice qui les travaille, en premier. */
+  weakPoints?: ClimbingPoint[];
+  /** Ce que le grimpeur aime : au moins un exercice qui en fait, en dernier. */
+  likedPoints?: ClimbingPoint[];
+}
+
+/** Pourquoi un exercice est là : point faible, plaisir, ou simple variété. */
+export type PickRole = 'weak' | 'liked' | 'other';
+
+export interface Pick {
+  exercise: Exercise;
+  minutes: number;
+  role: PickRole;
+  /** Points du profil que l'exercice travaille (vides pour « other »). */
+  points: ClimbingPoint[];
 }
 
 /**
  * Choisit les exercices du cœur de séance : 1 si le temps est court, jusqu'à 3 sinon, différents,
  * en tournant dans le catalogue selon `seed`, avec leurs minutes (la somme fait `minutes`).
+ *
+ * Avec un profil : au plus un exercice sur un point faible, en premier (quand on est frais), et
+ * au moins un exercice qu'on aime, en dernier (pour finir sur une bonne sensation). Avec un seul
+ * exercice, on alterne d'une séance à l'autre. Sans profil, en force, le bloc au max passe d'abord.
  */
-export function pickExercises(o: PickOptions): { exercise: Exercise; minutes: number }[] {
+export function pickExercises(o: PickOptions): Pick[] {
   const pool = EXERCISES.filter(
     (e) =>
       e.focus === o.focus &&
@@ -1157,25 +1478,62 @@ export function pickExercises(o: PickOptions): { exercise: Exercise; minutes: nu
   );
   if (!pool.length || o.minutes <= 0) return [];
 
-  // Force : un exercice « au max » d'abord, puis éventuellement un complément
   const howMany = o.minutes >= 45 ? 3 : o.minutes >= 25 ? 2 : 1;
   const start = ((o.seed % pool.length) + pool.length) % pool.length;
   const ordered = [...pool.slice(start), ...pool.slice(0, start)];
-  if (o.focus === 'strength') {
-    const limit = ordered.findIndex((e) => e.id === 'limit');
-    if (limit > 0) ordered.unshift(...ordered.splice(limit, 1));
+
+  const weak = new Set(o.weakPoints ?? []);
+  const liked = new Set(o.likedPoints ?? []);
+  const isWeak = (e: Exercise) => e.points.some((p) => weak.has(p));
+  const isLiked = (e: Exercise) => !isWeak(e) && e.points.some((p) => liked.has(p));
+  const fits = (e: Exercise) => Math.floor(o.minutes / howMany) >= e.minMinutes;
+  const first = (test: (e: Exercise) => boolean) =>
+    ordered.find((e) => test(e) && fits(e)) ?? ordered.find(test);
+
+  let weakPick = first(isWeak);
+  let likedPick = first(isLiked);
+  if (howMany === 1) {
+    // Un seul exercice : point faible et plaisir (ou variété) chacun leur tour
+    const turn = ((o.seed % 2) + 2) % 2;
+    if (weakPick && likedPick) {
+      if (turn) weakPick = undefined;
+      else likedPick = undefined;
+    } else if (turn) {
+      weakPick = likedPick = undefined;
+    }
   }
 
   const chosen: Exercise[] = [];
-  for (const e of ordered) {
-    if (chosen.length >= howMany) break;
-    const share = Math.floor(o.minutes / (chosen.length + 1));
-    if (share >= e.minMinutes || chosen.length === 0) chosen.push(e);
+  if (weakPick) chosen.push(weakPick);
+  // Le reste : variété, sans second exercice sur un point faible
+  const others = ordered.filter((e) => e !== weakPick && e !== likedPick && !isWeak(e));
+  if (o.focus === 'strength' && !weakPick) {
+    const limit = others.findIndex((e) => e.id === 'limit');
+    if (limit > 0) others.unshift(...others.splice(limit, 1));
   }
+  const slots = howMany - chosen.length - (likedPick ? 1 : 0);
+  for (const e of others) {
+    if (chosen.length >= howMany - (likedPick ? 1 : 0)) break;
+    const share = Math.floor(o.minutes / (chosen.length + 1));
+    if (share >= e.minMinutes || (chosen.length === 0 && slots > 0)) chosen.push(e);
+  }
+  if (likedPick) chosen.push(likedPick);
+
+  const role = (e: Exercise): PickRole =>
+    e === weakPick ? 'weak' : e === likedPick ? 'liked' : 'other';
+  const profilePoints = (e: Exercise): ClimbingPoint[] => {
+    const set = role(e) === 'weak' ? weak : role(e) === 'liked' ? liked : new Set();
+    return e.points.filter((p) => set.has(p));
+  };
 
   // Minutes réparties à parts égales, arrondies à 5, le reste sur le premier
   const each = Math.max(5, Math.floor(o.minutes / chosen.length / 5) * 5);
-  const split = chosen.map((exercise) => ({ exercise, minutes: each }));
+  const split = chosen.map((exercise) => ({
+    exercise,
+    minutes: each,
+    role: role(exercise),
+    points: profilePoints(exercise),
+  }));
   split[0].minutes += o.minutes - each * chosen.length;
   return split;
 }
@@ -1191,7 +1549,7 @@ export function catalogForPrompt(): string {
     .map((f) => {
       const lines = EXERCISES.filter((e) => e.focus === f).map(
         (e) =>
-          `- ${e.name} : ${e.summary}${e.advanced ? ' (seulement à partir de 6C, jamais en cas de douleur)' : e.stressful ? ' (jamais en cas de douleur)' : ''}`,
+          `- ${e.name} : ${e.summary} Travaille : ${e.points.map((p) => POINT_LABEL[p]).join(', ')}.${e.advanced ? ' (seulement à partir de 6C, jamais en cas de douleur)' : e.stressful ? ' (jamais en cas de douleur)' : ''}`,
       );
       return `${label[f]} :\n${lines.join('\n')}`;
     })

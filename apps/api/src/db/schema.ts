@@ -21,6 +21,10 @@ export const users = pgTable('users', {
   sessionsPerWeek: smallint('sessions_per_week').notNull().default(3),
   /** Matériel disponible (élastique, balle, poutre…), coché dans le profil. */
   equipment: text('equipment').array().notNull().default(['elastic']),
+  /** Points faibles cochés dans le profil (réglettes, dalle, peur de la chute…). */
+  weakPoints: text('weak_points').array().notNull().default([]),
+  /** Ce que le grimpeur aime faire : chaque séance en garde un peu. */
+  likedPoints: text('liked_points').array().notNull().default([]),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -113,10 +117,40 @@ export const schedulePlans = pgTable('schedule_plans', {
     .references(() => users.id, { onDelete: 'cascade' }),
   /** Rythme pour lequel le plan a été fait. */
   sessionsPerWeek: smallint('sessions_per_week').notNull(),
+  /** Points faibles pour lesquels le plan a été fait : le plan est refait s'ils changent. */
+  weakPoints: text('weak_points').array().notNull().default([]),
   summary: text('summary'),
   sessions: jsonb('sessions').$type<StoredPlannedSession[]>().notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+/** Alerte de fin de bloc à envoyer à l'heure `at` (ms) sur un appareil abonné. */
+export interface PushAlert {
+  at: number;
+  title: string;
+  body: string;
+}
+
+/**
+ * Appareils abonnés aux notifications push (un téléphone = un endpoint).
+ * `alerts` contient les fins de bloc à venir de la séance en cours ; `next_at` la plus proche,
+ * pour que l'envoi périodique ne lise que les lignes dues.
+ */
+export const pushSubscriptions = pgTable(
+  'push_subscriptions',
+  {
+    endpoint: text('endpoint').primaryKey(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    p256dh: text('p256dh').notNull(),
+    auth: text('auth').notNull(),
+    alerts: jsonb('alerts').$type<PushAlert[]>().notNull().default([]),
+    nextAt: timestamp('next_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('push_subscriptions_next_at_idx').on(t.nextAt)],
+);
 
 export const sessionsRelations = relations(sessions, ({ many }) => ({ climbs: many(climbs) }));
 export const climbsRelations = relations(climbs, ({ one }) => ({

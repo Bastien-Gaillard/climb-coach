@@ -1,7 +1,8 @@
+import { pointLabels } from '../auth/climbing-points';
 import { EQUIPMENT_LABEL } from '../auth/equipment';
 import { gradeFromValue, gradeValue } from '@climb-coach/grades';
 import { Injectable, Logger } from '@nestjs/common';
-import { catalogForPrompt } from './exercises';
+import { catalogForPrompt, pickExercises } from './exercises';
 import { ConfigService } from '@nestjs/config';
 import { Env } from '../config/env';
 import { REFERENCE_SYSTEM } from '../sessions/climb-normalizer';
@@ -213,6 +214,8 @@ Spécificités du bloc :
 - Technique : blocs sous le niveau max, avec une consigne de mouvement précise (pieds, hanches, lecture, équilibre).
 - Varie les styles de blocs d'une séance à l'autre : dalle, vertical, dévers, réglettes, plats, compression, mouvements dynamiques.
 - Pense à la désescalade ou à la chute contrôlée : jamais de chute non préparée sur les blocs hauts.
+- Points faibles et plaisir : le grimpeur indique ses points faibles et ce qu'il aime faire (et l'historique ou les notes peuvent en révéler d'autres). Dans le cœur de séance, mets au plus UN exercice qui travaille un point faible, en premier (il est frais), et au moins UN exercice qu'il aime, en dernier (pour finir sur une bonne sensation). Avec un seul exercice, alterne d'une séance à l'autre. Un point faible de mobilité se travaille à l'échauffement et au retour au calme. Le catalogue dit ce que chaque exercice travaille.
+- Exercices de chute : toujours progressifs (on part les pieds à 50 cm du sol, jamais au-delà de la mi-hauteur), en position de grimpe sans regarder en bas, réception sur les pieds genoux fléchis, au-dessus d'un tapis épais ; jamais en cas de douleur ni de séance légère.
 
 Catalogue d'exercices (choisis dans cette liste, en variant d'une séance à l'autre) :
 ${catalogForPrompt()}
@@ -224,7 +227,7 @@ Structure de la séance :
 - La séance est découpée en parties (le tableau "blocks" du JSON, à ne pas confondre avec les blocs d'escalade). La somme de leurs "minutes" doit être comprise entre (temps dispo - 10) et le temps dispo.
 - Échauffement progressif : toutes ses cotations restent au moins 2 crans sous le niveau à viser. Il va du général au spécifique, du lent au rapide, des grosses prises aux petites, dans cet ordre :
   1. 2 à 4 min de cardio léger (sautillements, montées de genoux, jumping jacks) ;
-  2. mobilité articulaire dynamique sans forcer (cercles de poignets, de bras, de hanches, de chevilles) ;
+  2. mobilité articulaire dynamique sans forcer (cercles de poignets, de bras, de chevilles ; rotations de hanche lentes genou levé, squats cosaques) ;
   3. doigts : glissements tendineux (poing, poing tendu, crochet) et ouvertures-fermetures rapides ;
   4. épaules : rotations externes coudes au corps, tirages d'omoplates bras tendus à une grosse prise, pieds au sol ;
   5. traversée très facile (pieds précis et silencieux, puis plus vite) ;
@@ -235,6 +238,7 @@ Structure de la séance :
   - balle souple : 20 pressions lentes puis 20 rapides, sans forcer, après les glissements tendineux ;
   - barre de traction : les tirages d'omoplates se font à la barre ;
   - poutre (sauf douleur) : 10 suspensions de 1 s sur grosse prise de 20-30 mm, pieds au sol au début ; avant une séance de force, elle remplace le recrutement : 2 suspensions de 10 s sur prise moyenne (15-20 mm) puis 2 sur petite prise (10-15 mm), 30 s de repos.
+- Retour au calme : étirements doux et maintenus des avant-bras, épaules et dos, hanches en grenouille (1 min sans forcer), floor angels lents pour les épaules, suspensions passives. C'est le seul endroit des étirements statiques.
 - Le "grade" du "target" d'une partie est la cotation la plus dure demandée dans cette partie.
 
 Santé :
@@ -349,6 +353,19 @@ export class MistralGenerator implements PlanGenerator {
       return `- ${s.date.toISOString().slice(0, 10)} : ${FOCUS_LABEL[s.focus]}, ${s.durationMinutes} min, fatigue ${s.fatigue}/5${climbs ? `, blocs : ${climbs}` : ''}${s.notes ? `, notes : ${s.notes}` : ''}`;
     });
 
+    const weak = ctx.weakPoints ?? [];
+    const liked = ctx.likedPoints ?? [];
+    const picks = pickExercises({
+      focus: a.focus,
+      minutes: split.main,
+      maxSent: a.maxSent,
+      careful: !!a.pain || a.intensity === 'light',
+      seed: Math.floor(ctx.now.getTime() / 86_400_000) + ctx.history.length,
+      weakPoints: weak,
+      likedPoints: liked,
+    });
+    const roleLabel = { weak: ' (point faible)', liked: ' (ce qu’il aime)', other: '' };
+
     return [
       `Temps dispo aujourd'hui : ${ctx.availableMinutes} min.`,
       `Découpage indicatif : échauffement ${split.warmup}, cœur ${split.main}, gainage ${split.core}, retour au calme ${split.cooldown}.`,
@@ -361,7 +378,14 @@ export class MistralGenerator implements PlanGenerator {
           ]
         : []),
       `Meilleure réussite récente : ${gradeFromValue(a.maxSent, system)}. Niveau à viser : ${gradeFromValue(a.project, system)}.`,
+      `Points faibles : ${weak.length ? pointLabels(weak) : 'aucun indiqué'}.`,
+      `Ce qu'il aime faire : ${liked.length ? pointLabels(liked) : 'rien d’indiqué'}.`,
       `Proposition : focus ${a.focus}, intensité ${a.intensity}.`,
+      ...(picks.length
+        ? [
+            `Exercices proposés par les règles, dans l'ordre : ${picks.map((p) => `${p.exercise.name}${roleLabel[p.role]}`).join(', ')}.`,
+          ]
+        : []),
       `Raisons : ${a.reasons.join(' ; ')}.`,
       history.length > 0
         ? `Dernières séances :\n${history.join('\n')}`

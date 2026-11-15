@@ -237,6 +237,21 @@ describe('MistralGenerator.generate', () => {
 });
 
 describe('MistralGenerator.buildUserPrompt', () => {
+  it('donne les points faibles, ce qu’il aime et les exercices proposés par les règles', () => {
+    const prompt = makeGenerator().buildUserPrompt({
+      availableMinutes: 90,
+      now,
+      history: [],
+      weakPoints: ['footwork'],
+      likedPoints: ['coordination'],
+    });
+    expect(prompt).toContain('Points faibles : placement des pieds.');
+    expect(prompt).toContain("Ce qu'il aime faire : coordination.");
+    expect(prompt).toMatch(
+      /Exercices proposés par les règles, dans l'ordre : .+ \(point faible\), .+, .+ \(ce qu’il aime\)\./,
+    );
+  });
+
   it('résume l’historique et la proposition des règles', () => {
     const prompt = makeGenerator().buildUserPrompt({
       availableMinutes: 90,

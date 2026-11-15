@@ -109,3 +109,22 @@ describe('jours calendaires', () => {
     expect(diffDays('2026-11-12', '2026-11-17')).toBe(5);
   });
 });
+
+describe('buildSchedule · point faible', () => {
+  it('plus de force sur le mois, jamais deux séances de force collées', () => {
+    const history = [session(2, now, { focus: 'technique' })];
+    const even = buildSchedule(history, now, { horizonDays: 28, sessionsPerWeek: 4 });
+    const weak = buildSchedule(history, now, {
+      horizonDays: 28,
+      sessionsPerWeek: 4,
+      weakPoints: ['crimps'],
+    });
+    const strength = (s: typeof weak) => s.sessions.filter((p) => p.focus === 'strength');
+    expect(strength(weak).length).toBeGreaterThan(strength(even).length);
+    for (let i = 1; i < weak.sessions.length; i++) {
+      expect(weak.sessions[i].focus).not.toBe(weak.sessions[i - 1].focus);
+    }
+    const days = strength(weak).map((p) => p.inDays);
+    for (let i = 1; i < days.length; i++) expect(days[i] - days[i - 1]).toBeGreaterThanOrEqual(2);
+  });
+});

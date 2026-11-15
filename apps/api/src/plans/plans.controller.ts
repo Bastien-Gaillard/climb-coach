@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Post, Query } from '@nestjs/common';
 import { z } from 'zod';
 import { CurrentUser } from '../auth/auth.decorators';
+import { normalizePreferences } from '../auth/climbing-points';
 import { normalizeEquipment } from '../auth/equipment';
 import type { User } from '../auth/users.service';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
@@ -16,6 +17,8 @@ const ScheduleQuerySchema = z.object({
   days: z.coerce.number().int().min(1).max(42).default(7),
 });
 
+const profilePoints = (user: User) => normalizePreferences(user.weakPoints, user.likedPoints);
+
 @Controller('plans')
 export class PlansController {
   constructor(private readonly plans: PlansService) {}
@@ -30,6 +33,7 @@ export class PlansController {
       body.availableMinutes,
       body.gymId,
       normalizeEquipment(user.equipment),
+      profilePoints(user),
     );
   }
 
@@ -39,7 +43,7 @@ export class PlansController {
     @CurrentUser() user: User,
     @Query(new ZodValidationPipe(ScheduleQuerySchema)) query: z.infer<typeof ScheduleQuerySchema>,
   ) {
-    return this.plans.schedule(user.id, query.days, user.sessionsPerWeek);
+    return this.plans.schedule(user.id, query.days, user.sessionsPerWeek, profilePoints(user));
   }
 
   /** Refait le planning du mois avec Mistral (sinon il ne change jamais tout seul). */
@@ -48,7 +52,12 @@ export class PlansController {
     @CurrentUser() user: User,
     @Query(new ZodValidationPipe(ScheduleQuerySchema)) query: z.infer<typeof ScheduleQuerySchema>,
   ) {
-    return this.plans.regenerateSchedule(user.id, query.days, user.sessionsPerWeek);
+    return this.plans.regenerateSchedule(
+      user.id,
+      query.days,
+      user.sessionsPerWeek,
+      profilePoints(user),
+    );
   }
 
   /** État de Mistral : l'appli affiche une bannière quand le quota est atteint. */

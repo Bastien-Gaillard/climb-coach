@@ -10,6 +10,7 @@ import {
 import { z } from 'zod';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { CurrentUser, Public } from './auth.decorators';
+import { CLIMBING_POINTS, normalizePreferences } from './climbing-points';
 import { EQUIPMENT, normalizeEquipment } from './equipment';
 import { User, UsersService } from './users.service';
 
@@ -21,8 +22,12 @@ const SettingsSchema = z
     sessionsPerWeek: z.number().int().min(1).max(7).optional(),
     /** Matériel disponible, coché dans le profil. */
     equipment: z.array(z.enum(EQUIPMENT)).max(EQUIPMENT.length).optional(),
+    /** Points faibles : les séances et le planning les ciblent. */
+    weakPoints: z.array(z.enum(CLIMBING_POINTS)).max(CLIMBING_POINTS.length).optional(),
+    /** Ce que le grimpeur aime : chaque séance en garde un peu. */
+    likedPoints: z.array(z.enum(CLIMBING_POINTS)).max(CLIMBING_POINTS.length).optional(),
   })
-  .refine((b) => b.sessionsPerWeek !== undefined || b.equipment !== undefined, {
+  .refine((b) => Object.values(b).some((v) => v !== undefined), {
     message: 'Rien à modifier',
   });
 
@@ -31,6 +36,7 @@ const toDto = (u: User) => ({
   username: u.username,
   sessionsPerWeek: u.sessionsPerWeek,
   equipment: normalizeEquipment(u.equipment),
+  ...normalizePreferences(u.weakPoints, u.likedPoints),
 });
 
 @Controller('auth')

@@ -127,7 +127,20 @@ describe('PlansService.generate', () => {
       now,
       history: [],
       equipment: [],
+      weakPoints: [],
+      likedPoints: [],
     });
+  });
+
+  it('passe les points faibles et ce qu’il aime au générateur', async () => {
+    const { service, mistralGen } = setup({ enabled: true });
+    await service.generate('u1', 60, undefined, [], {
+      weakPoints: ['crimps'],
+      likedPoints: ['power'],
+    });
+    expect(mistralGen.generate).toHaveBeenCalledWith(
+      expect.objectContaining({ weakPoints: ['crimps'], likedPoints: ['power'] }),
+    );
   });
 
   it('passe le matériel du profil au générateur', async () => {
@@ -271,6 +284,27 @@ describe('PlansService.schedule', () => {
     expect(savedPlans.get('u1')).toMatchObject({ sessionsPerWeek: 5 });
 
     await service.schedule('u1', 7, 5);
+    expect(advisor.advisePlan).toHaveBeenCalledTimes(2);
+  });
+
+  it('un changement de points faibles refait le planning, une seule fois', async () => {
+    const { service, sessions, advisor, savedPlans } = setup({
+      enabled: true,
+      advise: async () => structuredClone(injury),
+    });
+    (sessions.findRecent as jest.Mock).mockResolvedValue(history);
+    await service.schedule('u1', 7, 3);
+    await service.adviceSettled('u1');
+    expect(savedPlans.get('u1')).toMatchObject({ weakPoints: [] });
+
+    const s = await service.schedule('u1', 7, 3, { weakPoints: ['crimps'] });
+    expect(s.advicePending).toBe(true);
+    await service.adviceSettled('u1');
+    expect(savedPlans.get('u1')).toMatchObject({ weakPoints: ['crimps'] });
+    expect((advisor.advisePlan as jest.Mock).mock.calls[1][2]).toEqual({ weakPoints: ['crimps'] });
+
+    // Mêmes points dans un autre ordre, ou seulement « ce qu'il aime » qui change : rien à refaire
+    await service.schedule('u1', 7, 3, { weakPoints: ['crimps'], likedPoints: ['power'] });
     expect(advisor.advisePlan).toHaveBeenCalledTimes(2);
   });
 

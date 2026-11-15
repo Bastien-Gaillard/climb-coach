@@ -61,6 +61,20 @@ describe('parseMonthPlan', () => {
 });
 
 describe('buildScheduleUserPrompt', () => {
+  it('donne les points faibles, le type ciblé et ce qu’il aime', () => {
+    const history = [session(3, now, { focus: 'strength' })];
+    const prompt = buildScheduleUserPrompt(
+      history,
+      buildSchedule(history, now, { horizonDays: 28, weakPoints: ['crimps', 'slopers'] }),
+      { weakPoints: ['crimps', 'slopers'], likedPoints: ['slab'] },
+    );
+    expect(prompt).toContain('Points faibles : réglettes, plats (type ciblé : force).');
+    expect(prompt).toContain("Ce qu'il aime faire : dalle et adhérence.");
+    expect(buildScheduleUserPrompt(history, buildSchedule(history, now))).toContain(
+      'Points faibles : aucun indiqué.',
+    );
+  });
+
   it('donne à Mistral la proposition des règles sur 28 jours, le rythme et les notes', () => {
     const history = [
       session(0, now, { focus: 'endurance', fatigue: 4, notes: 'grosse douleur au majeur' }),

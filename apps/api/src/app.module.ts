@@ -7,6 +7,7 @@ import { GradesController } from './grades/grades.controller';
 import { GymsModule } from './gyms/gyms.module';
 import { HealthController } from './health.controller';
 import { PlansModule } from './plans/plans.module';
+import { PushModule } from './push/push.module';
 import { SessionsModule } from './sessions/sessions.module';
 
 @Module({
@@ -17,6 +18,7 @@ import { SessionsModule } from './sessions/sessions.module';
     GymsModule,
     SessionsModule,
     PlansModule,
+    PushModule,
   ],
   controllers: [HealthController, GradesController],
 })

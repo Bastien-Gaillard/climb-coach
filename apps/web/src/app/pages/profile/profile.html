@@ -38,4 +38,52 @@
   }
 </section>
 
+@if (profile()) {
+<section class="stack">
+  <h2 class="overline" id="weak-label">Mes points faibles</h2>
+  <p class="muted small">
+    Leur type de séance revient plus souvent, et chaque séance commence par un exercice qui les
+    travaille.
+  </p>
+  <ng-container
+    [ngTemplateOutlet]="points"
+    [ngTemplateOutletContext]="{ list: 'weakPoints', labelledby: 'weak-label' }"
+  />
+</section>
+
+<section class="stack">
+  <h2 class="overline" id="liked-label">Ce que j'aime faire</h2>
+  <p class="muted small">Chaque séance en garde au moins un exercice, pour finir sur du plaisir.</p>
+  <ng-container
+    [ngTemplateOutlet]="points"
+    [ngTemplateOutletContext]="{ list: 'likedPoints', labelledby: 'liked-label' }"
+  />
+</section>
+}
+
+<ng-template #points let-list="list" let-labelledby="labelledby">
+  @for (g of groups; track g.label) {
+  <div class="group" role="group" [attr.aria-labelledby]="labelledby">
+    <span class="group-label small muted">{{ g.label }}</span>
+    <div class="chips">
+      @for (pt of g.points; track pt.id) {
+      <button
+        type="button"
+        role="checkbox"
+        class="chip"
+        [attr.aria-checked]="checked(list, pt.id)"
+        [attr.data-testid]="list + '-' + pt.id"
+        [disabled]="saving()"
+        (click)="togglePoint(list, pt.id)"
+      >
+        @if (checked(list, pt.id)) {
+        <app-icon name="check" [size]="14" [stroke]="3" />
+        } {{ pt.label }}
+      </button>
+      }
+    </div>
+  </div>
+  }
+</ng-template>
+
 <button type="button" class="ghost switch" (click)="auth.logout()">Changer de compte</button>

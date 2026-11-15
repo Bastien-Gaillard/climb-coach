@@ -1,7 +1,12 @@
 @if (block(); as b) {
 <header class="top">
   <div class="bar">
-    <a routerLink="/generer" class="btn icon close" aria-label="Fermer la séance">
+    <a
+      routerLink="/generer"
+      class="btn icon close"
+      aria-label="Fermer la séance"
+      (click)="push.stop()"
+    >
       <app-icon name="close" [size]="22" [stroke]="2.4" />
     </a>
     <span class="overline"
@@ -9,6 +14,16 @@
     >
     <span class="badge accent">{{ generated()!.source === 'mistral' ? 'IA' : 'Règles' }}</span>
   </div>
+  @switch (push.state()) { @case ('ask') {
+  <button type="button" class="notif" (click)="push.enable()" data-testid="push-enable">
+    <app-icon name="bell" [size]="18" [stroke]="2.4" />Prévenir à la fin de chaque bloc
+  </button>
+  } @case ('denied') {
+  <p class="notif-off muted" data-testid="push-denied">
+    Notifications bloquées : autorise-les pour ce site dans Chrome pour être prévenu à la fin des
+    blocs.
+  </p>
+  } }
   <div class="segs" aria-hidden="true">
     @for (x of blocks(); track $index; let k = $index) {
     <span

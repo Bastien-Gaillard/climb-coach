@@ -31,6 +31,9 @@ services:
       MISTRAL_API_KEY: ${MISTRAL_API_KEY:-}
       MISTRAL_MODEL: ${MISTRAL_MODEL:-mistral-small-latest}
       MISTRAL_TIMEOUT_MS: ${MISTRAL_TIMEOUT_MS:-30000}
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:climb-coach@localhost}
     depends_on:
       db:
         condition: service_healthy

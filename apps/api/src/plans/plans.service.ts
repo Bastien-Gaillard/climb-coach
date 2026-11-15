@@ -4,6 +4,7 @@ import { Database, DB } from '../db/db.module';
 import { generatedPlans, schedulePlans, StoredPlannedSession } from '../db/schema';
 import { GymsService } from '../gyms/gyms.service';
 import { SessionsService } from '../sessions/sessions.service';
+import { ClimbingPoint } from '../auth/climbing-points';
 import { Equipment } from '../auth/equipment';
 import { GeneratorContext } from './generator';
 import { withGymColors } from './gym-colors';
@@ -28,9 +29,20 @@ export interface GeneratedPlanResult {
   createdAt: Date;
 }
 
+/** Points du profil qui orientent les séances et le planning. */
+export interface ProfilePoints {
+  weakPoints?: ClimbingPoint[];
+  likedPoints?: ClimbingPoint[];
+}
+
+/** Ce qui, s'il change, rend le planning du mois périmé : le rythme et les points faibles. */
+const planKey = (sessionsPerWeek: number, weakPoints: readonly string[] = []) =>
+  `${sessionsPerWeek}|${[...weakPoints].sort().join(',')}`;
+
 /** Planning du mois enregistré pour un compte. */
 interface StoredPlan {
   sessionsPerWeek: number;
+  weakPoints: string[];
   summary: string | null;
   sessions: StoredPlannedSession[];
   createdAt: Date;
@@ -42,7 +54,7 @@ export class PlansService {
   /** Planning en cours de calcul par Mistral, par compte (un seul à la fois). */
   private readonly adviceInFlight = new Map<string, Promise<void>>();
   /** Dernier échec de Mistral pour le planning, par compte (affiché jusqu'au prochain essai). */
-  private readonly adviceFailure = new Map<string, { message: string; sessionsPerWeek: number }>();
+  private readonly adviceFailure = new Map<string, { message: string; key: string }>();
 
   constructor(
     @Inject(DB) private readonly db: Database,
@@ -60,12 +72,20 @@ export class PlansService {
     availableMinutes: number,
     gymId?: string,
     equipment: Equipment[] = [],
+    points: ProfilePoints = {},
   ): Promise<GeneratedPlanResult> {
     const [history, gym] = await Promise.all([
       this.sessions.findRecent(userId, 10),
       gymId ? this.gyms.findOne(gymId) : undefined,
     ]);
-    const ctx: GeneratorContext = { availableMinutes, now: this.clock(), history, equipment };
+    const ctx: GeneratorContext = {
+      availableMinutes,
+      now: this.clock(),
+      history,
+      equipment,
+      weakPoints: points.weakPoints ?? [],
+      likedPoints: points.likedPoints ?? [],
+    };
     if (gym) ctx.gym = gym;
 
     let source: GeneratedPlanResult['source'] = 'rules';
@@ -107,16 +127,23 @@ export class PlansService {
    * demandé automatiquement.
    * Sans plan de Mistral (ou quand il est épuisé), ce sont les règles qui proposent.
    */
-  async schedule(userId: string, horizonDays = 7, sessionsPerWeek?: number): Promise<Schedule> {
+  async schedule(
+    userId: string,
+    horizonDays = 7,
+    sessionsPerWeek?: number,
+    points: ProfilePoints = {},
+  ): Promise<Schedule> {
     const now = this.clock();
     const history = await this.sessions.findRecent(userId, 5);
-    const base = buildSchedule(history, now, { horizonDays, sessionsPerWeek });
+    const weakPoints = points.weakPoints ?? [];
+    const base = buildSchedule(history, now, { horizonDays, sessionsPerWeek, weakPoints });
+    const key = planKey(base.sessionsPerWeek, weakPoints);
     if (!this.advisor.enabled || history.length === 0) return base;
 
     const pending = this.adviceInFlight.has(userId);
     // Un échec ne compte que pour le rythme demandé : un nouveau rythme a droit à un nouvel essai
     const failed = this.adviceFailure.get(userId);
-    const failure = failed?.sessionsPerWeek === base.sessionsPerWeek ? failed.message : undefined;
+    const failure = failed?.key === key ? failed.message : undefined;
     const status: Pick<Schedule, 'advicePending' | 'fallbackReason'> = {
       ...(pending ? { advicePending: true } : {}),
       ...(failure && !pending ? { fallbackReason: failure } : {}),
@@ -125,14 +152,16 @@ export class PlansService {
     const stored = await this.loadPlan(userId);
     if (!stored) {
       // Tout premier planning : on le demande à Mistral sans attendre de clic
-      if (!pending && !failure) this.requestAdvice(userId, history, now, sessionsPerWeek);
+      if (!pending && !failure) this.requestAdvice(userId, history, now, sessionsPerWeek, points);
       return { ...base, ...(failure ? { fallbackReason: failure } : { advicePending: true }) };
     }
 
-    // Rythme changé depuis le planning : on en refait un, une seule fois (pas en boucle si échec)
+    // Rythme ou points faibles changés depuis le planning : on en refait un, une seule fois
+    // (pas en boucle si échec)
     const rhythmChanged = stored.sessionsPerWeek !== base.sessionsPerWeek;
-    if (rhythmChanged && !pending && !failure) {
-      this.requestAdvice(userId, history, now, sessionsPerWeek);
+    const profileChanged = planKey(stored.sessionsPerWeek, stored.weakPoints) !== key;
+    if (profileChanged && !pending && !failure) {
+      this.requestAdvice(userId, history, now, sessionsPerWeek, points);
       status.advicePending = true;
     }
 
@@ -151,6 +180,7 @@ export class PlansService {
         sessionsPerWeek,
         advised: upcoming,
         summary: stored.summary ?? undefined,
+        weakPoints,
       }),
       ...plan,
       ...status,
@@ -162,15 +192,16 @@ export class PlansService {
     userId: string,
     horizonDays = 7,
     sessionsPerWeek?: number,
+    points: ProfilePoints = {},
   ): Promise<Schedule> {
     if (this.advisor.enabled) {
       const history = await this.sessions.findRecent(userId, 5);
       if (history.length) {
         this.adviceFailure.delete(userId);
-        this.requestAdvice(userId, history, this.clock(), sessionsPerWeek);
+        this.requestAdvice(userId, history, this.clock(), sessionsPerWeek, points);
       }
     }
-    return this.schedule(userId, horizonDays, sessionsPerWeek);
+    return this.schedule(userId, horizonDays, sessionsPerWeek, points);
   }
 
   /** Attend la fin du planning en cours de calcul (utile aux tests). */
@@ -184,18 +215,22 @@ export class PlansService {
     history: Awaited<ReturnType<SessionsService['findRecent']>>,
     now: Date,
     sessionsPerWeek?: number,
+    points: ProfilePoints = {},
   ): void {
     if (this.adviceInFlight.has(userId)) return;
+    const weakPoints = points.weakPoints ?? [];
     // Mistral reçoit la proposition des règles sur tout son horizon
     const base = buildSchedule(history, now, {
       horizonDays: ADVICE_HORIZON_DAYS,
       sessionsPerWeek,
+      weakPoints,
     });
     const done = this.advisor
-      .advisePlan(history, base)
+      .advisePlan(history, base, points)
       .then((plan) =>
         this.savePlan(userId, {
           sessionsPerWeek: base.sessionsPerWeek,
+          weakPoints,
           summary: plan.summary ?? null,
           sessions: plan.sessions.map(({ inDays, ...rest }) => ({
             ...rest,
@@ -212,7 +247,7 @@ export class PlansService {
         );
         this.adviceFailure.set(userId, {
           message: e.message,
-          sessionsPerWeek: base.sessionsPerWeek,
+          key: planKey(base.sessionsPerWeek, weakPoints),
         });
       })
       .finally(() => this.adviceInFlight.delete(userId));

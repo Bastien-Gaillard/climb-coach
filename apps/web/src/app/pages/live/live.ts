@@ -2,6 +2,7 @@ import { Component, computed, DestroyRef, effect, inject, OnInit, signal } from 
 import { Router, RouterLink } from '@angular/router';
 import { BLOCK_LABEL, FOCUS_LABEL, STYLE_LABEL } from '../../core/labels';
 import { PlanStore } from '../../core/plan.store';
+import { PushAlerts, vibrate } from '../../core/push-alerts';
 import { holdVars } from '../../shared/hold';
 import { Icon } from '../../shared/icon';
 import { ScreenWakeLock } from '../../shared/wake-lock';
@@ -17,6 +18,8 @@ export class LivePage implements OnInit {
   private readonly store = inject(PlanStore);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
+  /** Notifications de fin de bloc, même téléphone verrouillé. */
+  protected readonly push = inject(PushAlerts);
 
   protected readonly styleLabel = STYLE_LABEL;
   protected readonly holdVars = holdVars;
@@ -36,6 +39,8 @@ export class LivePage implements OnInit {
   private readonly wakeLock = new ScreenWakeLock();
   /** État restauré : avant ça, l'effet de sauvegarde écraserait la position enregistrée. */
   private readonly ready = signal(false);
+  /** Heure de fin (ms) du dernier bloc signalé par une vibration. */
+  private buzzedFor = 0;
 
   protected readonly left = computed(() =>
     this.running()
@@ -91,6 +96,8 @@ export class LivePage implements OnInit {
       return;
     }
     this.store.start();
+    this.push.resume();
+    void this.push.init();
     const saved = this.store.timer();
     if (saved) {
       // Reprise : le minuteur a continué de tourner pendant la saisie ou la veille
@@ -123,14 +130,29 @@ export class LivePage implements OnInit {
     let end = this.endsAt();
     let i = this.index();
     const last = this.blocks().length - 1;
+    /** Fin du dernier bloc écoulé (0 si le bloc en cours n'est pas fini). */
+    let passed = 0;
     while (now >= end && i < last) {
+      passed = end;
       i++;
       end += (this.blocks()[i]?.minutes ?? 0) * 60_000;
     }
+    if (now >= end) passed = end;
     if (i !== this.index()) {
       this.index.set(i);
       this.endsAt.set(end);
     }
+    this.buzz(passed, now);
+  }
+
+  /**
+   * Vibre à la fin d'un bloc, une seule fois. Pas au retour de veille pour une fin déjà
+   * ancienne : la notification push l'a annoncée.
+   */
+  private buzz(passed: number, now: number): void {
+    if (passed <= this.buzzedFor) return;
+    this.buzzedFor = passed;
+    if (now - passed < 5000) vibrate();
   }
 
   protected go(i: number): void {
@@ -156,6 +178,7 @@ export class LivePage implements OnInit {
   }
 
   protected finish(): void {
+    this.push.stop();
     this.router.navigate(['/seance']);
   }
 }

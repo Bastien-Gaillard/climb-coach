@@ -33,6 +33,21 @@
   background: var(--surface);
 }
 
+.notif {
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 10px;
+  font-size: 15px;
+  background: var(--surface);
+}
+
+.notif-off {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.4;
+  text-align: center;
+}
+
 .segs {
   display: flex;
   gap: 4px;

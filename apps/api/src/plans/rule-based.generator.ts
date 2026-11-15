@@ -1,5 +1,6 @@
 import { FONT, gradeFromValue } from '@climb-coach/grades';
 import { Injectable } from '@nestjs/common';
+import { MOBILITY_POINTS, pointLabels } from '../auth/climbing-points';
 import { Equipment } from '../auth/equipment';
 import { REFERENCE_SYSTEM } from '../sessions/climb-normalizer';
 import { GeneratorContext, PlanGenerator, splitTime } from './generator';
@@ -39,7 +40,7 @@ export class RuleBasedGenerator implements PlanGenerator {
     }
     blocks.push(...mains);
     if (time.core > 0) blocks.push(this.core(time.core, light));
-    if (time.cooldown > 0) blocks.push(this.cooldown(time.cooldown));
+    if (time.cooldown > 0) blocks.push(this.cooldown(time.cooldown, ctx));
 
     const intensityLabel = a.intensity === 'light' ? ' (légère)' : '';
     return {
@@ -69,8 +70,10 @@ export class RuleBasedGenerator implements PlanGenerator {
       careful: !!a.pain || light === 1,
       // Un jour, une sélection : la séance du lendemain ne propose pas les mêmes exercices
       seed: Math.floor(ctx.now.getTime() / 86_400_000) + ctx.history.length,
+      weakPoints: ctx.weakPoints,
+      likedPoints: ctx.likedPoints,
     });
-    return picks.map(({ exercise, minutes: m }) => {
+    return picks.map(({ exercise, minutes: m, role, points }) => {
       const built = exercise.build({
         maxSent: a.maxSent,
         project: a.project,
@@ -83,7 +86,15 @@ export class RuleBasedGenerator implements PlanGenerator {
         title: `${FOCUS_LABEL[a.focus][0].toUpperCase()}${FOCUS_LABEL[a.focus].slice(1)} : ${built.title}`,
         minutes: m,
         target: { style: 'boulder' as const, grade: this.grade('boulder', clamp(built.target)) },
-        instructions: built.instructions,
+        instructions: [
+          ...built.instructions,
+          ...(role === 'weak'
+            ? [`Ton point faible (${pointLabels(points)}) : en premier, frais`]
+            : []),
+          ...(role === 'liked'
+            ? [`Pour le plaisir (${pointLabels(points)}) : on finit dessus`]
+            : []),
+        ],
       };
     });
   }
@@ -124,7 +135,7 @@ export class RuleBasedGenerator implements PlanGenerator {
     // Du général au spécifique, du lent au rapide, des grosses prises aux petites.
     const instructions = [
       `${cardio} min de cardio léger : sautillements, montées de genoux, jumping jacks`,
-      'Mobilité sans forcer : cercles de poignets, de bras (10 dans chaque sens), de hanches et de chevilles',
+      'Mobilité sans forcer : cercles de poignets, de bras (10 dans chaque sens) et de chevilles, 5 rotations de hanche lentes par jambe, genou levé, puis 5 squats cosaques par côté',
       'Doigts : 10 glissements tendineux par main (poing, poing tendu, crochet), puis 20 ouvertures-fermetures rapides',
       ...(has('ball') ? ['Balle souple : 20 pressions lentes, puis 20 rapides, sans forcer'] : []),
       ...(has('elastic')
@@ -257,13 +268,21 @@ export class RuleBasedGenerator implements PlanGenerator {
     };
   }
 
-  private cooldown(minutes: number): PlanBlock {
+  private cooldown(minutes: number, ctx: GeneratorContext): PlanBlock {
+    const mobility = (ctx.weakPoints ?? []).filter((p) => MOBILITY_POINTS.includes(p));
     return {
       kind: 'cooldown',
       title: 'Retour au calme',
       minutes,
       instructions: [
+        ...(mobility.length
+          ? [
+              `Point faible (${pointLabels(mobility)}) : double le temps de la grenouille et des floor angels`,
+            ]
+          : []),
         'Étirements doux des avant-bras, épaules et dos',
+        'Hanches : 1 min en grenouille (à genoux, genoux écartés, bassin vers l’arrière), sans forcer',
+        'Épaules : 10 floor angels lents, allongé sur le dos, bras qui glissent au sol de la position W à la position Y',
         'Suspensions passives de 20 s',
       ],
     };

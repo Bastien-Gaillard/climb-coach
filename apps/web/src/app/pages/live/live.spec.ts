@@ -1,7 +1,10 @@
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { GeneratedPlan } from '../../core/models';
 import { PlanStore } from '../../core/plan.store';
+import { PushAlerts, VIBRATION } from '../../core/push-alerts';
 import { LivePage } from './live';
 
 const plan: GeneratedPlan = {
@@ -29,14 +32,19 @@ describe('LivePage · minuteur', () => {
   const clock = () => el.querySelector('.clock')?.textContent?.trim();
   const title = () => el.querySelector('h1')?.textContent?.trim();
 
+  let vibrate: jasmine.Spy;
+
   beforeEach(() => {
     sessionStorage.clear();
     jasmine.clock().install();
     jasmine.clock().mockDate(t0);
     TestBed.configureTestingModule({
       imports: [LivePage],
-      providers: [provideRouter([])],
+      providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting()],
     });
+    // Pas de service worker ni d'appel à l'API ici : PushAlerts est testé à part
+    spyOn(TestBed.inject(PushAlerts), 'init').and.resolveTo();
+    vibrate = spyOn(navigator, 'vibrate').and.returnValue(true);
     TestBed.inject(PlanStore).set(plan);
     fixture = TestBed.createComponent(LivePage);
     el = fixture.nativeElement;
@@ -117,5 +125,43 @@ describe('LivePage · minuteur', () => {
     el = fixture.nativeElement;
     fixture.detectChanges();
     expect(clock()).toBe('08:00');
+  });
+
+  it('vibre à la fin d’un bloc, une seule fois', () => {
+    jasmine.clock().tick(15 * 60_000);
+    fixture.detectChanges();
+    expect(title()).toBe('Technique');
+    expect(vibrate).toHaveBeenCalledOnceWith(VIBRATION);
+    jasmine.clock().tick(5_000);
+    expect(vibrate).toHaveBeenCalledTimes(1);
+  });
+
+  it('vibre à chaque fin de bloc, jusqu’à la fin de séance, puis s’arrête', () => {
+    jasmine.clock().tick(60 * 60_000);
+    // Échauffement, Technique, Retour au calme
+    expect(vibrate).toHaveBeenCalledTimes(3);
+    jasmine.clock().tick(30_000);
+    expect(vibrate).toHaveBeenCalledTimes(3);
+  });
+
+  it('ne vibre pas au retour de veille pour une fin de bloc déjà ancienne', () => {
+    jasmine.clock().mockDate(new Date(t0.getTime() + 20 * 60_000));
+    document.dispatchEvent(new Event('visibilitychange'));
+    fixture.detectChanges();
+    expect(title()).toBe('Technique');
+    expect(vibrate).not.toHaveBeenCalled();
+  });
+
+  it('propose d’activer les notifications tant qu’elles ne le sont pas', () => {
+    const push = TestBed.inject(PushAlerts);
+    const enable = spyOn(push, 'enable').and.resolveTo();
+    push.state.set('ask');
+    fixture.detectChanges();
+    (el.querySelector('[data-testid=push-enable]') as HTMLButtonElement).click();
+    expect(enable).toHaveBeenCalled();
+
+    push.state.set('on');
+    fixture.detectChanges();
+    expect(el.querySelector('[data-testid=push-enable]')).toBeNull();
   });
 });

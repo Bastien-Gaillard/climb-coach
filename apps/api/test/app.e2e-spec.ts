@@ -6,6 +6,8 @@ import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { Database, DB } from '../src/db/db.module';
 import { CLOCK } from '../src/plans/plans.service';
+import { PUSH_SENDER, PushTarget } from '../src/push/push.sender';
+import { PushService } from '../src/push/push.service';
 
 /**
  * Tests de bout en bout sur une vraie base Postgres.
@@ -15,6 +17,16 @@ describe('API (e2e)', () => {
   let app: INestApplication;
   let db: Database;
   const now = new Date('2025-11-29T18:00:00Z');
+  /** Faux service push : garde les messages au lieu de les envoyer. */
+  const pushSender = {
+    publicKey: 'cle-publique-test',
+    sent: [] as { target: PushTarget; payload: unknown }[],
+    fail: null as null | { statusCode: number },
+    async send(target: PushTarget, payload: string) {
+      if (this.fail) throw this.fail;
+      this.sent.push({ target, payload: JSON.parse(payload) });
+    },
+  };
 
   beforeAll(async () => {
     process.env.DATABASE_URL ??= 'postgresql://climb:climb@localhost:5432/climbcoach_test';
@@ -23,6 +35,8 @@ describe('API (e2e)', () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
       .overrideProvider(CLOCK)
       .useValue(() => now)
+      .overrideProvider(PUSH_SENDER)
+      .useValue(pushSender)
       .compile();
 
     app = moduleRef.createNestApplication();
@@ -32,7 +46,9 @@ describe('API (e2e)', () => {
   });
 
   beforeEach(async () => {
-    await db.execute(sql`TRUNCATE sessions, climbs, generated_plans, gyms CASCADE`);
+    await db.execute(
+      sql`TRUNCATE sessions, climbs, generated_plans, gyms, push_subscriptions CASCADE`,
+    );
   });
 
   afterAll(async () => {
@@ -84,6 +100,27 @@ describe('API (e2e)', () => {
         .patch('/api/auth/me')
         .send({ equipment: ['trampoline'] })
         .expect(400);
+    });
+
+    it('enregistre les points faibles et ce qu’il aime, sans recouvrement', async () => {
+      const me = await http('kuzimu').get('/api/auth/me').expect(200);
+      expect(me.body).toMatchObject({ weakPoints: [], likedPoints: [] });
+      const { body } = await http('kuzimu')
+        .patch('/api/auth/me')
+        .send({ weakPoints: ['slab', 'crimps'], likedPoints: ['crimps', 'power'] })
+        .expect(200);
+      expect(body).toMatchObject({ weakPoints: ['crimps', 'slab'], likedPoints: ['power'] });
+      // Cocher la dalle comme plaisir seulement : elle sort des points faibles
+      const { body: liked } = await http('kuzimu')
+        .patch('/api/auth/me')
+        .send({ likedPoints: ['power', 'slab'] })
+        .expect(200);
+      expect(liked).toMatchObject({ weakPoints: ['crimps'], likedPoints: ['power', 'slab'] });
+      await http('kuzimu')
+        .patch('/api/auth/me')
+        .send({ weakPoints: ['yoga'] })
+        .expect(400);
+      await http('kuzimu').post('/api/plans/generate').send({ availableMinutes: 90 }).expect(201);
     });
 
     it('refuse un compte inconnu', async () => {
@@ -308,5 +345,86 @@ describe('API (e2e)', () => {
 
     it('renvoie une 404 sur une salle inconnue', () =>
       http().get('/api/gyms/inconnue').expect(404));
+  });
+
+  describe('notifications push', () => {
+    const endpoint = 'https://fcm.googleapis.com/fcm/send/appareil-1';
+    const subscription = { endpoint, keys: { p256dh: 'cle-p256dh', auth: 'cle-auth' } };
+    let push: PushService;
+
+    beforeAll(() => {
+      push = app.get(PushService);
+      // L'envoi automatique chaque seconde gênerait les tests : on l'appelle à la main
+      push.onModuleDestroy();
+    });
+
+    beforeEach(() => {
+      pushSender.sent = [];
+      pushSender.fail = null;
+    });
+
+    it('donne la clé publique pour s’abonner', async () => {
+      const { body } = await http().get('/api/push/key').expect(200);
+      expect(body).toEqual({ publicKey: 'cle-publique-test' });
+    });
+
+    it('envoie la fin de bloc à l’heure prévue, puis la suivante', async () => {
+      await http().post('/api/push/subscribe').send(subscription).expect(204);
+      const t = Date.now();
+      const alerts = [
+        { at: t + 60_000, title: 'Échauffement terminé', body: 'Suivant : Technique · 40 min' },
+        { at: t + 120_000, title: 'Séance terminée', body: '' },
+      ];
+      const { body } = await http().put('/api/push/alerts').send({ endpoint, alerts }).expect(200);
+      expect(body).toEqual({ scheduled: 2 });
+
+      expect(await push.dispatchDue(t + 30_000)).toBe(0);
+      expect(await push.dispatchDue(t + 61_000)).toBe(1);
+      expect(pushSender.sent[0].target).toMatchObject({ endpoint, p256dh: 'cle-p256dh' });
+      expect(pushSender.sent[0].payload).toMatchObject({
+        title: 'Échauffement terminé',
+        url: '/seance-en-cours',
+      });
+      // Déjà partie : pas de doublon
+      expect(await push.dispatchDue(t + 62_000)).toBe(0);
+      expect(await push.dispatchDue(t + 121_000)).toBe(1);
+      expect(pushSender.sent.map((m) => (m.payload as { title: string }).title)).toEqual([
+        'Échauffement terminé',
+        'Séance terminée',
+      ]);
+    });
+
+    it('une liste vide annule les alertes (pause, fin de séance)', async () => {
+      await http().post('/api/push/subscribe').send(subscription).expect(204);
+      const t = Date.now();
+      await http()
+        .put('/api/push/alerts')
+        .send({ endpoint, alerts: [{ at: t + 1000, title: 'Fin', body: '' }] })
+        .expect(200);
+      await http().put('/api/push/alerts').send({ endpoint, alerts: [] }).expect(200);
+      expect(await push.dispatchDue(t + 5000)).toBe(0);
+    });
+
+    it('refuse de programmer sur l’appareil d’un autre compte', async () => {
+      await http().post('/api/push/subscribe').send(subscription).expect(204);
+      await http('tophe').put('/api/push/alerts').send({ endpoint, alerts: [] }).expect(404);
+    });
+
+    it('oublie un appareil désabonné chez le service push (410)', async () => {
+      await http().post('/api/push/subscribe').send(subscription).expect(204);
+      const t = Date.now();
+      await http()
+        .put('/api/push/alerts')
+        .send({ endpoint, alerts: [{ at: t + 1000, title: 'Fin', body: '' }] })
+        .expect(200);
+      pushSender.fail = { statusCode: 410 };
+      await push.dispatchDue(t + 2000);
+      await http().put('/api/push/alerts').send({ endpoint, alerts: [] }).expect(404);
+    });
+
+    it('valide le corps des requêtes', async () => {
+      await http().post('/api/push/subscribe').send({ endpoint: 'pas-une-url' }).expect(400);
+      await anonymous().get('/api/push/key').expect(401);
+    });
   });
 });

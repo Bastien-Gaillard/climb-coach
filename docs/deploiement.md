@@ -56,6 +56,22 @@ Ensuite, dans la console Tailscale, page **Machines** : sur `climb-coach`, chois
 
 Le nom de ton tailnet est visible dans la console Tailscale, page **DNS**.
 
+### Notifications de fin de bloc
+
+Le minuteur de « Séance en cours » envoie une notification (et fait vibrer le téléphone) à la
+fin de chaque bloc, même téléphone verrouillé. C'est l'API qui l'envoie, par le service push de
+Chrome : il lui faut une paire de clés VAPID, générée une seule fois.
+
+```bash
+docker run --rm node:22-alpine npx -y web-push generate-vapid-keys
+nano .env.prod   # VAPID_PUBLIC_KEY et VAPID_PRIVATE_KEY
+docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
+```
+
+Sur le téléphone, ouvrir une séance et toucher « Prévenir à la fin de chaque bloc », puis
+autoriser les notifications. Sans clés, le bouton n'apparaît pas et seule la vibration
+(appli à l'écran) reste.
+
 ## 3. Reprendre tes séances actuelles (optionnel)
 
 Sur ton PC, avec la base locale lancée (`docker compose up -d db`) :

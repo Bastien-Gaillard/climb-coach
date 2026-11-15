@@ -21,6 +21,15 @@ const EnvSchema = z.object({
   MISTRAL_MIN_INTERVAL_MS: z.coerce.number().int().min(0).default(1100),
   /** Nouvelles tentatives après un HTTP 429 (trop de requêtes). */
   MISTRAL_MAX_RETRIES: z.coerce.number().int().min(0).max(5).default(2),
+
+  /**
+   * Clés VAPID des notifications push (fin de bloc du minuteur), générées une fois avec
+   * `npx web-push generate-vapid-keys`. Sans clés, pas de notifications.
+   */
+  VAPID_PUBLIC_KEY: z.string().optional(),
+  VAPID_PRIVATE_KEY: z.string().optional(),
+  /** Contact transmis aux services push (mailto: ou https:). */
+  VAPID_SUBJECT: z.string().default('mailto:climb-coach@localhost'),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

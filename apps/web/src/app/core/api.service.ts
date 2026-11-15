@@ -3,6 +3,7 @@ import { inject, Injectable } from '@angular/core';
 import { EMPTY, expand, Observable, switchMap, timer } from 'rxjs';
 import {
   AiStatus,
+  ClimbingPoint,
   CreateSession,
   Equipment,
   GeneratedPlan,
@@ -79,7 +80,12 @@ export class ApiService {
   }
 
   /** Réglages du compte connecté. */
-  updateSettings(body: { sessionsPerWeek?: number; equipment?: Equipment[] }): Observable<Profile> {
+  updateSettings(body: {
+    sessionsPerWeek?: number;
+    equipment?: Equipment[];
+    weakPoints?: ClimbingPoint[];
+    likedPoints?: ClimbingPoint[];
+  }): Observable<Profile> {
     return this.http.patch<Profile>(`${this.base}/auth/me`, body);
   }
 

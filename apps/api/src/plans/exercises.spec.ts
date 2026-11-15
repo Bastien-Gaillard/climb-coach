@@ -86,6 +86,55 @@ describe('pickExercises', () => {
   });
 });
 
+describe('exercices des points faibles', () => {
+  const ids = (focus: 'technique' | 'strength', careful: boolean, maxSent = 6) =>
+    Array.from({ length: 40 }, (_, seed) =>
+      pickExercises({ focus, minutes: 70, maxSent, careful, seed }).map((p) => p.exercise.id),
+    ).flat();
+
+  it('chutes, lancés et blocs au max ne sortent jamais en mode prudent', () => {
+    const careful = [...ids('technique', true), ...ids('strength', true)];
+    for (const id of [
+      'fall-practice',
+      'rapid-fire',
+      'build-the-move',
+      'grip-limit',
+      'compression',
+      'varied-dynos',
+      'fall-in-move',
+    ]) {
+      expect(careful).not.toContain(id);
+    }
+  });
+
+  it('la tension en dévers est accessible sous le 6C', () => {
+    expect(ids('strength', false, ADVANCED_LEVEL - 2)).toContain('steep-poor-feet');
+    expect(ids('strength', true, ADVANCED_LEVEL - 2)).toContain('steep-poor-feet');
+  });
+
+  it('les chutes volontaires partent bas et restent sous la mi-hauteur', () => {
+    const text = EXERCISES.find((e) => e.id === 'fall-practice')!
+      .build({ maxSent: 6, project: 7, light: 0, minutes: 15, grade })
+      .instructions.join(' ');
+    expect(text).toContain('50 cm du sol');
+    expect(text).toContain('mi-hauteur');
+    expect(text).toContain('sans regarder en bas');
+  });
+
+  it('tour des inclinaisons : un bloc par inclinaison et par tour', () => {
+    const first = (minutes: number) =>
+      EXERCISES.find((e) => e.id === 'wall-tour')!.build({
+        maxSent: 6,
+        project: 7,
+        light: 0,
+        minutes,
+        grade,
+      }).instructions[0];
+    expect(first(10)).toBe('3 blocs en G4, 1 passage par bloc');
+    expect(first(30)).toBe('9 blocs en G4, 1 passage par bloc');
+  });
+});
+
 describe('catalogForPrompt', () => {
   it('liste les exercices par type, avec les précautions', () => {
     const text = catalogForPrompt();
@@ -94,6 +143,7 @@ describe('catalogForPrompt', () => {
     expect(text).toContain('- Pyramide');
     expect(text).toContain('Sans les pieds');
     expect(text).toContain('seulement à partir de 6C');
+    expect(text).toContain('Travaille : réglettes, plats, pinces.');
   });
 });
 
@@ -111,5 +161,82 @@ describe('dosage de la force', () => {
   it('mouvements puissants : environ 10 min par bloc', () => {
     expect(build('power', 15)).toMatch(/^1 bloc en G6/);
     expect(build('power', 30)).toMatch(/^3 blocs en G6/);
+  });
+});
+
+describe('pickExercises avec le profil', () => {
+  const base = { maxSent: 6, careful: false };
+
+  it('chaque exercice dit quels points il travaille', () => {
+    expect(EXERCISES.every((e) => e.points.length > 0)).toBe(true);
+  });
+
+  it('au plus un exercice sur un point faible, en premier ; un exercice aimé, en dernier', () => {
+    for (const seed of [0, 1, 2, 3, 4, 5]) {
+      const picks = pickExercises({
+        ...base,
+        focus: 'technique',
+        minutes: 70,
+        seed,
+        weakPoints: ['footwork', 'slab'],
+        likedPoints: ['coordination'],
+      });
+      expect(picks).toHaveLength(3);
+      expect(picks.filter((p) => p.role === 'weak')).toHaveLength(1);
+      expect(picks[0].role).toBe('weak');
+      expect(picks[2].role).toBe('liked');
+      expect(picks[2].points).toEqual(['coordination']);
+      // Le reste ne travaille pas un point faible
+      expect(picks[1].exercise.points.some((p) => p === 'footwork' || p === 'slab')).toBe(false);
+      expect(picks.reduce((s, p) => s + p.minutes, 0)).toBe(70);
+    }
+  });
+
+  it('un seul exercice : point faible et plaisir chacun leur tour', () => {
+    const roles = [0, 1, 2, 3].map(
+      (seed) =>
+        pickExercises({
+          ...base,
+          focus: 'technique',
+          minutes: 20,
+          seed,
+          weakPoints: ['footwork'],
+          likedPoints: ['coordination'],
+        })[0].role,
+    );
+    expect(roles).toEqual(['weak', 'liked', 'weak', 'liked']);
+  });
+
+  it('en force avec un point faible : il passe avant le bloc au max', () => {
+    const picks = pickExercises({
+      ...base,
+      focus: 'strength',
+      minutes: 33,
+      seed: 0,
+      weakPoints: ['compression'],
+    });
+    expect(picks[0].exercise.id).toBe('compression');
+    expect(picks[0].role).toBe('weak');
+  });
+
+  it('en mode prudent, un plaisir risqué est remplacé par un plaisir sans risque', () => {
+    for (const seed of [0, 1, 2, 3]) {
+      const picks = pickExercises({
+        ...base,
+        focus: 'strength',
+        minutes: 70,
+        careful: true,
+        seed,
+        likedPoints: ['power', 'tension'],
+      });
+      expect(picks.every((p) => !p.exercise.stressful && !p.exercise.advanced)).toBe(true);
+      expect(picks[picks.length - 1].exercise.id).toBe('steep-poor-feet');
+    }
+  });
+
+  it('sans profil : rien ne change', () => {
+    const picks = pickExercises({ ...base, focus: 'strength', minutes: 33, seed: 2 });
+    expect(picks[0].exercise.id).toBe('limit');
+    expect(picks.every((p) => p.role === 'other' && p.points.length === 0)).toBe(true);
   });
 });

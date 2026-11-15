@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { z } from 'zod';
+import { ClimbingPoint, pointLabels } from '../auth/climbing-points';
 import { SessionWithClimbs } from '../sessions/sessions.service';
+import { weakFocus } from './focus-balance';
 import { FOCUS_LABEL } from './history-analysis';
 import { ChatMessage, extractJson, MistralError, MistralGenerator } from './mistral.generator';
 import { FocusSchema } from './plan.schema';
@@ -37,13 +39,16 @@ Ton rôle : planifier ses séances des 4 prochaines semaines (28 jours, jour 0 =
 
 Ce que tu reçois :
 - la date du jour et le rythme visé (séances par semaine) ;
-- une proposition calculée par des règles fixes (rotation force → endurance → technique, jours de récup) ;
+- ses points faibles et ce qu'il aime faire, s'il les a indiqués ;
+- une proposition calculée par des règles fixes (rotation force → endurance → technique, ou plus de séances du type de son point faible, jours de récup) ;
 - ses dernières séances : date, type, durée, fatigue ressentie (1 = frais, 5 = épuisé), blocs tentés et ses NOTES libres, avec sa durée habituelle.
 
 Rythme :
 - Vise le rythme demandé : N séances par semaine, donc environ 4 × N séances sur les 28 jours, réparties régulièrement. Ne planifie pas moins sans raison de santé, ni plus.
 - Jamais deux séances le même jour. Pas de force la veille ou le lendemain d'une autre séance de force.
 - Alterne les types (force, endurance, technique) ; la technique se place bien entre deux séances dures.
+- Point faible indiqué : environ une séance sur deux de son type (le type ciblé est donné), sans jamais deux séances de force à moins de 48 h, et au moins une séance de chacun des autres types par semaine.
+- Ce qu'il aime : garde chaque semaine des séances qui lui font plaisir, la motivation compte autant que le point faible.
 
 Ta valeur ajoutée : lire et interpréter les notes et l'historique, ce que les règles ne savent pas faire.
 - Pas de souci particulier dans les notes : reste proche de la proposition des règles.
@@ -87,7 +92,14 @@ function dayLabel(day: string): string {
 }
 
 /** Contexte envoyé à Mistral : la proposition des règles sur 28 jours et l'historique avec les notes. */
-export function buildScheduleUserPrompt(history: SessionWithClimbs[], base: Schedule): string {
+export function buildScheduleUserPrompt(
+  history: SessionWithClimbs[],
+  base: Schedule,
+  profile: { weakPoints?: ClimbingPoint[]; likedPoints?: ClimbingPoint[] } = {},
+): string {
+  const weak = profile.weakPoints ?? [];
+  const liked = profile.likedPoints ?? [];
+  const targeted = weakFocus(weak);
   const lines = history.slice(0, 5).map((s) => {
     const day = localDay(s.date);
     const ago = diffDays(day, base.today);
@@ -106,6 +118,8 @@ export function buildScheduleUserPrompt(history: SessionWithClimbs[], base: Sche
   return [
     `Aujourd'hui (jour 0) : ${dayLabel(base.today)}.`,
     `Rythme visé : ${base.sessionsPerWeek} séance${base.sessionsPerWeek > 1 ? 's' : ''} par semaine, soit environ ${base.sessionsPerWeek * 4} séances sur 28 jours.`,
+    `Points faibles : ${weak.length ? `${pointLabels(weak)} (type ciblé : ${FOCUS_LABEL[targeted!]})` : 'aucun indiqué'}.`,
+    `Ce qu'il aime faire : ${liked.length ? pointLabels(liked) : 'rien d’indiqué'}.`,
     proposal.length
       ? `Proposition des règles :\n${proposal.join('\n')}`
       : 'Pas de proposition des règles.',
@@ -178,10 +192,14 @@ export class MistralScheduleAdvisor {
   }
 
   /** `base` : proposition des règles sur {@link ADVICE_HORIZON_DAYS} jours. */
-  async advisePlan(history: SessionWithClimbs[], base: Schedule): Promise<MonthPlan> {
+  async advisePlan(
+    history: SessionWithClimbs[],
+    base: Schedule,
+    profile: { weakPoints?: ClimbingPoint[]; likedPoints?: ClimbingPoint[] } = {},
+  ): Promise<MonthPlan> {
     const messages: ChatMessage[] = [
       { role: 'system', content: SCHEDULE_PROMPT },
-      { role: 'user', content: buildScheduleUserPrompt(history, base) },
+      { role: 'user', content: buildScheduleUserPrompt(history, base, profile) },
     ];
     const content = await this.mistral.chat(messages, 'low');
     let plan: MonthPlan;

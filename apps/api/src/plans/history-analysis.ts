@@ -1,4 +1,6 @@
 import { FONT, FRENCH } from '@climb-coach/grades';
+import { pointLabels, POINT_FOCUS } from '../auth/climbing-points';
+import { focusWeights, nextFocus, weakFocus } from './focus-balance';
 import { GeneratorContext } from './generator';
 import { mentionsPain } from './pain-notes';
 import { Focus } from './plan.schema';
@@ -35,11 +37,8 @@ const MAX_LEVEL: Record<Style, number> = {
   boulder: FONT.grades.length - 1,
   route: FRENCH.grades.length - 1,
 };
-const ROTATION: Record<Focus, Focus> = {
-  strength: 'endurance',
-  endurance: 'technique',
-  technique: 'strength',
-};
+/** Deux séances de force doivent être espacées d'au moins 48 h. */
+const STRENGTH_SPACING_MS = 48 * 60 * 60 * 1000;
 
 export const FOCUS_LABEL: Record<Focus, string> = {
   strength: 'force',
@@ -88,7 +87,17 @@ export function analyzeHistory(ctx: GeneratorContext): HistoryAnalysis {
     reasons.push('2 réussites au niveau max la dernière fois : on monte d’un cran');
 
   const daysSinceLast = Math.floor((ctx.now.getTime() - last.date.getTime()) / DAY_MS);
-  let focus = ROTATION[last.focus];
+  let focus = nextFocus(
+    ctx.history.map((s) => s.focus),
+    focusWeights(ctx.weakPoints),
+  );
+  const lastStrength = ctx.history.find((s) => s.focus === 'strength');
+  const strengthTooSoon =
+    focus === 'strength' &&
+    !!lastStrength &&
+    ctx.now.getTime() - lastStrength.date.getTime() < STRENGTH_SPACING_MS;
+  if (strengthTooSoon) focus = last.focus === 'technique' ? 'endurance' : 'technique';
+  const targeted = weakFocus(ctx.weakPoints);
   let intensity: HistoryAnalysis['intensity'] = 'normal';
 
   if (daysSinceLast >= 14) {
@@ -102,6 +111,15 @@ export function analyzeHistory(ctx: GeneratorContext): HistoryAnalysis {
       daysSinceLast < 1
         ? 'Dernière séance il y a moins de 24 h : séance légère'
         : `Fatigue ${last.fatigue}/5 la dernière fois : séance légère`,
+    );
+  } else if (strengthTooSoon) {
+    reasons.push(
+      `Force il y a moins de 48 h : on attend avant la suivante, séance de ${FOCUS_LABEL[focus]}`,
+    );
+  } else if (targeted === focus) {
+    const points = (ctx.weakPoints ?? []).filter((p) => POINT_FOCUS[p] === focus);
+    reasons.push(
+      `Point faible (${pointLabels(points)}) : séance de ${FOCUS_LABEL[focus]}, environ une sur deux`,
     );
   } else {
     reasons.push(

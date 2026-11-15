@@ -20,6 +20,7 @@ const PATHS = {
   chevron: 'M6 9l6 6 6-6',
   calendar: 'M4 6.5h16v13.5H4zM4 10.5h16M8.5 3.5v5M15.5 3.5v5',
   user: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4.5 20a7.5 7.5 0 0 1 15 0',
+  bell: 'M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15zM10 20.5a2 2 0 0 0 4 0',
 } as const;
 
 /** Icônes pleines (lecture, pause, saut). */

@@ -1,4 +1,6 @@
+import { ClimbingPoint } from '../auth/climbing-points';
 import { SessionWithClimbs } from '../sessions/sessions.service';
+import { focusWeights, FocusWeights, nextFocus } from './focus-balance';
 import { FOCUS_LABEL } from './history-analysis';
 import { mentionsPain } from './pain-notes';
 import { Focus } from './plan.schema';
@@ -20,13 +22,6 @@ export const DEFAULT_SESSIONS_PER_WEEK = 3;
 const RECOVERY_DAYS: Record<Focus, number> = { strength: 2, endurance: 2, technique: 1 };
 /** Jours de repos voulus AVANT une séance de ce type, pour y arriver frais. */
 const READINESS_DAYS: Record<Focus, number> = { strength: 3, endurance: 2, technique: 1 };
-
-/** Même rotation que le générateur, pour que la séance générée colle au planning. */
-const ROTATION: Record<Focus, Focus> = {
-  strength: 'endurance',
-  endurance: 'technique',
-  technique: 'strength',
-};
 
 const LONG_BREAK_DAYS = 14;
 const PAIN_WINDOW_DAYS = 7;
@@ -94,14 +89,19 @@ export function buildSchedule(
     sessionsPerWeek = DEFAULT_SESSIONS_PER_WEEK,
     advised,
     summary,
+    weakPoints = [],
   }: {
     horizonDays?: number;
     sessionsPerWeek?: number;
     /** Plan de Mistral : remplace celui des règles, qui ne servent plus qu'à le prolonger. */
     advised?: AdvisedSession[];
     summary?: string;
+    /** Points faibles du profil : leur type de séance revient plus souvent. */
+    weakPoints?: ClimbingPoint[];
   } = {},
 ): Schedule {
+  const weights = focusWeights(weakPoints);
+  const pastFoci = history.map((s) => s.focus);
   const today = localDay(now);
   const perWeek = Math.min(7, Math.max(1, Math.round(sessionsPerWeek)));
   const last = history[0];
@@ -123,7 +123,7 @@ export function buildSchedule(
       source: 'rules',
       sessionsPerWeek: perWeek,
       basedOn: null,
-      sessions: extendCycle(sessions, today, horizonDays, perWeek, 0),
+      sessions: extendCycle(sessions, today, horizonDays, perWeek, 0, weights, pastFoci),
     };
   }
 
@@ -131,7 +131,8 @@ export function buildSchedule(
   const sinceLast = diffDays(lastDay, today);
   const pain = recentPain(history, today);
 
-  let focus = ROTATION[last.focus];
+  // Même choix que le générateur, pour que la séance générée colle au planning
+  let focus = nextFocus(pastFoci, weights);
   let intensity: PlannedSession['intensity'] = 'normal';
   const exact = ruleGap(last.focus, focus, perWeek);
   let gap = Math.max(1, Math.round(exact));
@@ -194,7 +195,7 @@ export function buildSchedule(
     );
   }
 
-  extendCycle(sessions, today, horizonDays, perWeek, carry);
+  extendCycle(sessions, today, horizonDays, perWeek, carry, weights, pastFoci);
 
   return {
     today,
@@ -218,10 +219,12 @@ function extendCycle(
   horizonDays: number,
   perWeek: number,
   carry: number,
+  weights: FocusWeights,
+  pastFoci: Focus[],
 ): PlannedSession[] {
   while (sessions.length < 50) {
     const prev = sessions[sessions.length - 1];
-    const next = ROTATION[prev.focus];
+    const next = nextFocus([...sessions.map((s) => s.focus).reverse(), ...pastFoci], weights);
     // Le reste des arrondis est reporté : sur la durée, on tombe pile sur le rythme demandé
     const exact = ruleGap(prev.focus, next, perWeek) + carry;
     const gap = Math.max(1, Math.round(exact));
