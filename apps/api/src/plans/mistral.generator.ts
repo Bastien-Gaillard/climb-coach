@@ -261,8 +261,16 @@ Vocabulaire des consignes (obligatoire, pour qu'aucune consigne ne soit ambiguë
   - "repos X min entre chaque essai" (pour les "essais max") ;
   - "repos X min avant de changer de bloc" ;
   - "repos X min entre les séries", seulement si la consigne définit la série, ex : "série = enchaîner les 4 blocs sans pause".
-- Exemple complet : "6 blocs en [6A], 2 passages par bloc, repos 1 min entre chaque passage et 3 min avant de changer de bloc".
-- Consignes courtes, concrètes, en français.
+- Consignes courtes, concrètes, en français : une idée par ligne, jamais plus de 150 caractères.
+
+Format des consignes d'un exercice du cœur de séance (obligatoire, dans cet ordre, une entrée du tableau "instructions" par ligne) :
+1. Le volume : nombre de blocs, cotation entre crochets, et s'il y a lieu "N essais max par bloc" ou "N passages par bloc", ex : "6 blocs en [6A], 2 passages par bloc".
+2. "Objectif : …" : une phrase, pourquoi on fait cet exercice.
+3. Les gestes : 1 à 3 lignes, une par geste, à l'impératif, sans le pourquoi, ex : "Pose le pied sur la carre externe, pointe vers l'extérieur".
+4. "Repère : …" : à quoi le grimpeur voit que c'est réussi, ex : "Repère : tu atteins la prise bras tendu, sans à-coup".
+5. Le repos, en dernier, ex : "Repos 2 min avant de changer de bloc".
+Exemple complet : ["3 blocs en [6A], 2 passages par bloc", "Objectif : gagner de l'allonge en dévers sans tirer sur les bras", "Pose le pied sur la carre externe, pointe vers l'extérieur", "Tourne le genou vers le bas et vers le mur", "Colle la hanche au mur, puis allonge le bras", "Repère : tu atteins la prise bras tendu, sans à-coup", "Repos 2 min avant de changer de bloc"].
+L'échauffement, le gainage et le retour au calme gardent des consignes simples, une par étape, sans "Objectif" ni "Repère".
 
 Réponds UNIQUEMENT avec un objet JSON de la forme :
 {

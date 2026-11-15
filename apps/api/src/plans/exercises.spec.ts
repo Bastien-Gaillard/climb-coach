@@ -40,7 +40,7 @@ describe('catalogue d’exercices', () => {
     const text = flag
       .build({ maxSent: 6, project: 7, light: 0, minutes: 20, grade })
       .instructions.join(' ');
-    expect(text).toContain('tends l’autre jambe sur le côté');
+    expect(text).toContain('Tends l’autre jambe sur le côté');
   });
 });
 
@@ -238,5 +238,23 @@ describe('pickExercises avec le profil', () => {
     const picks = pickExercises({ ...base, focus: 'strength', minutes: 33, seed: 2 });
     expect(picks[0].exercise.id).toBe('limit');
     expect(picks.every((p) => p.role === 'other' && p.points.length === 0)).toBe(true);
+  });
+});
+
+describe('format des consignes', () => {
+  const ctxs = [20, 70].map((minutes) => ({ maxSent: 6, project: 7, light: 0, minutes, grade }));
+
+  it('chaque exercice a un objectif et un repère, des lignes courtes', () => {
+    for (const e of EXERCISES)
+      for (const ctx of ctxs) {
+        const lines = e.build(ctx).instructions;
+        expect(lines.filter((l) => l.startsWith('Objectif : '))).toHaveLength(1);
+        expect(lines.filter((l) => l.startsWith('Repère : '))).toHaveLength(1);
+        // L'objectif vient juste après le volume, le repos ferme (s'il y en a un)
+        expect(lines[1].startsWith('Objectif : ')).toBe(true);
+        const rest = lines.filter((l) => /^Repos /.test(l));
+        if (rest.length) expect(lines[lines.length - 1]).toMatch(/^Repos /);
+        for (const l of lines) expect(l.length).toBeLessThanOrEqual(150);
+      }
   });
 });

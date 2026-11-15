@@ -133,6 +133,17 @@ describe('MistralGenerator.generate', () => {
     });
   });
 
+  it('impose le format des consignes : volume, objectif, gestes, repère, repos', async () => {
+    const fetchMock = mockFetch({ content: JSON.stringify(validPlan) });
+    await makeGenerator().generate(ctx);
+    const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string);
+    const system: string = body.messages[0].content;
+    expect(system).toContain('Format des consignes');
+    expect(system).toContain('"Objectif : …"');
+    expect(system).toContain('"Repère : …"');
+    expect(system).toContain('Le repos, en dernier');
+  });
+
   it('relance une fois Mistral avec l’erreur si la réponse est invalide', async () => {
     const fetchMock = jest
       .spyOn(global, 'fetch')

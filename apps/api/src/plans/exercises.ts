@@ -77,8 +77,10 @@ export const EXERCISES: Exercise[] = [
         target: v,
         instructions: [
           `${plural(count(c.minutes, 4, 3), 'bloc')} en ${c.grade(v)}`,
-          'Pose chaque pied sans aucun bruit, en le regardant jusqu’à ce que le chausson touche la prise',
-          'Un pied fait du bruit : redescends et refais le mouvement',
+          'Objectif : des pieds précis, posés du premier coup',
+          'Regarde la prise de pied jusqu’à ce que le chausson la touche',
+          'Pose le pied sans aucun bruit, puis seulement lève les yeux',
+          'Repère : aucun bruit de pied sur tout le bloc. Un bruit : redescends d’un mouvement et refais-le',
         ],
       };
     },
@@ -99,7 +101,10 @@ export const EXERCISES: Exercise[] = [
         target: v,
         instructions: [
           `${plural(count(c.minutes, 4, 3), 'bloc')} en ${c.grade(v)}`,
-          'Avant de poser un pied, garde-le 3 s immobile juste au-dessus de la prise, puis pose-le une seule fois, sans le réajuster',
+          'Objectif : viser l’endroit exact de la prise avant de poser le pied',
+          'Arrête le pied 3 s juste au-dessus de la prise, immobile',
+          'Pose-le une seule fois, sans le réajuster',
+          'Repère : tu tiens les 3 s sans trembler et le pied ne bouge plus une fois posé',
         ],
       };
     },
@@ -120,7 +125,11 @@ export const EXERCISES: Exercise[] = [
         target: v,
         instructions: [
           `${plural(count(c.minutes, 5, 3), 'bloc')} en ${c.grade(v)}`,
-          'Avant de prendre chaque prise, garde la main 2 à 3 s au-dessus, corps gainé et hanches au mur, puis attrape-la sans la réajuster',
+          'Objectif : tenir la position par le gainage, pas par les bras',
+          'Avant chaque prise de main, arrête la main 2 s juste au-dessus',
+          'Pendant ces 2 s, ventre serré et hanches collées au mur',
+          'Prends la prise une seule fois, sans la réajuster',
+          'Repère : tu peux tenir les 2 s sans que les pieds ou les hanches décollent',
         ],
       };
     },
@@ -140,7 +149,10 @@ export const EXERCISES: Exercise[] = [
         target: v,
         instructions: [
           `${plural(count(c.minutes, 4, 3), 'bloc')}, du plus facile au plus dur, jusqu’en ${c.grade(v)}`,
-          'Chaque main et chaque pied se posent une seule fois sur la prise : interdit de les réajuster',
+          'Objectif : décider où va chaque main et chaque pied avant de bouger',
+          'Regarde la prise, choisis l’endroit exact, puis pose-toi dessus une seule fois',
+          'Interdit de réajuster : un pied ou une main qui bouge, c’est raté',
+          'Repère : le bloc entier sans un seul réajustement',
         ],
       };
     },
@@ -161,9 +173,12 @@ export const EXERCISES: Exercise[] = [
         title: 'Équilibre sans les mains',
         target: v,
         instructions: [
-          `Sur une dalle facile, en ${c.grade(v)} ou moins : monte puis redescends sans utiliser les mains (mains dans le dos)`,
-          'Seuls les pieds et le bassin au-dessus des pieds te portent : petits pas, regard sur chaque prise',
-          `${plural(n, 'passage')}, repos 1 min entre chaque passage`,
+          `Dalle facile, en ${c.grade(v)} ou moins : ${plural(n, 'passage')}, monte puis redescends`,
+          'Objectif : faire confiance aux pieds et garder le bassin au-dessus d’eux',
+          'Mains dans le dos, du début à la fin',
+          'Petits pas, regard sur chaque prise de pied, bassin au-dessus des pieds',
+          'Repère : tu montes et redescends sans toucher le mur avec les mains',
+          'Repos 1 min entre chaque passage',
         ],
       };
     },
@@ -185,9 +200,12 @@ export const EXERCISES: Exercise[] = [
         title: 'Un bras en moins',
         target: v,
         instructions: [
-          `Sur une dalle ou un mur vertical facile, en ${c.grade(v)} ou moins : grimpe avec une seule main, l’autre dans le dos`,
-          'Ce sont les pieds et les rotations du bassin qui te font monter, la main ne sert qu’à l’équilibre',
-          `${plural(n, 'passage')} en alternant main droite et main gauche, repos 1 min entre chaque passage`,
+          `Dalle ou mur vertical facile, en ${c.grade(v)} ou moins : ${plural(n, 'passage')}, en alternant main droite et main gauche`,
+          'Objectif : monter avec les pieds et les rotations du bassin, pas avec les bras',
+          'Une seule main, l’autre dans le dos',
+          'Tourne le bassin vers la main qui tient pour aller chercher la prise suivante',
+          'Repère : la main sert seulement à l’équilibre, jamais à tirer',
+          'Repos 1 min entre chaque passage',
         ],
       };
     },
@@ -208,7 +226,10 @@ export const EXERCISES: Exercise[] = [
         target: v,
         instructions: [
           `${plural(count(c.minutes, 5, 3), 'bloc')} en ${c.grade(v)}`,
-          'Un mouvement sur deux, garde un seul pied sur une prise et tends l’autre jambe sur le côté pour t’équilibrer (drapeau), au lieu de la poser',
+          'Objectif : t’équilibrer avec la jambe libre au lieu de chercher un pied',
+          'Un mouvement sur deux, garde un seul pied sur une prise',
+          'Tends l’autre jambe sur le côté, contre le mur, en contrepoids (drapeau)',
+          'Repère : tu attrapes la prise suivante sans que le corps pivote',
         ],
       };
     },
@@ -228,8 +249,11 @@ export const EXERCISES: Exercise[] = [
         target: v,
         instructions: [
           `${plural(count(c.minutes, 4, 3), 'bloc')} en ${c.grade(v)}`,
-          'Garde les bras tendus le plus longtemps possible : ce sont les jambes et la rotation des hanches qui te font monter',
-          'Plie les bras seulement au moment d’attraper la prise suivante',
+          'Objectif : monter avec les jambes et économiser les bras',
+          'Garde les bras tendus, bassin bas',
+          'Monte avec une poussée de jambe et une rotation des hanches',
+          'Plie le bras seulement au moment d’attraper la prise suivante',
+          'Repère : les avant-bras restent frais sur tout le bloc',
         ],
       };
     },
@@ -248,8 +272,11 @@ export const EXERCISES: Exercise[] = [
         title: 'Désescalade',
         target: v,
         instructions: [
-          `${plural(count(c.minutes, 4, 3), 'bloc')} en ${c.grade(v)} : monte, puis redescends par le même chemin au lieu de sauter`,
-          'En descendant, regarde chaque prise de pied avant de la charger',
+          `${plural(count(c.minutes, 4, 3), 'bloc')} en ${c.grade(v)}, montés puis désescaladés`,
+          'Objectif : voir et placer les pieds sans les avoir sous les yeux',
+          'Après le sommet, redescends par le même chemin au lieu de sauter',
+          'Regarde chaque prise de pied avant de la charger',
+          'Repère : tu arrives en bas sans un seul pied posé au hasard',
         ],
       };
     },
@@ -270,7 +297,10 @@ export const EXERCISES: Exercise[] = [
         target: v,
         instructions: [
           `${plural(n, 'bloc')} en ${c.grade(v)}, 2 passages par bloc`,
-          'Premier passage très lent et contrôlé (paresseux), second passage rapide et fluide, sans t’arrêter (singe)',
+          'Objectif : choisir ton rythme au lieu de le subir',
+          '1er passage « paresseux » : très lent, chaque position tenue 2 s',
+          '2e passage « singe » : vite et fluide, sans aucun arrêt',
+          'Repère : le passage rapide est aussi propre que le lent',
           'Repos 2 min avant de changer de bloc',
         ],
       };
@@ -291,7 +321,10 @@ export const EXERCISES: Exercise[] = [
         target: v,
         instructions: [
           `${plural(count(c.minutes, 5, 3), 'bloc')} en ${c.grade(v)}`,
-          'Juste avant d’attraper chaque prise, freine le mouvement avec le gainage pour la prendre en douceur, sans à-coup',
+          'Objectif : arriver sur chaque prise en douceur grâce au gainage',
+          'Juste avant d’attraper la prise, freine le mouvement avec le ventre',
+          'Prends la prise sans à-coup, comme si elle était fragile',
+          'Repère : aucun claquement de main, le corps ne balance pas après la prise',
         ],
       };
     },
@@ -311,7 +344,10 @@ export const EXERCISES: Exercise[] = [
         target: v,
         instructions: [
           `${plural(count(c.minutes, 5, 3), 'bloc')} en ${c.grade(v)}, sur du vertical ou du léger dévers`,
-          'À chaque grand mouvement, pose le pied sur sa carre externe et tourne la hanche contre le mur pour allonger ton bras',
+          'Objectif : gagner de l’allonge en tournant la hanche contre le mur',
+          'À chaque grand mouvement, pose le pied sur sa carre externe',
+          'Tourne la hanche du même côté contre le mur, puis allonge le bras',
+          'Repère : tu atteins la prise bras tendu, sans sauter',
         ],
       };
     },
@@ -332,7 +368,10 @@ export const EXERCISES: Exercise[] = [
         target: v,
         instructions: [
           `${plural(count(c.minutes, 4, 3), 'bloc')} en ${c.grade(v)}`,
-          'Imagine que tout ton poids tombe dans tes pieds : bassin bas, ce sont les jambes qui poussent, les bras ne font que tenir',
+          'Objectif : mettre le poids dans les pieds, pas dans les bras',
+          'Imagine tout ton poids qui tombe dans les pieds, bassin bas',
+          'Pousse sur les jambes pour monter ; les bras ne font que tenir',
+          'Repère : tu sens la poussée dans les cuisses, pas la traction dans les bras',
         ],
       };
     },
@@ -353,7 +392,10 @@ export const EXERCISES: Exercise[] = [
         target: v,
         instructions: [
           `${plural(count(c.minutes, 4, 3), 'bloc')} en ${c.grade(v)}`,
-          'Pose seulement la pointe du chausson sur chaque prise de pied, talon haut, et pivote dessus pour tourner les hanches',
+          'Objectif : des pieds précis qui te laissent pivoter librement',
+          'Pose seulement la pointe du chausson sur la prise, talon haut',
+          'Pivote sur cette pointe pour tourner les hanches vers la prise suivante',
+          'Repère : le pied ne bouge plus une fois posé, et il tourne sans se décoller',
         ],
       };
     },
@@ -374,7 +416,11 @@ export const EXERCISES: Exercise[] = [
         target: v,
         instructions: [
           `${plural(count(c.minutes, 5, 3), 'bloc')} en ${c.grade(v)}, sur du léger dévers avec des prises de côté`,
-          'Place une lolotte dès que possible : pied sur la carre externe, genou tourné vers le bas et vers le mur, hanche collée, puis va chercher loin',
+          'Objectif : gagner de l’allonge en dévers sans tirer sur les bras',
+          'Pose le pied sur la carre externe, pointe vers l’extérieur',
+          'Tourne le genou vers le bas et vers le mur',
+          'Colle la hanche au mur, puis allonge le bras',
+          'Repère : tu atteins la prise bras tendu, sans à-coup',
         ],
       };
     },
@@ -395,7 +441,10 @@ export const EXERCISES: Exercise[] = [
         target: v,
         instructions: [
           `${plural(count(c.minutes, 5, 3), 'bloc')} en ${c.grade(v)}, en dévers ou avec des volumes`,
-          'Place le plus de crochets talon possible : talon sur la prise, pointe du pied tirée vers le bas, et tire avec l’arrière de la cuisse pour coller le bassin',
+          'Objectif : faire porter une jambe à la place d’un bras',
+          'Pose le talon sur la prise, pointe du pied tirée vers le bas',
+          'Tire avec l’arrière de la cuisse pour coller le bassin au mur',
+          'Repère : le bras du même côté se relâche quand le talon tire',
         ],
       };
     },
@@ -415,7 +464,10 @@ export const EXERCISES: Exercise[] = [
         target: v,
         instructions: [
           `${plural(count(c.minutes, 5, 3), 'bloc')} en ${c.grade(v)}, en dévers`,
-          'Dès que les pieds risquent de partir, accroche le dessus du pied derrière une prise et serre la jambe pour garder le corps au mur',
+          'Objectif : empêcher le corps de partir en arrière dans le dévers',
+          'Dès que les pieds risquent de partir, accroche le dessus du pied derrière une prise',
+          'Serre la jambe pour garder le corps au mur',
+          'Repère : tu peux relâcher une main sans que le corps parte',
         ],
       };
     },
@@ -435,8 +487,10 @@ export const EXERCISES: Exercise[] = [
         title: 'Un seul type de pied',
         target: v,
         instructions: [
-          `1 ou 2 blocs en ${c.grade(v)} avec beaucoup de prises`,
-          'Monte-les plusieurs fois en t’imposant à chaque passage un seul placement de pied : que des lolottes, puis que des drapeaux intérieurs, puis extérieurs, puis que des crochets talon',
+          `1 ou 2 blocs en ${c.grade(v)} avec beaucoup de prises, plusieurs passages`,
+          'Objectif : maîtriser chaque placement de pied en l’isolant',
+          'À chaque passage, un seul placement autorisé : que des lolottes, puis que des drapeaux intérieurs, puis extérieurs, puis que des crochets talon',
+          'Repère : chaque passage réussi sans tricher avec un autre placement',
           'Repos 1 min entre chaque passage',
         ],
       };
@@ -458,7 +512,10 @@ export const EXERCISES: Exercise[] = [
         target: v,
         instructions: [
           `${plural(count(c.minutes, 4, 3), 'bloc')} en dalle, en ${c.grade(v)} ou moins`,
-          'Utilise les prises pour les mains, mais pose les pieds directement sur le mur (adhérence), talon bas et poids au-dessus des pieds',
+          'Objectif : faire confiance au frottement du chausson',
+          'Mains sur les prises, mais pieds posés à plat sur le mur, sans prise',
+          'Talon bas, poids au-dessus des pieds, bouge lentement',
+          'Repère : un pied posé en adhérence ne glisse pas',
         ],
       };
     },
@@ -477,9 +534,13 @@ export const EXERCISES: Exercise[] = [
         title: 'Rétablissements',
         target: v,
         instructions: [
-          `${plural(count(c.minutes, 5, 2, 6), 'bloc')} en ${c.grade(v)} qui finissent sur une sortie ou un volume`,
-          'Pied le plus haut possible, mains qui passent de tirer à pousser (paume vers le bas), puis monte le pied à côté des mains sans poser le genou',
-          '3 passages par bloc, repos 1 min entre chaque passage',
+          `${plural(count(c.minutes, 5, 2, 6), 'bloc')} en ${c.grade(v)} qui finissent sur une sortie ou un volume, 3 passages par bloc`,
+          'Objectif : passer au-dessus d’une prise en poussant au lieu de tirer',
+          'Monte un pied le plus haut possible',
+          'Tourne les mains paumes vers le bas et pousse dessus',
+          'Monte le second pied à côté des mains, sans poser le genou',
+          'Repère : la sortie se fait en poussant, genou jamais posé',
+          'Repos 1 min entre chaque passage',
         ],
       };
     },
@@ -500,7 +561,10 @@ export const EXERCISES: Exercise[] = [
         target: v,
         instructions: [
           `${plural(count(c.minutes, 5, 3), 'bloc')} en ${c.grade(v)} dans un dièdre, un angle ou sur une arête`,
-          'Cherche les oppositions : pieds qui poussent contre les mains qui tirent (dulfer), ou mains et pieds écartés sur deux pans (cheminée), paumes comprises',
+          'Objectif : tenir par des forces opposées plutôt qu’en tirant',
+          'Pieds qui poussent contre les mains qui tirent (dulfer)',
+          'Ou mains et pieds écartés sur les deux pans, paumes comprises (cheminée)',
+          'Repère : tu peux lâcher une main et rester en place',
         ],
       };
     },
@@ -521,9 +585,12 @@ export const EXERCISES: Exercise[] = [
         title: 'Lancés contrôlés',
         target: v,
         instructions: [
-          `${plural(count(c.minutes, 5, 2, 5), 'bloc')} en ${c.grade(v)} avec un mouvement un peu loin`,
-          'Pieds au mur, prends de l’élan avec les jambes et attrape la prise au moment où ton corps ne monte plus (point mort), sans la claquer',
-          '3 essais max par mouvement, repos 2 min entre chaque essai',
+          `${plural(count(c.minutes, 5, 2, 5), 'bloc')} en ${c.grade(v)} avec un mouvement un peu loin, 3 essais max par mouvement`,
+          'Objectif : saisir une prise lointaine au moment où le corps ne monte plus',
+          'Pieds au mur, prends l’élan avec les jambes',
+          'Attrape la prise au sommet de l’élan, au point mort, sans la claquer',
+          'Repère : la prise est saisie en douceur, les pieds restent au mur',
+          'Repos 2 min entre chaque essai',
         ],
       };
     },
@@ -544,9 +611,13 @@ export const EXERCISES: Exercise[] = [
         title: 'Prises touchées',
         target: c.maxSent - 3,
         instructions: [
-          'En dévers, une main sur une bonne prise de départ : saute attraper une prise plus haute avec l’autre main, sans la réajuster',
-          'Plus la prise visée est petite, plus c’est dur. Commence sur des grosses prises',
-          `${plural(n, 'saut')}, en alternant les mains, repos 1 min entre chaque saut`,
+          `${plural(n, 'saut')}, en alternant les mains`,
+          'Objectif : viser juste du premier coup',
+          'En dévers, une main sur une bonne prise de départ',
+          'Saute attraper une prise plus haute avec l’autre main, sans la réajuster',
+          'Commence sur des grosses prises, puis vise plus petit',
+          'Repère : la main arrive exactement où tu voulais',
+          'Repos 1 min entre chaque saut',
         ],
       };
     },
@@ -566,8 +637,10 @@ export const EXERCISES: Exercise[] = [
         target: v,
         instructions: [
           `${plural(count(c.minutes, 6, 2, 6), 'bloc')} en ${c.grade(v)} que tu n’as jamais faits`,
-          'Avant de grimper, prévois depuis le sol chaque mouvement, chaque pied et la position du corps',
-          'Puis essaie de les faire du premier coup (à vue) et note ce qui différait de ton plan',
+          'Objectif : trouver la méthode depuis le sol',
+          'Avant de grimper, prévois chaque main, chaque pied et la position du corps',
+          'Grimpe le bloc en suivant ton plan',
+          'Repère : note ce qui différait de ton plan, de moins en moins à chaque bloc',
         ],
       };
     },
@@ -586,8 +659,12 @@ export const EXERCISES: Exercise[] = [
         title: 'Blocs à vue',
         target: v,
         instructions: [
-          `${plural(count(c.minutes, 4, 3), 'bloc')} jamais essayés, jusqu’en ${c.grade(v)}`,
-          'Un seul essai par bloc, après l’avoir bien lu depuis le sol. Repos 2 min avant de changer de bloc',
+          `${plural(count(c.minutes, 4, 3), 'bloc')} jamais essayés, jusqu’en ${c.grade(v)}, 1 seul essai par bloc`,
+          'Objectif : lire vite et s’engager du premier coup',
+          'Lis le bloc depuis le sol, puis pars sans hésiter',
+          'Un seul essai, réussi ou non : passe au suivant',
+          'Repère : le nombre de blocs réussis du premier coup',
+          'Repos 2 min avant de changer de bloc',
         ],
       };
     },
@@ -608,7 +685,10 @@ export const EXERCISES: Exercise[] = [
         target: v,
         instructions: [
           `${plural(count(c.minutes, 4, 3), 'bloc')} en ${c.grade(v)}`,
-          'Avant de saisir chaque prise, parcours-la entièrement de la main, puis prends-la à l’endroit où elle se tient le mieux',
+          'Objectif : trouver le meilleur endroit de chaque prise',
+          'Avant de saisir la prise, parcours-la entièrement avec la main',
+          'Prends-la à l’endroit où elle se tient le mieux',
+          'Repère : tu serres moins fort qu’avant sur la même prise',
         ],
       };
     },
@@ -630,7 +710,10 @@ export const EXERCISES: Exercise[] = [
         target: v,
         instructions: [
           `${plural(count(c.minutes, 5, 2, 5), 'bloc')} en ${c.grade(v)}, 2 passages par bloc`,
-          'Premier passage en serrant chaque prise le plus fort possible, second en serrant juste ce qu’il faut pour tenir : sens la différence',
+          'Objectif : serrer juste ce qu’il faut pour tenir',
+          '1er passage : serre chaque prise le plus fort possible',
+          '2e passage : serre le minimum qui te permet de rester sur la prise',
+          'Repère : tu sens la différence dans les avant-bras à la fin du 2e passage',
           'Repos 1 min entre chaque passage',
         ],
       };
@@ -653,7 +736,10 @@ export const EXERCISES: Exercise[] = [
         target: v,
         instructions: [
           `${plural(count(c.minutes, 5, 3), 'bloc')} en ${c.grade(v)}`,
-          'Avant chaque mouvement, fige-toi 2 s, stable sur trois appuis (trépied), puis ne bouge qu’une main ou qu’un pied',
+          'Objectif : être stable avant chaque mouvement',
+          'Avant de bouger, fige-toi 2 s sur trois appuis (trépied)',
+          'Ne bouge qu’une main ou qu’un pied à la fois',
+          'Repère : tu peux tenir les 2 s sans que rien ne bouge',
         ],
       };
     },
@@ -674,8 +760,11 @@ export const EXERCISES: Exercise[] = [
         title: 'Un seul pied',
         target: v,
         instructions: [
-          `Sur des blocs faciles en ${c.grade(v)} ou moins, grimpe en n’utilisant qu’un seul pied, l’autre jambe libre pour t’équilibrer`,
-          `${plural(n, 'passage')} en alternant pied droit et pied gauche, repos 1 min entre chaque passage`,
+          `Blocs faciles en ${c.grade(v)} ou moins : ${plural(n, 'passage')}, en alternant pied droit et pied gauche`,
+          'Objectif : rendre le pied d’appui précis et fiable',
+          'Un seul pied sur les prises, l’autre jambe libre pour l’équilibre',
+          'Repère : tu montes sans que le pied d’appui glisse ni se réajuste',
+          'Repos 1 min entre chaque passage',
         ],
       };
     },
@@ -695,8 +784,12 @@ export const EXERCISES: Exercise[] = [
         title: 'Traversée de profil',
         target: v,
         instructions: [
-          `Traverse le mur sur des prises faciles (${c.grade(v)} ou moins) en gardant toujours la même hanche contre le mur, pieds sur les carres`,
-          'Fais l’aller vers la droite, le retour vers la gauche, puis recommence 2 fois, repos 2 min entre chaque traversée',
+          `Traversée sur prises faciles (${c.grade(v)} ou moins) : 3 allers-retours`,
+          'Objectif : grimper de profil, sur les carres et les hanches',
+          'Garde toujours la même hanche contre le mur, pieds sur les carres',
+          'Aller vers la droite, retour vers la gauche',
+          'Repère : la hanche ne décolle pas du mur de toute la traversée',
+          'Repos 2 min entre chaque traversée',
         ],
       };
     },
@@ -717,7 +810,11 @@ export const EXERCISES: Exercise[] = [
         target: v,
         instructions: [
           `${plural(count(c.minutes, 6, 2, 5), 'bloc')} en ${c.grade(v)}`,
-          'Fais le 1er mouvement et redescends au départ, puis les 2 premiers et redescends, et ainsi de suite jusqu’en haut, sans poser le pied au sol',
+          'Objectif : contrôler chaque mouvement dans les deux sens',
+          'Fais le 1er mouvement et redescends au départ',
+          'Puis les 2 premiers et redescends, et ainsi de suite jusqu’en haut',
+          'Sans poser le pied au sol entre deux allers-retours',
+          'Repère : tu arrives en haut sans avoir touché le sol',
           'Repos 3 min avant de changer de bloc',
         ],
       };
@@ -738,8 +835,11 @@ export const EXERCISES: Exercise[] = [
         title: 'Plats : ligne d’aplomb',
         target: v,
         instructions: [
-          `${plural(count(c.minutes, 5, 2, 6), 'bloc')} en ${c.grade(v)}, 2 passages par bloc`,
-          'Choisis des blocs à plats. Sur chaque plat, place le bassin sous la prise, bras tendus, et pousse dans les pieds : plus tu es sous le plat, mieux il tient',
+          `${plural(count(c.minutes, 5, 2, 6), 'bloc')} à plats en ${c.grade(v)}, 2 passages par bloc`,
+          'Objectif : tenir les plats par la position, pas par la force',
+          'Sur chaque plat, place le bassin juste sous la prise, bras tendu',
+          'Pousse dans les pieds pour rester sous le plat',
+          'Repère : le plat tient sans serrer fort, et il lâche dès que le bassin s’écarte',
           'Repos 2 min avant de changer de bloc',
         ],
       };
@@ -762,9 +862,10 @@ export const EXERCISES: Exercise[] = [
         target: v,
         instructions: [
           `${3 * rounds} blocs en ${c.grade(v)}, 1 passage par bloc`,
+          'Objectif : repérer l’inclinaison où tu casses',
           `${rounds > 1 ? `${rounds} tours, chacun` : 'Un tour'} : un bloc en dalle, un en vertical, un en dévers`,
+          'Repère : l’inclinaison où tu tombes ou hésites le plus, c’est elle à travailler',
           'Repos 2 min avant de changer de bloc',
-          'Note l’inclinaison où tu tombes ou bloques le plus : c’est elle qu’il faut travailler',
         ],
       };
     },
@@ -782,19 +883,22 @@ export const EXERCISES: Exercise[] = [
     build: (c) => {
       const v = c.maxSent - 3 - c.light;
       const moves = [
-        'pas croisé façon « skate »',
-        'saut avec accroche d’un pied',
-        'allonge latérale dynamique avec crochet de pointe opposé',
-        'rétablissement jusqu’à pousser bras tendu au-dessus de la tête',
+        'Pas croisé façon « skate »',
+        'Saut avec accroche d’un pied',
+        'Allonge dynamique avec crochet de pointe opposé',
+        'Rétablissement poussé bras tendu au-dessus de la tête',
       ];
       const n = count(c.minutes, 6, 2, moves.length);
       return {
         title: 'Construis-moi le mouvement',
         target: v,
         instructions: [
-          `Sur des prises faciles (${c.grade(v)} ou moins), reproduis ces mouvements de compétition : ${moves.slice(0, n).join(', ')}`,
-          '5 passages sur chaque mouvement, repos 1 min entre chaque passage',
+          `Prises faciles (${c.grade(v)} ou moins) : 5 passages par mouvement`,
+          'Objectif : apprivoiser les mouvements de compétition par la répétition',
+          ...moves.slice(0, n).map((m, i) => `Mouvement ${i + 1} : ${m}`),
           'Même réussi, refais-le : c’est la répétition qui donne confiance',
+          'Repère : le 5e passage est plus fluide que le 1er',
+          'Repos 1 min entre chaque passage',
         ],
       };
     },
@@ -816,9 +920,12 @@ export const EXERCISES: Exercise[] = [
         title: 'Blocs en rafale',
         target: top,
         instructions: [
-          `${n} blocs que tu n’as jamais faits : ${n - 1} entre ${c.grade(top - 3)} et ${c.grade(top - 1)}, et 1 en ${c.grade(top)}`,
-          '30 s pour lire chaque bloc depuis le sol, puis 3 passages par bloc, même si tu le réussis au premier',
-          'Change de méthode entre deux passages si besoin. Après le 3e, passe au suivant sans y revenir, réussi ou non',
+          `${n} blocs jamais faits : ${n - 1} entre ${c.grade(top - 3)} et ${c.grade(top - 1)}, et 1 en ${c.grade(top)}, 3 passages par bloc`,
+          'Objectif : décider vite et rester calme quand ça ne passe pas',
+          '30 s pour lire le bloc depuis le sol, puis 3 passages, même si tu réussis au 1er',
+          'Change de méthode entre deux passages si besoin',
+          'Après le 3e passage, passe au suivant sans y revenir, réussi ou non',
+          'Repère : tu enchaînes les blocs sans t’énerver ni t’attarder',
           'Repos 2 min entre chaque passage',
         ],
       };
@@ -841,10 +948,14 @@ export const EXERCISES: Exercise[] = [
         title: 'Chutes volontaires',
         target: v,
         instructions: [
-          `Sur un bloc facile (${c.grade(v)} ou moins), au-dessus d’un tapis épais, lâche volontairement en pleine grimpe`,
-          'Commence les pieds à 50 cm du sol, puis monte d’une prise à chaque chute tant que tu restes à l’aise, jamais au-delà de la mi-hauteur',
-          'Lâche en position de grimpe, sans regarder en bas. Réception sur les pieds, genoux fléchis, puis fesses et dos, bras près du corps',
-          `${plural(n, 'chute')}, repos 1 min entre chaque chute`,
+          `Bloc facile (${c.grade(v)} ou moins), au-dessus d’un tapis épais : ${plural(n, 'chute')}`,
+          'Objectif : apprivoiser la chute en la choisissant',
+          'Commence les pieds à 50 cm du sol, et lâche volontairement en pleine grimpe',
+          'Lâche en position de grimpe, sans regarder en bas',
+          'Réception sur les pieds, genoux fléchis, puis fesses et dos, bras près du corps',
+          'Monte d’une prise à chaque chute tant que tu restes à l’aise, jamais au-delà de la mi-hauteur',
+          'Repère : tu lâches sans hésiter et tu te réceptionnes sans te raidir',
+          'Repos 1 min entre chaque chute',
         ],
       };
     },
@@ -867,8 +978,10 @@ export const EXERCISES: Exercise[] = [
         target: v,
         instructions: [
           `Choisis 4 blocs en ${c.grade(v)}`,
+          'Objectif : tenir l’effort quand les avant-bras gonflent',
           `${plural(sets, 'série')} : une série = enchaîner les 4 blocs sans pause (désescalade ou retour rapide au pied du bloc suivant)`,
-          'Repos 3 min entre les séries. Les avant-bras doivent bien gonfler sur les dernières séries',
+          'Repère : les avant-bras gonflent sur les dernières séries, mais tu finis chaque série',
+          'Repos 3 min entre les séries',
         ],
       };
     },
@@ -891,8 +1004,11 @@ export const EXERCISES: Exercise[] = [
         target: top,
         instructions: [
           `Enchaîne 7 blocs en montant puis en redescendant en cotation : ${steps.map(c.grade).join(' → ')}`,
-          '1 passage par bloc, repos 1 min entre chaque passage',
-          ...(rounds > 1 ? ['Fais la pyramide 2 fois, repos 4 min entre les deux'] : []),
+          'Objectif : grimper dur en étant déjà fatigué',
+          '1 passage par bloc, du plus facile au sommet, puis retour',
+          'Repère : les blocs de la descente passent aussi bien que ceux de la montée',
+          ...(rounds > 1 ? ['Fais la pyramide 2 fois'] : []),
+          `Repos 1 min entre chaque passage${rounds > 1 ? ', 4 min entre les deux pyramides' : ''}`,
         ],
       };
     },
@@ -913,8 +1029,10 @@ export const EXERCISES: Exercise[] = [
         title: `${n} blocs en ${n} min`,
         target: v,
         instructions: [
-          `${n} blocs différents en ${c.grade(v)}, un au début de chaque minute : le reste de la minute sert de repos`,
-          'Vise 80 à 90 % de réussite : si tu tombes souvent, prends des blocs plus faciles',
+          `${n} blocs différents en ${c.grade(v)}, un au début de chaque minute`,
+          'Objectif : récupérer vite entre deux efforts',
+          'Le reste de la minute sert de repos : plus tu vas vite, plus tu récupères',
+          'Repère : 80 à 90 % de réussite. Si tu tombes souvent, prends des blocs plus faciles',
         ],
       };
     },
@@ -935,7 +1053,9 @@ export const EXERCISES: Exercise[] = [
         target: v,
         instructions: [
           `${plural(n, 'bloc')} en ${c.grade(v)}, sans mouvement dur ni saut en haut`,
-          'Sur chaque bloc : monte, désescalade, puis remonte sans poser le pied au sol',
+          'Objectif : doubler la longueur de l’effort sans monter en difficulté',
+          'Monte, désescalade, puis remonte, sans poser le pied au sol',
+          'Repère : la 2e montée reste propre malgré la fatigue',
           'Repos 3 min avant de changer de bloc',
         ],
       };
@@ -956,9 +1076,11 @@ export const EXERCISES: Exercise[] = [
         title: 'Blocs enchaînés',
         target: v,
         instructions: [
-          `Choisis 3 blocs voisins en ${c.grade(v)}`,
-          'Enchaîne-les sans poser le pied au sol : désescalade le premier et passe directement au suivant',
-          `${plural(n, 'enchaînement')}, repos 3 min entre chaque enchaînement`,
+          `Choisis 3 blocs voisins en ${c.grade(v)} : ${plural(n, 'enchaînement')}`,
+          'Objectif : grimper longtemps sans jamais lâcher le mur',
+          'Désescalade le 1er bloc et passe directement au suivant, sans poser le pied au sol',
+          'Repère : les 3 blocs enchaînés sans toucher le sol',
+          'Repos 3 min entre chaque enchaînement',
         ],
       };
     },
@@ -979,8 +1101,11 @@ export const EXERCISES: Exercise[] = [
         title: 'Traversée continue',
         target: v,
         instructions: [
-          `2 traversées de ${each} min sans t’arrêter, sur des prises faciles (${c.grade(v)} ou moins), repos 4 min entre les deux`,
-          'Tu dois finir essoufflé mais sans avant-bras durs : s’ils gonflent, choisis des prises plus grosses',
+          `2 traversées de ${each} min sans t’arrêter, sur des prises faciles (${c.grade(v)} ou moins)`,
+          'Objectif : grimper longtemps sans jamais être daubé',
+          'Bouge en continu, lentement, bras tendus le plus possible',
+          'Repère : tu finis essoufflé mais sans avant-bras durs. S’ils gonflent, prends des prises plus grosses',
+          'Repos 4 min entre les deux traversées',
         ],
       };
     },
@@ -1002,8 +1127,11 @@ export const EXERCISES: Exercise[] = [
         title: `Intervalles 30/30 · ${plural(sets, 'série')}`,
         target: v,
         instructions: [
-          `Sur un pan ou une zone de mur facile (${c.grade(v)} ou moins) : 30 s de grimpe sans t’arrêter, 30 s de repos au sol, 6 fois = 1 série`,
-          `${plural(sets, 'série')}, repos 5 min entre les séries`,
+          `Pan ou zone de mur facile (${c.grade(v)} ou moins) : ${plural(sets, 'série')}`,
+          'Objectif : enchaîner des efforts courts avec peu de repos',
+          '30 s de grimpe sans t’arrêter, 30 s de repos au sol, 6 fois = 1 série',
+          'Repère : la 6e grimpe de la série reste continue, sans arrêt sur le mur',
+          'Repos 5 min entre les séries',
         ],
       };
     },
@@ -1024,9 +1152,11 @@ export const EXERCISES: Exercise[] = [
         title: `Course aux points · ${c.minutes} min`,
         target: v,
         instructions: [
-          `Pendant ${c.minutes} min, enchaîne des blocs jusqu’en ${c.grade(v)} : chaque bloc se grimpe 2 fois de suite, sans repos entre les 2`,
-          'Un bloc réussi 2 fois rapporte des points (1 point par cran au-dessus de 4). Note ton total pour le battre la prochaine fois',
+          `Pendant ${c.minutes} min, des blocs jusqu’en ${c.grade(v)}, chacun grimpé 2 fois de suite`,
+          'Objectif : accumuler du volume en jouant',
+          'Grimpe chaque bloc 2 fois d’affilée, sans repos entre les 2',
           'Alterne un bloc dur et un bloc facile pour récupérer en grimpant',
+          'Repère : un bloc réussi 2 fois rapporte 1 point par cran au-dessus de 4. Note ton total pour le battre la prochaine fois',
         ],
       };
     },
@@ -1045,8 +1175,10 @@ export const EXERCISES: Exercise[] = [
         title: 'Tour d’une cotation',
         target: v,
         instructions: [
-          `Fais un maximum de blocs en ${c.grade(v)} de la salle, à la suite`,
-          'Repos 1 min entre chaque bloc. Note combien tu en as fait pour progresser d’une séance à l’autre',
+          `Un maximum de blocs en ${c.grade(v)} de la salle, à la suite`,
+          'Objectif : du volume à une cotation que tu maîtrises',
+          'Repère : note combien tu en as fait, pour faire mieux la prochaine fois',
+          'Repos 1 min entre chaque bloc',
         ],
       };
     },
@@ -1068,7 +1200,9 @@ export const EXERCISES: Exercise[] = [
         target: v,
         instructions: [
           `${plural(sets, 'bloc')} en ${c.grade(v)}, un par série`,
+          'Objectif : tenir des mouvements connus sous la fatigue',
           'Une série = le même bloc 4 fois de suite, juste le temps de redescendre entre deux passages',
+          'Repère : le 4e passage reste propre, même s’il est plus dur',
           'Repos 3 min entre les séries',
         ],
       };
@@ -1094,8 +1228,11 @@ export const EXERCISES: Exercise[] = [
         target: c.project,
         instructions: [
           `${plural(n, 'bloc')} en ${c.grade(c.project)}, ${per} essais max par bloc`,
-          'Repos 3 à 5 min entre chaque essai (enlève les chaussons) : chaque essai à fond',
+          'Objectif : produire ta force maximale sur peu de mouvements',
+          'Chaque essai à fond, après un repos complet',
           'Arrête un bloc dès que les essais n’avancent plus',
+          'Repère : chaque essai est aussi explosif que le premier',
+          'Repos 3 à 5 min entre chaque essai (enlève les chaussons)',
         ],
       };
     },
@@ -1117,7 +1254,10 @@ export const EXERCISES: Exercise[] = [
         target: v,
         instructions: [
           `1 ou 2 blocs en ${c.grade(v)} (au-dessus de ton niveau)`,
-          'Travaille séparément les 3 ou 4 mouvements les plus durs, puis essaie de les relier',
+          'Objectif : apprendre des mouvements trop durs pour toi en les isolant',
+          'Travaille séparément les 3 ou 4 mouvements les plus durs',
+          'Puis essaie de les relier deux par deux',
+          'Repère : un mouvement impossible au départ qui passe en fin d’exercice',
           'Repos 3 min entre chaque essai, arrête dès que tu perds en explosivité',
         ],
       };
@@ -1140,9 +1280,12 @@ export const EXERCISES: Exercise[] = [
         title: 'Mouvements puissants',
         target: v,
         instructions: [
-          `${plural(n, 'bloc')} en ${c.grade(v)} avec de grands mouvements sur de bonnes prises (lancés, jetés)`,
-          '3 essais max par bloc, repos 3 min entre chaque essai',
-          'Engage-toi à fond sur chaque mouvement, réception bras légèrement fléchis',
+          `${plural(n, 'bloc')} en ${c.grade(v)} avec de grands mouvements sur de bonnes prises (lancés, jetés), 3 essais max par bloc`,
+          'Objectif : produire de la vitesse avec tout le corps',
+          'Engage-toi à fond sur chaque mouvement, sans hésiter',
+          'Réception bras légèrement fléchis, épaules engagées',
+          'Repère : le mouvement passe en un seul élan, sans mouvement intermédiaire',
+          'Repos 3 min entre chaque essai',
         ],
       };
     },
@@ -1163,7 +1306,9 @@ export const EXERCISES: Exercise[] = [
         target: v,
         instructions: [
           `${plural(n, 'bloc')} en ${c.grade(v)}`,
+          'Objectif : tenir bras plié pendant que l’autre main cherche',
           'Sur chaque prise, bloque 3 s bras plié à 90° avant d’aller chercher la suivante',
+          'Repère : pas de tremblement pendant les 3 s. S’il apparaît, prends un bloc plus facile',
           'Repos 3 min avant de changer de bloc',
         ],
       };
@@ -1187,9 +1332,12 @@ export const EXERCISES: Exercise[] = [
         title: 'Sans les pieds',
         target: v,
         instructions: [
-          `Sur un dévers à bonnes prises (${c.grade(v)} ou moins), grimpe sans les pieds : mains seules`,
-          'Rattrape chaque prise bras légèrement fléchi, épaules engagées, jamais bras tendu',
-          `${plural(n, 'passage')} courts, repos 3 min entre chaque passage`,
+          `Dévers à bonnes prises (${c.grade(v)} ou moins) : ${plural(n, 'passage')} courts, sans les pieds`,
+          'Objectif : de la puissance de bras pure',
+          'Mains seules, pieds libres, et rattrape chaque prise bras légèrement fléchi',
+          'Épaules engagées, jamais bras tendu à l’arrivée',
+          'Repère : chaque prise est rattrapée sans balancer',
+          'Repos 3 min entre chaque passage',
         ],
       };
     },
@@ -1212,8 +1360,11 @@ export const EXERCISES: Exercise[] = [
         title: 'Traversée à un bras',
         target: v,
         instructions: [
-          `Sur un dévers à très bonnes prises (${c.grade(v)} ou moins), traverse avec une seule main en lâchant et rattrapant chaque prise, pieds posés`,
-          `${plural(n, 'passage')} en alternant main droite et main gauche, repos 3 min entre chaque passage`,
+          `Dévers à très bonnes prises (${c.grade(v)} ou moins) : ${plural(n, 'passage')}, en alternant main droite et main gauche`,
+          'Objectif : de la force de contact à une main',
+          'Une seule main : lâche la prise et rattrape la suivante, pieds posés',
+          'Repère : tu rattrapes chaque prise sans que les pieds partent',
+          'Repos 3 min entre chaque passage',
         ],
       };
     },
@@ -1235,8 +1386,10 @@ export const EXERCISES: Exercise[] = [
         target: v,
         instructions: [
           `Choisis ${3 * Math.min(2, sets)} blocs connus en ${c.grade(v)}`,
-          `${plural(sets, 'série')} de 3 blocs, 1 passage par bloc, repos 3 min entre chaque passage et entre les séries`,
-          'Arrête si la qualité baisse',
+          'Objectif : de la force de qualité, sans fatigue qui s’accumule',
+          `${plural(sets, 'série')} de 3 blocs, 1 passage par bloc`,
+          'Repère : chaque passage reste propre. Arrête si la qualité baisse',
+          'Repos 3 min entre chaque passage et entre les séries',
         ],
       };
     },
@@ -1260,9 +1413,11 @@ export const EXERCISES: Exercise[] = [
         title: `Bloc sans les pieds · ${plural(sets, 'série')}`,
         target: v,
         instructions: [
-          `1 bloc en dévers à bonnes prises, en ${c.grade(v)}, grimpé sans les pieds (mains seules)`,
-          `${plural(sets, 'série')} de 3 passages, repos 3 min entre chaque passage et entre les séries`,
-          'Rattrape chaque prise bras légèrement fléchi, épaules engagées',
+          `1 bloc en dévers à bonnes prises, en ${c.grade(v)}, grimpé sans les pieds : ${plural(sets, 'série')} de 3 passages`,
+          'Objectif : de la puissance de bras sur un bloc facile, répétée',
+          'Mains seules, et rattrape chaque prise bras légèrement fléchi, épaules engagées',
+          'Repère : le 3e passage d’une série reste aussi propre que le 1er',
+          'Repos 3 min entre chaque passage et entre les séries',
         ],
       };
     },
@@ -1284,8 +1439,12 @@ export const EXERCISES: Exercise[] = [
         title: 'Lancés à un bras',
         target: c.maxSent - 4,
         instructions: [
-          'En dévers, pieds posés, une main sur une très bonne prise : lance l’autre main vers une bonne prise plus haute et rattrape-la',
-          `${plural(n, 'lancé')} en alternant les mains, repos 2 min entre chaque lancé`,
+          `${plural(n, 'lancé')}, en alternant les mains`,
+          'Objectif : de la vitesse de contact sur une seule main',
+          'En dévers, pieds posés, une main sur une très bonne prise',
+          'Lance l’autre main vers une bonne prise plus haute et rattrape-la',
+          'Repère : tu rattrapes la prise sans que les pieds décollent',
+          'Repos 2 min entre chaque lancé',
         ],
       };
     },
@@ -1307,9 +1466,13 @@ export const EXERCISES: Exercise[] = [
         title: 'Jetés',
         target: v,
         instructions: [
-          `${plural(n, 'bloc')} en ${c.grade(v)} avec un jeté (les deux mains quittent le mur), ou choisis toi-même une prise de départ et une grosse prise cible`,
-          'Charge avec les jambes, regarde la cible, et attrape-la bras légèrement fléchis',
-          '4 essais max par jeté, repos 2 min entre chaque essai',
+          `${plural(n, 'bloc')} en ${c.grade(v)} avec un jeté (les deux mains quittent le mur), 4 essais max par jeté`,
+          'Objectif : coordonner jambes, bras et regard dans un seul élan',
+          'Charge avec les jambes, les yeux sur la prise cible',
+          'Attrape-la bras légèrement fléchis',
+          'Sans jeté dans la salle : choisis toi-même une prise de départ et une grosse prise cible',
+          'Repère : tu arrives sur la cible sans la dépasser ni la claquer',
+          'Repos 2 min entre chaque essai',
         ],
       };
     },
@@ -1331,8 +1494,11 @@ export const EXERCISES: Exercise[] = [
         target: c.project,
         instructions: [
           `${plural(n, 'bloc')} en ${c.grade(c.project)}, 4 essais max par bloc`,
-          'Choisis des blocs dont le pas dur se fait sur le type de prise que tu évites d’habitude : réglettes, plats ou pinces',
-          'Repos 3 à 5 min entre chaque essai : chaque essai à fond',
+          'Objectif : renforcer le type de prise que tu évites',
+          'Choisis des blocs dont le pas dur se fait sur ce type de prise : réglettes, plats ou pinces',
+          'Chaque essai à fond, après un repos complet',
+          'Repère : le pas dur sur cette prise passe de plus en plus loin',
+          'Repos 3 à 5 min entre chaque essai',
         ],
       };
     },
@@ -1355,7 +1521,10 @@ export const EXERCISES: Exercise[] = [
         target: v,
         instructions: [
           `${plural(n, 'bloc')} en ${c.grade(v)}, 4 essais max par bloc`,
-          'Choisis des blocs où il faut serrer : volumes, arêtes, prises opposées. Pousse vers l’intérieur avec les deux mains et garde les hanches près du mur',
+          'Objectif : tenir en serrant entre deux prises opposées',
+          'Choisis des blocs où il faut serrer : volumes, arêtes, prises opposées',
+          'Pousse vers l’intérieur avec les deux mains, hanches près du mur',
+          'Repère : tu tiens la position même quand une main n’a presque rien',
           'Repos 3 min entre chaque essai',
         ],
       };
@@ -1378,8 +1547,10 @@ export const EXERCISES: Exercise[] = [
         target: v,
         instructions: [
           `${plural(n, 'bloc')} en ${c.grade(v)}, 3 essais max par bloc`,
-          'Choisis-les en dévers, avec de bonnes prises de main et de mauvais pieds : si les pieds partent, tu tombes',
+          'Objectif : garder les pieds au mur dans le dévers',
+          'Choisis des blocs en dévers avec de bonnes prises de main et de mauvais pieds',
           'Pousse sur les pointes et tire les pieds vers le mur avec le ventre, hanches près du mur',
+          'Repère : les pieds restent au mur sur tout le bloc. S’ils partent, tu tombes',
           'Repos 3 min entre chaque essai',
         ],
       };
@@ -1401,10 +1572,13 @@ export const EXERCISES: Exercise[] = [
         title: 'Lancés variés',
         target: v,
         instructions: [
-          `Prépare 3 lancés différents en ${c.grade(v)} ou moins : change à chaque fois de type de prise, d’inclinaison ou de distance`,
-          'Si tu trouves un crochet de pointe à prendre en dynamique, ajoute-le',
-          '4 essais max par lancé, repos 2 min entre chaque essai',
+          `3 lancés différents en ${c.grade(v)} ou moins, 4 essais max par lancé`,
+          'Objectif : rendre le lancé fiable dans toutes les situations',
+          'Change à chaque lancé de type de prise, d’inclinaison ou de distance',
           'Charge avec les jambes, regarde la cible, attrape-la bras légèrement fléchis',
+          'Si tu trouves un crochet de pointe à prendre en dynamique, ajoute-le',
+          'Repère : chaque lancé passe en 4 essais ou moins',
+          'Repos 2 min entre chaque essai',
         ],
       };
     },
@@ -1427,8 +1601,11 @@ export const EXERCISES: Exercise[] = [
         target: c.project,
         instructions: [
           `${plural(n, 'bloc')} en ${c.grade(c.project)}, 4 essais max par bloc`,
+          'Objectif : aller au bout du pas dur au lieu de renoncer',
           'Choisis des blocs où l’on tombe sur les pieds, au-dessus d’un tapis épais',
-          'À chaque essai, engage-toi dans le pas dur jusqu’au bout, quitte à tomber : ne redescends pas avant d’avoir essayé',
+          'À chaque essai, engage-toi dans le pas dur jusqu’au bout, quitte à tomber',
+          'Ne redescends jamais avant d’avoir essayé',
+          'Repère : tu tombes en essayant, jamais en renonçant',
           'Repos 3 min entre chaque essai',
         ],
       };
