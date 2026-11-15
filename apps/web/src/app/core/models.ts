@@ -136,3 +136,14 @@ export interface AiStatus {
   lastSuccessAt?: string;
   lastModel?: string | null;
 }
+
+/** Matériel qu'on peut cocher dans le profil (même liste que l'API). */
+export type Equipment = 'elastic' | 'ball' | 'hangboard' | 'pullup-bar';
+
+/** Compte connecté et ses réglages. */
+export interface Profile {
+  id: string;
+  username: string;
+  sessionsPerWeek: number;
+  equipment: Equipment[];
+}

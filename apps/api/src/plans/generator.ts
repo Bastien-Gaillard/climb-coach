@@ -1,4 +1,5 @@
 import { Gym } from '@climb-coach/grades';
+import { Equipment } from '../auth/equipment';
 import { SessionWithClimbs } from '../sessions/sessions.service';
 import { Plan } from './plan.schema';
 
@@ -9,6 +10,8 @@ export interface GeneratorContext {
   history: SessionWithClimbs[];
   /** Salle du jour : impose le style (bloc ou voie) et permet de parler en couleurs. */
   gym?: Gym;
+  /** Matériel coché dans le profil : l'échauffement s'en sert s'il est là. */
+  equipment?: Equipment[];
 }
 
 export interface PlanGenerator {

@@ -259,6 +259,21 @@ describe('MistralGenerator.buildUserPrompt', () => {
     expect(prompt).toContain('doigts un peu tendus');
   });
 
+  it('liste le matériel coché, ou précise qu’il n’y en a pas', () => {
+    const gen = makeGenerator();
+    expect(
+      gen.buildUserPrompt({
+        availableMinutes: 60,
+        now,
+        history: [],
+        equipment: ['elastic', 'hangboard'],
+      }),
+    ).toContain('Matériel disponible : élastique, poutre.');
+    expect(gen.buildUserPrompt({ availableMinutes: 60, now, history: [] })).toContain(
+      'Matériel disponible : aucun',
+    );
+  });
+
   it('signale une douleur notée récemment dans la proposition', () => {
     const prompt = makeGenerator().buildUserPrompt({
       availableMinutes: 90,

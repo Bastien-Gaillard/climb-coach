@@ -107,8 +107,12 @@ nav {
   font-size: 14px;
 
   .who {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
     font-weight: 600;
     color: var(--ink-2);
+    text-decoration: none;
   }
 
   .switch {

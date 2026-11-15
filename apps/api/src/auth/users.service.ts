@@ -2,6 +2,7 @@ import { ConflictException, Inject, Injectable } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { Database, DB } from '../db/db.module';
 import { users } from '../db/schema';
+import { Equipment, normalizeEquipment } from './equipment';
 
 export type User = typeof users.$inferSelect;
 
@@ -21,10 +22,18 @@ export class UsersService {
   }
 
   /** Réglages modifiables depuis l'appli. */
-  async updateSettings(id: string, settings: { sessionsPerWeek: number }): Promise<User> {
+  async updateSettings(
+    id: string,
+    settings: { sessionsPerWeek?: number; equipment?: Equipment[] },
+  ): Promise<User> {
     const [user] = await this.db
       .update(users)
-      .set({ sessionsPerWeek: settings.sessionsPerWeek })
+      .set({
+        ...(settings.sessionsPerWeek !== undefined && {
+          sessionsPerWeek: settings.sessionsPerWeek,
+        }),
+        ...(settings.equipment && { equipment: normalizeEquipment(settings.equipment) }),
+      })
       .where(eq(users.id, id))
       .returning();
     return user;

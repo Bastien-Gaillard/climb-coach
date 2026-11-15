@@ -4,6 +4,7 @@ import { Database, DB } from '../db/db.module';
 import { generatedPlans, schedulePlans, StoredPlannedSession } from '../db/schema';
 import { GymsService } from '../gyms/gyms.service';
 import { SessionsService } from '../sessions/sessions.service';
+import { Equipment } from '../auth/equipment';
 import { GeneratorContext } from './generator';
 import { withGymColors } from './gym-colors';
 import { MistralGenerator } from './mistral.generator';
@@ -58,12 +59,13 @@ export class PlansService {
     userId: string,
     availableMinutes: number,
     gymId?: string,
+    equipment: Equipment[] = [],
   ): Promise<GeneratedPlanResult> {
     const [history, gym] = await Promise.all([
       this.sessions.findRecent(userId, 10),
       gymId ? this.gyms.findOne(gymId) : undefined,
     ]);
-    const ctx: GeneratorContext = { availableMinutes, now: this.clock(), history };
+    const ctx: GeneratorContext = { availableMinutes, now: this.clock(), history, equipment };
     if (gym) ctx.gym = gym;
 
     let source: GeneratedPlanResult['source'] = 'rules';

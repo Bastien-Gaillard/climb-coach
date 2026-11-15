@@ -45,6 +45,11 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/gyms/gyms').then((m) => m.GymsPage),
       },
       {
+        path: 'profil',
+        title: 'Mon profil',
+        loadComponent: () => import('./pages/profile/profile').then((m) => m.ProfilePage),
+      },
+      {
         path: 'convertisseur',
         title: 'Convertisseur',
         loadComponent: () => import('./pages/converter/converter').then((m) => m.ConverterPage),

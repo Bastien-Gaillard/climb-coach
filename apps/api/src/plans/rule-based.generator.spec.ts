@@ -189,6 +189,49 @@ describe('RuleBasedGenerator', () => {
       expect(text).toContain('Pas de petites prises ni de mouvements dynamiques');
     });
 
+    it('se fait à mains nues sans matériel', async () => {
+      const plan = await generator.generate({ availableMinutes: 60, now, history: [] });
+      const text = plan.blocks[0].instructions.join(' | ');
+      expect(text).not.toMatch(/élastique|Balle|Poutre/);
+      expect(text).toContain('à une grosse prise');
+    });
+
+    it('utilise l’élastique, la balle et la barre quand ils sont cochés', async () => {
+      const plan = await generator.generate({
+        availableMinutes: 60,
+        now,
+        history: [],
+        equipment: ['elastic', 'ball', 'pullup-bar'],
+      });
+      const steps = plan.blocks[0].instructions;
+      expect(steps).toContain('Balle souple : 20 pressions lentes, puis 20 rapides, sans forcer');
+      expect(steps.some((s) => s.startsWith('Épaules à l’élastique'))).toBe(true);
+      expect(steps).toContain('10 tirages d’omoplates bras tendus à la barre, pieds au sol');
+    });
+
+    it('remplace le recrutement par la poutre avant une séance de force', async () => {
+      const plan = await generator.generate({
+        availableMinutes: 90,
+        now,
+        history: strengthHistory,
+        equipment: ['hangboard'],
+      });
+      const text = plan.blocks[0].instructions.join(' | ');
+      expect(text).toContain('Poutre : 10 suspensions de 1 s');
+      expect(text).toContain('Poutre : 2 suspensions de 10 s');
+      expect(text).not.toContain('Recrutement');
+    });
+
+    it('laisse la poutre de côté quand une douleur est signalée', async () => {
+      const plan = await generator.generate({
+        availableMinutes: 90,
+        now,
+        history: [session(2, now, { focus: 'technique', notes: 'Mal au majeur' })],
+        equipment: ['hangboard'],
+      });
+      expect(plan.blocks[0].instructions.join(' | ')).not.toContain('Poutre');
+    });
+
     it('raccourcit les étapes quand l’échauffement ne dure que 10 min', async () => {
       const plan = await generator.generate({ availableMinutes: 30, now, history: [] });
       const text = plan.blocks[0].instructions.join(' | ');

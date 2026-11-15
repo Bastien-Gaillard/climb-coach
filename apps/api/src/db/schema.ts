@@ -19,6 +19,8 @@ export const users = pgTable('users', {
   username: text('username').notNull().unique(),
   /** Rythme visé, utilisé pour espacer les séances du planning. */
   sessionsPerWeek: smallint('sessions_per_week').notNull().default(3),
+  /** Matériel disponible (élastique, balle, poutre…), coché dans le profil. */
+  equipment: text('equipment').array().notNull().default(['elastic']),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 

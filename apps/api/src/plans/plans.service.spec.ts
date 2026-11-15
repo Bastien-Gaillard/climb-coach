@@ -122,7 +122,20 @@ describe('PlansService.generate', () => {
     const { service, mistralGen, sessions } = setup({ enabled: true });
     await service.generate('u1', 90);
     expect(sessions.findRecent).toHaveBeenCalledWith('u1', 10);
-    expect(mistralGen.generate).toHaveBeenCalledWith({ availableMinutes: 90, now, history: [] });
+    expect(mistralGen.generate).toHaveBeenCalledWith({
+      availableMinutes: 90,
+      now,
+      history: [],
+      equipment: [],
+    });
+  });
+
+  it('passe le matériel du profil au générateur', async () => {
+    const { service, mistralGen } = setup({ enabled: true });
+    await service.generate('u1', 60, undefined, ['elastic', 'ball']);
+    expect(mistralGen.generate).toHaveBeenCalledWith(
+      expect.objectContaining({ equipment: ['elastic', 'ball'] }),
+    );
   });
 
   it('ajoute les couleurs de la salle choisie aux niveaux visés', async () => {

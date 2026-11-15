@@ -2,8 +2,6 @@ import { Component, computed, DestroyRef, effect, inject, OnInit, signal } from 
 import { Router, RouterLink } from '@angular/router';
 import { BLOCK_LABEL, FOCUS_LABEL, STYLE_LABEL } from '../../core/labels';
 import { PlanStore } from '../../core/plan.store';
-import { Figure } from '../../shared/figure';
-import { blockFigures } from '../../shared/figures';
 import { holdVars } from '../../shared/hold';
 import { Icon } from '../../shared/icon';
 import { ScreenWakeLock } from '../../shared/wake-lock';
@@ -11,7 +9,7 @@ import { ScreenWakeLock } from '../../shared/wake-lock';
 /** Séance guidée : un bloc à la fois, minuteur lisible à 3 m, gros boutons. */
 @Component({
   selector: 'app-live',
-  imports: [Icon, RouterLink, Figure],
+  imports: [Icon, RouterLink],
   templateUrl: './live.html',
   styleUrl: './live.scss',
 })
@@ -48,12 +46,6 @@ export class LivePage implements OnInit {
   protected readonly block = computed(() => this.blocks()[this.index()]);
   protected readonly next = computed(() => this.blocks()[this.index() + 1] ?? null);
   protected readonly isLast = computed(() => this.index() >= this.blocks().length - 1);
-
-  /** Schéma de chaque consigne du bloc en cours. */
-  protected readonly figures = computed(() => {
-    const b = this.block();
-    return b ? blockFigures(b, this.generated()!.plan.focus) : [];
-  });
 
   protected readonly kind = computed(() => {
     const b = this.block();

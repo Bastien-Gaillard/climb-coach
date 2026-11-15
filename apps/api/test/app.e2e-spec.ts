@@ -66,9 +66,24 @@ describe('API (e2e)', () => {
         .post('/api/auth/login')
         .send({ username: ' Kuzimu ' })
         .expect(200);
-      expect(res.body).toEqual({ id: expect.any(String), username: 'kuzimu' });
+      expect(res.body).toMatchObject({ id: expect.any(String), username: 'kuzimu' });
       const me = await http('tophe').get('/api/auth/me').expect(200);
       expect(me.body.username).toBe('tophe');
+    });
+
+    it('coche l’élastique par défaut et enregistre le matériel du profil', async () => {
+      const me = await http('tophe').get('/api/auth/me').expect(200);
+      expect(me.body.equipment).toEqual(['elastic']);
+      const { body } = await http('tophe')
+        .patch('/api/auth/me')
+        .send({ equipment: ['hangboard', 'elastic'] })
+        .expect(200);
+      expect(body.equipment).toEqual(['elastic', 'hangboard']);
+      expect(body.sessionsPerWeek).toBe(me.body.sessionsPerWeek);
+      await http('tophe')
+        .patch('/api/auth/me')
+        .send({ equipment: ['trampoline'] })
+        .expect(400);
     });
 
     it('refuse un compte inconnu', async () => {

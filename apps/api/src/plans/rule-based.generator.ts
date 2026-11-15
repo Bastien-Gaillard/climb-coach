@@ -1,5 +1,6 @@
 import { FONT, gradeFromValue } from '@climb-coach/grades';
 import { Injectable } from '@nestjs/common';
+import { Equipment } from '../auth/equipment';
 import { REFERENCE_SYSTEM } from '../sessions/climb-normalizer';
 import { GeneratorContext, PlanGenerator, splitTime } from './generator';
 import { pickExercises } from './exercises';
@@ -116,13 +117,27 @@ export class RuleBasedGenerator implements PlanGenerator {
     const traverse = (long ? 3 : 2) + (a.focus === 'endurance' ? 1 : 0);
     const easyCount = long ? 3 : 2;
     const mediumCount = minutes >= 18 ? 2 : 1;
+    const has = (e: Equipment) => ctx.equipment?.includes(e) ?? false;
+    const hangboard = has('hangboard') && !careful;
+    const scapHold = has('pullup-bar') ? 'à la barre' : 'à une grosse prise';
 
     // Du général au spécifique, du lent au rapide, des grosses prises aux petites.
     const instructions = [
       `${cardio} min de cardio léger : sautillements, montées de genoux, jumping jacks`,
       'Mobilité sans forcer : cercles de poignets, de bras (10 dans chaque sens), de hanches et de chevilles',
       'Doigts : 10 glissements tendineux par main (poing, poing tendu, crochet), puis 20 ouvertures-fermetures rapides',
-      'Épaules : 10 rotations externes coudes au corps, puis 10 tirages d’omoplates bras tendus à une grosse prise, pieds au sol',
+      ...(has('ball') ? ['Balle souple : 20 pressions lentes, puis 20 rapides, sans forcer'] : []),
+      ...(has('elastic')
+        ? [
+            'Épaules à l’élastique : 10 rotations externes coudes au corps en tenant 1 s, puis 10 écartés bras tendus',
+            `10 tirages d’omoplates bras tendus ${scapHold}, pieds au sol`,
+          ]
+        : [
+            `Épaules : 10 rotations externes coudes au corps, puis 10 tirages d’omoplates bras tendus ${scapHold}, pieds au sol`,
+          ]),
+      ...(hangboard
+        ? ['Poutre : 10 suspensions de 1 s sur grosse prise (20-30 mm), pieds au sol au début']
+        : []),
       a.focus === 'technique'
         ? `Traversée très facile ${traverse} min : pieds précis et silencieux, puis on varie les positions du corps`
         : `Traversée très facile ${traverse} min : pieds précis et silencieux, puis on accélère peu à peu`,
@@ -130,7 +145,9 @@ export class RuleBasedGenerator implements PlanGenerator {
     ];
     if (a.focus === 'strength' && !careful) {
       instructions.push(
-        'Recrutement : sur une bonne prise de départ, pieds au sol, tirer fort 5 s puis relâcher 1 s, 5 fois par main',
+        hangboard
+          ? 'Poutre : 2 suspensions de 10 s sur prise moyenne (15-20 mm), puis 2 sur petite prise (10-15 mm), 30 s de repos'
+          : 'Recrutement : sur une bonne prise de départ, pieds au sol, tirer fort 5 s puis relâcher 1 s, 5 fois par main',
         `Finir par 1 ${this.unit(a.style, false)} plus dur en ${this.label(ctx, a.style, this.grade(a.style, a.maxSent - 1))} ou quelques mouvements dynamiques sur grosses prises, sans aller à l’échec`,
       );
     }

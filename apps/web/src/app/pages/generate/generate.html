@@ -69,12 +69,7 @@
       } } @if (b.instructions.length) {
       <ul>
         @for (step of b.instructions; track $index; let k = $index) {
-        <li [class.with-fig]="figures()[i]?.[k]">
-          @if (figures()[i]?.[k]; as f) {
-          <app-figure [name]="f" />
-          }
-          <span>{{ step }}</span>
-        </li>
+        <li>{{ step }}</li>
         }
       </ul>
       }

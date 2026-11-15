@@ -45,16 +45,18 @@
     </nav>
 
     <div class="account side-account">
-      <app-icon name="user" [size]="20" />
-      <span class="who">{{ auth.username() }}</span>
+      <a routerLink="/profil" class="who" aria-label="Mon profil"
+        ><app-icon name="user" [size]="20" />{{ auth.username() }}</a
+      >
       <button type="button" class="ghost switch" (click)="auth.logout()">Changer</button>
     </div>
   </aside>
 
   <main>
     <div class="account top-account">
-      <app-icon name="user" [size]="16" />
-      <span class="who">{{ auth.username() }}</span>
+      <a routerLink="/profil" class="who" aria-label="Mon profil"
+        ><app-icon name="user" [size]="16" />{{ auth.username() }}</a
+      >
       <button type="button" class="ghost switch" (click)="auth.logout()">Changer de compte</button>
     </div>
     <app-ai-banner />

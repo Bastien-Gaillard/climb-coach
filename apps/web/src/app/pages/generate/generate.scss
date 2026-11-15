@@ -247,28 +247,6 @@ h2.overline {
     display: flex;
     flex-direction: column;
     gap: 2px;
-
-    // Avec des schémas : une colonne de pictos, le texte aligné à droite
-    &:has(.with-fig) {
-      list-style: none;
-      padding-left: 0;
-      gap: 6px;
-
-      > li {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        padding-left: 66px;
-
-        &.with-fig {
-          padding-left: 0;
-        }
-      }
-    }
-
-    app-figure {
-      width: 56px;
-    }
   }
 }
 

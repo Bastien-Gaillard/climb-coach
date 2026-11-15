@@ -1,0 +1,41 @@
+<header class="hero dots">
+  <span class="overline">Mon profil</span>
+  <h1>{{ auth.username() }}</h1>
+</header>
+
+<section class="stack">
+  <h2 class="overline" id="equipment-label">Matériel disponible</h2>
+  <p class="muted small">L'échauffement s'en sert quand il est coché.</p>
+
+  @if (profile()) {
+  <div class="equipment" role="group" aria-labelledby="equipment-label">
+    @for (o of options; track o.id) {
+    <button
+      type="button"
+      role="checkbox"
+      class="option"
+      [attr.aria-checked]="has(o.id)"
+      [attr.data-testid]="'equipment-' + o.id"
+      [disabled]="saving()"
+      (click)="toggle(o.id)"
+    >
+      <span class="text">
+        <strong>{{ o.label }}</strong>
+        <span class="muted small">{{ o.hint }}</span>
+      </span>
+      <span class="box" aria-hidden="true">
+        @if (has(o.id)) {
+        <app-icon name="check" [size]="18" [stroke]="3" />
+        }
+      </span>
+    </button>
+    }
+  </div>
+  } @else if (!error()) {
+  <p class="muted">Chargement…</p>
+  } @if (error(); as e) {
+  <p class="error">{{ e }}</p>
+  }
+</section>
+
+<button type="button" class="ghost switch" (click)="auth.logout()">Changer de compte</button>

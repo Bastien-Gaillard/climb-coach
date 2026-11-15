@@ -4,9 +4,11 @@ import { EMPTY, expand, Observable, switchMap, timer } from 'rxjs';
 import {
   AiStatus,
   CreateSession,
+  Equipment,
   GeneratedPlan,
   Gym,
   GymInput,
+  Profile,
   ProgressionPoint,
   Schedule,
   Session,
@@ -71,9 +73,14 @@ export class ApiService {
     return this.http.get<AiStatus>(`${this.base}/plans/ai-status`);
   }
 
+  /** Compte connecté et ses réglages. */
+  profile(): Observable<Profile> {
+    return this.http.get<Profile>(`${this.base}/auth/me`);
+  }
+
   /** Réglages du compte connecté. */
-  updateSettings(body: { sessionsPerWeek: number }): Observable<unknown> {
-    return this.http.patch(`${this.base}/auth/me`, body);
+  updateSettings(body: { sessionsPerWeek?: number; equipment?: Equipment[] }): Observable<Profile> {
+    return this.http.patch<Profile>(`${this.base}/auth/me`, body);
   }
 
   listGyms(): Observable<Gym[]> {

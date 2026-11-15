@@ -1,3 +1,4 @@
+import { EQUIPMENT_LABEL } from '../auth/equipment';
 import { gradeFromValue, gradeValue } from '@climb-coach/grades';
 import { Injectable, Logger } from '@nestjs/common';
 import { catalogForPrompt } from './exercises';
@@ -229,6 +230,11 @@ Structure de la séance :
   5. traversée très facile (pieds précis et silencieux, puis plus vite) ;
   6. quelques blocs faciles sur grosses prises (3 à 4 crans sous le max), puis 1 ou 2 un peu plus durs.
   Avant une séance de force, ajoute un recrutement des doigts (pieds au sol, tirer fort 5 s / relâcher 1 s, 5 fois par main) et finis par un bloc proche du max ou quelques mouvements dynamiques, sans aller à l'échec. Si une douleur est signalée, pas de petites prises ni de dynamique à l'échauffement. Jamais d'étirements statiques à l'échauffement : ils vont dans le retour au calme.
+- Matériel : utilise à l'échauffement le matériel listé, et jamais un matériel absent de la liste.
+  - élastique : rotations externes des épaules à l'élastique, coudes au corps, 10 à 12 en tenant 1 s, puis écartés bras tendus ;
+  - balle souple : 20 pressions lentes puis 20 rapides, sans forcer, après les glissements tendineux ;
+  - barre de traction : les tirages d'omoplates se font à la barre ;
+  - poutre (sauf douleur) : 10 suspensions de 1 s sur grosse prise de 20-30 mm, pieds au sol au début ; avant une séance de force, elle remplace le recrutement : 2 suspensions de 10 s sur prise moyenne (15-20 mm) puis 2 sur petite prise (10-15 mm), 30 s de repos.
 - Le "grade" du "target" d'une partie est la cotation la plus dure demandée dans cette partie.
 
 Santé :
@@ -347,6 +353,7 @@ export class MistralGenerator implements PlanGenerator {
       `Temps dispo aujourd'hui : ${ctx.availableMinutes} min.`,
       `Découpage indicatif : échauffement ${split.warmup}, cœur ${split.main}, gainage ${split.core}, retour au calme ${split.cooldown}.`,
       `Style principal : ${a.style === 'boulder' ? 'bloc' : 'voie'}.`,
+      `Matériel disponible : ${ctx.equipment?.length ? ctx.equipment.map((e) => EQUIPMENT_LABEL[e]).join(', ') : 'aucun (échauffement à mains nues)'}.`,
       ...(ctx.gym
         ? [
             `Salle du jour : ${ctx.gym.name}, ${ctx.gym.discipline === 'boulder' ? 'bloc' : 'voie'} uniquement : tous les "target" ont le style "${ctx.gym.discipline}".`,

@@ -1,0 +1,1 @@
+ALTER TABLE "users" ADD COLUMN "equipment" text[] DEFAULT '{"elastic"}' NOT NULL;

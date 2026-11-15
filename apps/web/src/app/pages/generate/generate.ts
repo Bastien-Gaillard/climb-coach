@@ -15,8 +15,6 @@ import {
 import { Gym, PlannedSession, Schedule, Session } from '../../core/models';
 import { AiStatusStore } from '../../core/ai-status.store';
 import { PlanStore } from '../../core/plan.store';
-import { Figure } from '../../shared/figure';
-import { blockFigures } from '../../shared/figures';
 import { holdVars } from '../../shared/hold';
 import { Icon } from '../../shared/icon';
 
@@ -27,7 +25,7 @@ const MAX = 300;
 
 @Component({
   selector: 'app-generate',
-  imports: [DatePipe, RouterLink, Icon, Figure],
+  imports: [DatePipe, RouterLink, Icon],
   templateUrl: './generate.html',
   styleUrl: './generate.scss',
 })
@@ -64,12 +62,6 @@ export class GeneratePage implements OnInit {
   protected readonly durationLabel = durationLabel;
   protected readonly relativeDay = relativeDay;
   protected readonly dayDate = dayDate;
-
-  /** Schéma de chaque consigne, bloc par bloc. */
-  protected readonly figures = computed(() => {
-    const p = this.result()?.plan;
-    return p ? p.blocks.map((b) => blockFigures(b, p.focus)) : [];
-  });
 
   protected readonly total = computed(
     () => this.result()?.plan.blocks.reduce((sum, b) => sum + b.minutes, 0) ?? 0,

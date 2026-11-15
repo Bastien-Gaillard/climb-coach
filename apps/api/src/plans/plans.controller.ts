@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Post, Query } from '@nestjs/common';
 import { z } from 'zod';
 import { CurrentUser } from '../auth/auth.decorators';
+import { normalizeEquipment } from '../auth/equipment';
 import type { User } from '../auth/users.service';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { PlansService } from './plans.service';
@@ -24,7 +25,12 @@ export class PlansController {
     @CurrentUser() user: User,
     @Body(new ZodValidationPipe(GeneratePlanSchema)) body: z.infer<typeof GeneratePlanSchema>,
   ) {
-    return this.plans.generate(user.id, body.availableMinutes, body.gymId);
+    return this.plans.generate(
+      user.id,
+      body.availableMinutes,
+      body.gymId,
+      normalizeEquipment(user.equipment),
+    );
   }
 
   /** Planning des prochains jours : quand grimper, quel type de séance, combien de temps. */
