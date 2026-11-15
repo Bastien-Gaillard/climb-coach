@@ -18,6 +18,21 @@ export const PlanBlockSchema = z.object({
       colors: z
         .array(z.object({ color: z.string().min(1), hex: z.string().optional() }))
         .optional(),
+      /**
+       * Volume par cotation (« 3 blocs » en 5+), sorti des consignes pour être affiché
+       * dans le badge, chacun avec ses propres couleurs (ajouté par l'API).
+       */
+      volumes: z
+        .array(
+          z.object({
+            count: z.string().min(1),
+            grade: z.string().min(1),
+            colors: z
+              .array(z.object({ color: z.string().min(1), hex: z.string().optional() }))
+              .optional(),
+          }),
+        )
+        .optional(),
     })
     .optional(),
 });

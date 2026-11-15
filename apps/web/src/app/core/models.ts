@@ -64,6 +64,8 @@ export interface PlanBlock {
     range?: { min: string; max: string };
     /** Couleurs de la salle choisie qui couvrent la cotation. */
     colors?: { color: string; hex?: string }[];
+    /** Volume par cotation (« 3 blocs » en 5+), chacun avec ses couleurs de salle. */
+    volumes?: { count: string; grade: string; colors?: { color: string; hex?: string }[] }[];
   };
 }
 

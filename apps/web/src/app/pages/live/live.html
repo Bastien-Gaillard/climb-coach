@@ -24,7 +24,17 @@
   <div class="title">
     <span class="overline kind">{{ kind() }}</span>
     <h1>{{ b.title }}</h1>
-    @if (b.target) { @if (b.target.colors?.length) {
+    @if (b.target?.volumes?.length) { @for (v of b.target!.volumes!; track $index) {
+    <div class="level-colors" data-testid="target-volume">
+      @for (c of v.colors ?? []; track c.color) {
+      <span class="hold-chip big" [style]="holdVars(c.hex)">{{ c.color }}</span>
+      } @if (v.colors?.length) {
+      <span class="muted"><b class="num">{{ v.count }}</b> · {{ v.grade }}</span>
+      } @else {
+      <span class="badge line level">{{ v.count }} · <b class="num">{{ v.grade }}</b></span>
+      }
+    </div>
+    } } @else if (b.target) { @if (b.target.colors?.length) {
     <div class="level-colors">
       @for (c of b.target.colors; track c.color) {
       <span class="hold-chip big" [style]="holdVars(c.hex)">{{ c.color }}</span>

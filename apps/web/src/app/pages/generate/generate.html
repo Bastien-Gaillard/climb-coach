@@ -52,7 +52,21 @@
         </div>
         <span class="num mins">{{ b.minutes }}<small> min</small></span>
       </div>
-      @if (b.target) { @if (b.target.colors?.length) {
+      @if (b.target?.volumes?.length) { @for (v of b.target!.volumes!; track $index) {
+      <div class="target-colors" data-testid="target-volume">
+        @for (c of v.colors ?? []; track c.color) {
+        <span class="hold-chip" [style]="holdVars(c.hex)">{{ c.color }}</span>
+        } @if (v.colors?.length) {
+        <span class="muted small"
+          >{{ v.count }} · {{ styleLabel[b.target!.style] }} · {{ v.grade }}</span
+        >
+        } @else {
+        <span class="badge line target"
+          >{{ v.count }} · {{ styleLabel[b.target!.style] }} · {{ v.grade }}</span
+        >
+        }
+      </div>
+      } } @else if (b.target) { @if (b.target.colors?.length) {
       <div class="target-colors" data-testid="target-colors">
         @for (c of b.target.colors; track c.color) {
         <span class="hold-chip" [style]="holdVars(c.hex)">{{ c.color }}</span>

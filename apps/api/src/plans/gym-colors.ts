@@ -128,18 +128,77 @@ export function labelGrades(text: string, gym: Gym | undefined): string {
   );
 }
 
+/** Volume demandé pour une cotation, affiché dans le badge avec ses couleurs. */
+export interface TargetVolume {
+  count: string;
+  grade: string;
+  colors?: TargetColor[];
+}
+
+/**
+ * Consigne qui donne seulement le volume : « 3 blocs en [5+] » (Mistral), « 3 blocs en
+ * orange (Peu difficile, 5+) » ou « 3 blocs en 5+ » (règles), suivie ou non de « , 4 essais max ».
+ */
+const VOLUME_LINE =
+  /^(\d+(?: à \d+)? (?:blocs?|voies?)) en (\[[^\]]+\]|[^,()[\]]+(?: \([^()]*\))?)(?:, (.+))?$/;
+
+/** Cotation désignée par le texte d'une consigne, si c'est bien une cotation connue. */
+function gradeOf(text: string, gym: Gym | undefined, style: Style): string | null {
+  const bracketed = /^\[(.+)\]$/.exec(text);
+  const candidate = bracketed
+    ? cleanGrade(bracketed[1])
+    : (/\(([^()]*)\)$/.exec(text)?.[1].split(', ').pop() ?? text).trim();
+  try {
+    gradeValue(candidate, REFERENCE_SYSTEM[style]);
+  } catch {
+    return null;
+  }
+  // Texte déjà rédigé par les règles : il doit être exactement le libellé de la cotation
+  if (!bracketed && gradeLabel(gym, style, candidate) !== text) return null;
+  return candidate;
+}
+
+/**
+ * Sort des consignes les lignes de volume (« 3 blocs en … »). Ce qui suit le volume
+ * (« 4 essais max par bloc ») reste une consigne.
+ */
+export function splitVolumes(
+  instructions: string[],
+  gym: Gym | undefined,
+  style: Style,
+): { volumes: TargetVolume[]; rest: string[] } {
+  const volumes: TargetVolume[] = [];
+  const rest: string[] = [];
+  for (const text of instructions) {
+    const m = VOLUME_LINE.exec(text.trim());
+    const grade = m ? gradeOf(m[2].trim(), gym, style) : null;
+    if (!m || !grade) {
+      rest.push(text);
+      continue;
+    }
+    const colors = gymColorsFor(gym, style, grade);
+    volumes.push({ count: m[1], grade, ...(colors.length > 0 && { colors }) });
+    if (m[3]) rest.push(m[3][0].toUpperCase() + m[3].slice(1));
+  }
+  return { volumes, rest };
+}
+
 /**
  * Ajoute à chaque niveau visé les couleurs de la salle, et écrit les cotations
  * des consignes avec le nom du niveau de la salle. Les couleurs éventuellement
  * renvoyées par le modèle sont ignorées : seule la config de la salle fait foi.
+ *
+ * Quand chaque cotation du badge a sa ligne de volume (« 3 blocs en [5+] »), ces
+ * lignes passent dans le badge : une ligne par cotation, avec ses propres couleurs.
+ * Sinon les consignes restent telles quelles, pour que le badge ne mente jamais.
  */
 export function withGymColors(plan: Plan, gym: Gym | undefined): Plan {
   return {
     ...plan,
     blocks: plan.blocks.map((raw) => {
-      const block = { ...raw, instructions: raw.instructions.map((i) => labelGrades(i, gym)) };
-      if (!block.target) return block;
-      const { colors: _fromModel, range: _oldRange, ...target } = block.target;
+      const label = (list: string[]) => list.map((i) => labelGrades(i, gym));
+      if (!raw.target) return { ...raw, instructions: label(raw.instructions) };
+      const { colors: _fromModel, range: _oldRange, volumes: _oldVolumes, ...target } = raw.target;
 
       // Le badge reflète ce que les consignes demandent vraiment, pas seulement
       // la cotation « cible » choisie à part par le modèle.
@@ -149,12 +208,18 @@ export function withGymColors(plan: Plan, gym: Gym | undefined): Plan {
       const range =
         grades.length > 1 ? { min: grades[0], max: grades[grades.length - 1] } : undefined;
 
+      const { volumes, rest } = splitVolumes(raw.instructions, gym, target.style);
+      const covered = new Set(volumes.map((v) => v.grade));
+      const useVolumes = volumes.length > 0 && shown.every((g) => covered.has(g));
+
       return {
-        ...block,
+        ...raw,
+        instructions: label(useVolumes ? rest : raw.instructions),
         target: {
           ...target,
           ...(range && { range }),
           ...(colors.length > 0 && { colors }),
+          ...(useVolumes && { volumes }),
         },
       };
     }),

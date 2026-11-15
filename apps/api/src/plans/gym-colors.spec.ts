@@ -5,6 +5,7 @@ import {
   gradeLabel,
   gymColorsFor,
   labelGrades,
+  splitVolumes,
   withGymColors,
 } from './gym-colors';
 import { analyzeHistory } from './history-analysis';
@@ -129,7 +130,8 @@ describe('withGymColors', () => {
         },
       ],
     };
-    expect(withGymColors(mixed, alpha).blocks[1].target).toEqual({
+    const block = withGymColors(mixed, alpha).blocks[1];
+    expect(block.target).toEqual({
       style: 'boulder',
       grade: '6A',
       range: { min: '6A', max: '6B' },
@@ -137,7 +139,80 @@ describe('withGymColors', () => {
         { color: 'bleu', hex: '#3b82f6' },
         { color: 'rouge', hex: '#ef4444' },
       ],
+      volumes: [
+        { count: '4 blocs', grade: '6A', colors: [{ color: 'bleu', hex: '#3b82f6' }] },
+        { count: '4 blocs', grade: '6A+', colors: [{ color: 'rouge', hex: '#ef4444' }] },
+        { count: '4 blocs', grade: '6B', colors: [{ color: 'rouge', hex: '#ef4444' }] },
+      ],
     });
+    expect(block.instructions).toEqual(['2 en rouge (6B)']);
+  });
+
+  const main = (instructions: string[], grade = '6B'): Plan => ({
+    ...plan,
+    blocks: [
+      plan.blocks[0],
+      {
+        kind: 'main',
+        title: 'Technique',
+        minutes: 15,
+        instructions,
+        target: { style: 'boulder', grade },
+      },
+    ],
+  });
+
+  it('sort la ligne de volume des consignes pour la mettre dans le badge', () => {
+    const block = withGymColors(
+      main(['3 blocs en [6B], 3 essais max par bloc', 'Pose la pointe du chausson']),
+      alpha,
+    ).blocks[1];
+    expect(block.target!.volumes).toEqual([
+      { count: '3 blocs', grade: '6B', colors: [{ color: 'rouge', hex: '#ef4444' }] },
+    ]);
+    expect(block.instructions).toEqual(['3 essais max par bloc', 'Pose la pointe du chausson']);
+  });
+
+  it('garde toutes les couleurs d’une cotation à cheval sur deux niveaux', () => {
+    const block = withGymColors(main(['3 blocs en [4]', 'Pieds précis'], '4'), alpha).blocks[1];
+    expect(block.target!.volumes).toEqual([
+      {
+        count: '3 blocs',
+        grade: '4',
+        colors: [
+          { color: 'jaune', hex: '#facc15' },
+          { color: 'vert', hex: '#22c55e' },
+        ],
+      },
+    ]);
+    expect(block.target!.colors).toEqual(block.target!.volumes![0].colors);
+  });
+
+  it('reconnaît les lignes déjà rédigées par les règles, même à deux couleurs', () => {
+    const block = withGymColors(
+      main([`3 blocs en ${gradeLabel(alpha, 'boulder', '4')}`, 'Pieds précis'], '4'),
+      alpha,
+    ).blocks[1];
+    expect(block.target!.volumes?.[0]).toMatchObject({ count: '3 blocs', grade: '4' });
+    expect(block.target!.volumes?.[0].colors).toHaveLength(2);
+    expect(block.instructions).toEqual(['Pieds précis']);
+  });
+
+  it('laisse les consignes intactes si une cotation du badge n’a pas de ligne de volume', () => {
+    const block = withGymColors(
+      main(['3 blocs en [6A]', 'Puis 1 bloc en [6C] au max'], '6A'),
+      alpha,
+    ).blocks[1];
+    expect(block.target!.volumes).toBeUndefined();
+    expect(block.instructions).toEqual(['3 blocs en bleu (6A)', 'Puis 1 bloc en noir (6C) au max']);
+  });
+
+  it('ignore les volumes renvoyés par le modèle et fonctionne sans salle', () => {
+    const raw = main(['2 blocs en [6B]', 'Gaine']);
+    raw.blocks[1].target!.volumes = [{ count: '99 blocs', grade: '8A' }];
+    const block = withGymColors(raw, undefined).blocks[1];
+    expect(block.target!.volumes).toEqual([{ count: '2 blocs', grade: '6B' }]);
+    expect(block.instructions).toEqual(['Gaine']);
   });
 
   it('retire les couleurs quand aucune salle n’est choisie', () => {
@@ -171,5 +246,26 @@ describe('salle et générateur à règles', () => {
     });
     const text = plan.blocks.flatMap((b) => b.instructions).join(' ');
     expect(text).toMatch(/(jaune|vert|bleu|rouge|noir|violet) \(/);
+  });
+
+  it('ne laisse aucune ligne de volume en consigne quand le badge la reprend', async () => {
+    let withVolumes = 0;
+    for (let day = 0; day < 30; day++) {
+      const plan = withGymColors(
+        await new RuleBasedGenerator().generate({
+          availableMinutes: 60 + (day % 4) * 20,
+          now: new Date(now.getTime() + day * 86_400_000),
+          history: [],
+          gym: alpha,
+        }),
+        alpha,
+      );
+      for (const b of plan.blocks.filter((x) => x.target?.volumes)) {
+        withVolumes++;
+        for (const v of b.target!.volumes!) expect(v.colors?.length).toBeGreaterThan(0);
+        expect(splitVolumes(b.instructions, alpha, 'boulder').volumes).toEqual([]);
+      }
+    }
+    expect(withVolumes).toBeGreaterThan(0);
   });
 });

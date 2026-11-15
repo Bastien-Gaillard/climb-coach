@@ -49,6 +49,35 @@ describe('LivePage · minuteur', () => {
     sessionStorage.clear();
   });
 
+  it('affiche le volume de chaque cotation avec ses couleurs', () => {
+    fixture.destroy();
+    const withVolumes = structuredClone(plan);
+    withVolumes.plan.blocks[0].target = {
+      style: 'boulder',
+      grade: '5+',
+      volumes: [
+        {
+          count: '3 blocs',
+          grade: '5+',
+          colors: [
+            { color: 'orange', hex: '#f97316' },
+            { color: 'bleu', hex: '#3b82f6' },
+          ],
+        },
+        { count: '2 blocs', grade: '6A', colors: [{ color: 'rouge', hex: '#ef4444' }] },
+      ],
+    };
+    TestBed.inject(PlanStore).set(withVolumes);
+    fixture = TestBed.createComponent(LivePage);
+    el = fixture.nativeElement;
+    fixture.detectChanges();
+
+    const rows = Array.from(el.querySelectorAll('[data-testid=target-volume]'));
+    expect(rows.map((r) => r.querySelectorAll('.hold-chip').length)).toEqual([2, 1]);
+    expect(rows[0].textContent).toContain('3 blocs');
+    expect(rows[1].textContent).toContain('rouge');
+  });
+
   it('décompte le temps réel', () => {
     expect(clock()).toBe('15:00');
     jasmine.clock().tick(61_000);

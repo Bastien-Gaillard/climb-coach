@@ -213,6 +213,58 @@ describe('GeneratePage', () => {
     expect(localStorage.getItem('climb-coach.gym')).toBe('alpha-bloc');
   });
 
+  it('affiche le volume de chaque cotation avec ses propres couleurs, même à cheval', () => {
+    click('Générer');
+    const withVolumes = structuredClone(response);
+    withVolumes.plan.blocks[1].instructions = ['Pose la pointe du chausson'];
+    withVolumes.plan.blocks[1].target = {
+      style: 'boulder',
+      grade: '5+',
+      volumes: [
+        {
+          count: '3 blocs',
+          grade: '5+',
+          colors: [
+            { color: 'orange', hex: '#f97316' },
+            { color: 'bleu', hex: '#3b82f6' },
+          ],
+        },
+        { count: '2 blocs', grade: '6A', colors: [{ color: 'rouge', hex: '#ef4444' }] },
+      ],
+    };
+    http.expectOne('/api/plans/generate').flush(withVolumes);
+    fixture.detectChanges();
+
+    const rows = Array.from(el.querySelectorAll('[data-testid=target-volume]'));
+    expect(rows.length).toBe(2);
+    expect(Array.from(rows[0].querySelectorAll('.hold-chip')).map((c) => c.textContent)).toEqual([
+      'orange',
+      'bleu',
+    ]);
+    expect(rows[0].textContent).toContain('3 blocs · Bloc · 5+');
+    expect(Array.from(rows[1].querySelectorAll('.hold-chip')).map((c) => c.textContent)).toEqual([
+      'rouge',
+    ]);
+    expect(rows[1].textContent).toContain('2 blocs · Bloc · 6A');
+    expect(el.querySelector('[data-testid=target-colors]')).toBeNull();
+    expect(el.querySelector('.blocks ul')?.textContent).not.toContain('3 blocs');
+  });
+
+  it('garde le volume dans un badge sans salle', () => {
+    click('Générer');
+    const noGym = structuredClone(response);
+    noGym.plan.blocks[1].target = {
+      style: 'boulder',
+      grade: '6A',
+      volumes: [{ count: '4 blocs', grade: '6A' }],
+    };
+    http.expectOne('/api/plans/generate').flush(noGym);
+    fixture.detectChanges();
+    expect(el.querySelector('[data-testid=target-volume]')?.textContent).toContain(
+      '4 blocs · Bloc · 6A',
+    );
+  });
+
   it('propose la durée idéale de la séance conseillée aujourd’hui', () => {
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({
