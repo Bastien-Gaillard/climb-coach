@@ -109,13 +109,21 @@ describe('analyzeHistory', () => {
       expect(a).toMatchObject({ focus: 'strength', intensity: 'light' });
     });
 
-    it('jamais de force avec une douleur', () => {
+    it('une douleur notée ne change rien : force gardée, intensité normale', () => {
       const a = analyzeHistory({
         ...ctx([session(3, now, { focus: 'technique', notes: 'douleur au doigt' })]),
         requestedFocus: 'strength',
       });
-      expect(a.focus).toBe('technique');
-      expect(a.reasons.join(' ')).toContain('Pas de force avec une douleur, même choisie');
+      expect(a).toMatchObject({ focus: 'strength', intensity: 'normal', pain: null });
+      expect(a.reasons.join(' ')).not.toContain('Douleur');
+    });
+
+    it('sans choix, la douleur allège toujours la séance', () => {
+      const a = analyzeHistory(
+        ctx([session(3, now, { focus: 'technique', notes: 'douleur au doigt' })]),
+      );
+      expect(a.intensity).toBe('light');
+      expect(a.focus).not.toBe('strength');
     });
   });
 

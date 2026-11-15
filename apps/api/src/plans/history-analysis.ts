@@ -145,7 +145,8 @@ export function analyzeHistory(ctx: GeneratorContext): HistoryAnalysis {
     );
   }
 
-  const pain = findRecentPain(ctx, recent);
+  // Type choisi à la main : les douleurs notées ne changent rien, le grimpeur décide
+  const pain = requested ? null : findRecentPain(ctx, recent);
   if (pain) {
     intensity = 'light';
     if (focus === 'strength') focus = 'technique';
@@ -154,8 +155,6 @@ export function analyzeHistory(ctx: GeneratorContext): HistoryAnalysis {
     reasons.push(
       `Douleur signalée ${when} (« ${pain.notes} ») : séance légère, sans forcer sur la zone`,
     );
-    if (requested === 'strength')
-      reasons.push('Pas de force avec une douleur, même choisie : séance de technique');
   }
 
   return {

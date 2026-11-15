@@ -242,7 +242,7 @@ Structure de la séance :
 - Le "grade" du "target" d'une partie est la cotation la plus dure demandée dans cette partie.
 
 Santé :
-- Tiens compte des notes du grimpeur : si une douleur ou une blessure est signalée, intensité "light", pas de travail en force, et aucun exercice qui sollicite la zone concernée (ex : doigts → pas de petites réglettes ni de suspensions ; épaule → pas de jetés ni de grands mouvements). Mentionne-le dans le résumé.
+- Tiens compte des notes du grimpeur : si une douleur ou une blessure est signalée, intensité "light", pas de travail en force, et aucun exercice qui sollicite la zone concernée (ex : doigts → pas de petites réglettes ni de suspensions ; épaule → pas de jetés ni de grands mouvements). Mentionne-le dans le résumé. Exception : quand le grimpeur a choisi lui-même le type de la séance, garde ce type et une intensité normale, même avec une douleur notée.
 
 Cotations :
 - Toujours en cotation Fontainebleau (ex : 5+, 6A, 6A+, 6B).

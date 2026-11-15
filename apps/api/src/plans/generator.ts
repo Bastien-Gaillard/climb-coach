@@ -16,8 +16,8 @@ export interface GeneratorContext {
   /** Objectif d'entraînement du profil : son type de séance revient environ une fois sur deux. */
   focusGoal?: Focus | null;
   /**
-   * Type de séance choisi pour aujourd'hui, à la place du planning. Respecté, sauf la force
-   * quand une douleur est signalée.
+   * Type de séance choisi pour aujourd'hui, à la place du planning. Toujours respecté, et les
+   * douleurs notées n'allègent pas la séance.
    */
   requestedFocus?: Focus;
   /** Points faibles du profil : un exercice par séance, et le type favorisé sans objectif. */
