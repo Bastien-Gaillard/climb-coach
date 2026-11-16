@@ -32,10 +32,17 @@ describe('ProfilePage', () => {
     el = fixture.nativeElement;
     fixture.detectChanges();
     http.expectOne('/api/auth/me').flush(profile);
+    http.expectOne('/api/health').flush({ status: 'ok', version: 'b4f66d2 · 16/11/2026 16:20' });
     fixture.detectChanges();
   });
 
   afterEach(() => http.verify());
+
+  it('affiche la version déployée sous « Changer de compte »', () => {
+    expect(el.querySelector('[data-testid=version]')?.textContent).toBe(
+      'Version b4f66d2 · 16/11/2026 16:20',
+    );
+  });
 
   it('affiche le matériel en cases à cocher, l’élastique coché', () => {
     expect(box('elastic').getAttribute('role')).toBe('checkbox');

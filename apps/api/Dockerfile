@@ -12,6 +12,10 @@ COPY packages/grades packages/grades
 COPY apps/api apps/api
 RUN pnpm --filter "@climb-coach/api..." build \
   && pnpm --filter @climb-coach/api deploy --legacy --prod /out
+# Version affichée dans le profil : le dernier commit du dépôt (lue par /api/health)
+RUN apk add --no-cache git
+COPY .git .git
+RUN git log -1 --format='%h · %cd' --date=format:'%d/%m/%Y %H:%M' > /out/version.txt
 
 FROM node:22-alpine
 WORKDIR /app

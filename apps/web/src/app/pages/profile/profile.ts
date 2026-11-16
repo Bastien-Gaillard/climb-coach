@@ -152,8 +152,14 @@ export class ProfilePage implements OnInit {
   protected readonly profile = signal<Profile | null>(null);
   protected readonly error = signal<string | null>(null);
   protected readonly saving = signal(false);
+  /** Dernier commit déployé, pour vérifier qu'une mise à jour est bien en ligne. */
+  protected readonly version = signal<string | null>(null);
 
   ngOnInit(): void {
+    this.api.version().subscribe({
+      next: (v) => this.version.set(v.version),
+      error: () => this.version.set(null),
+    });
     this.api.profile().subscribe({
       next: (p) => this.profile.set(p),
       error: (err) => this.error.set(errorMessage(err)),

@@ -118,3 +118,6 @@
 </ng-template>
 
 <button type="button" class="ghost switch" (click)="auth.logout()">Changer de compte</button>
+@if (version(); as v) {
+<p class="version" data-testid="version">Version {{ v }}</p>
+}

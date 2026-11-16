@@ -81,6 +81,11 @@ export class ApiService {
     return this.http.get<AiStatus>(`${this.base}/plans/ai-status`);
   }
 
+  /** Version déployée de l'appli (dernier commit), « dev » en local. */
+  version(): Observable<{ version: string }> {
+    return this.http.get<{ version: string }>(`${this.base}/health`);
+  }
+
   /** Compte connecté et ses réglages. */
   profile(): Observable<Profile> {
     return this.http.get<Profile>(`${this.base}/auth/me`);

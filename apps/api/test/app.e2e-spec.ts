@@ -66,7 +66,8 @@ describe('API (e2e)', () => {
     return res.body.id as string;
   };
 
-  it('GET /api/health', () => anonymous().get('/api/health').expect(200, { status: 'ok' }));
+  it('GET /api/health', () =>
+    anonymous().get('/api/health').expect(200, { status: 'ok', version: 'dev' }));
 
   describe('comptes', () => {
     const session = {
