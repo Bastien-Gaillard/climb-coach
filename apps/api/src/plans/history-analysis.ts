@@ -1,6 +1,7 @@
 import { FONT, FRENCH } from '@climb-coach/grades';
 import { pointLabels, POINT_GROUP } from '../auth/climbing-points';
 import { favoredFocus, focusWeights, nextFocus } from './focus-balance';
+import { DeclaredLevel } from './declared-level';
 import { GeneratorContext } from './generator';
 import { mentionsPain } from './pain-notes';
 import { Focus } from './plan.schema';
@@ -50,6 +51,29 @@ export const FOCUS_LABEL: Record<Focus, string> = {
 export const ofFocus = (f: Focus) => (f === 'endurance' ? 'd’endurance' : `de ${FOCUS_LABEL[f]}`);
 
 export function analyzeHistory(ctx: GeneratorContext): HistoryAnalysis {
+  return withDeclaredLevel(analyzeSessions(ctx), ctx.level);
+}
+
+/**
+ * Le niveau stable déclaré dans la salle sert de plancher : l'historique ne fait descendre ni le
+ * niveau max ni le niveau visé en force en dessous. Celui-ci vise la couleur suivante.
+ */
+function withDeclaredLevel(a: HistoryAnalysis, level?: DeclaredLevel): HistoryAnalysis {
+  if (!level || level.style !== a.style) return a;
+  const top = MAX_LEVEL[a.style];
+  const maxSent = Math.min(top, Math.max(a.maxSent, level.value));
+  const project = Math.min(top, Math.max(a.project, level.project, maxSent));
+  if (maxSent === a.maxSent && project === a.project) return a;
+  const aim = level.next ? `, on vise le ${level.next} au max en force` : '';
+  return {
+    ...a,
+    maxSent,
+    project,
+    reasons: [...a.reasons, `Niveau stable déclaré à ${level.gymName} : ${level.color}${aim}`],
+  };
+}
+
+function analyzeSessions(ctx: GeneratorContext): HistoryAnalysis {
   const recent = ctx.history.slice(0, RECENT_SESSIONS);
   const last = recent[0];
 

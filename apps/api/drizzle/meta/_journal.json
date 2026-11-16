@@ -64,6 +64,13 @@
       "when": 1794779615458,
       "tag": "0008_focus_goal",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1794782588216,
+      "tag": "0009_gym_levels",
+      "breakpoints": true
     }
   ]
 }

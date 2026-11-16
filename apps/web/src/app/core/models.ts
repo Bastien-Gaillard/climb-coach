@@ -1,8 +1,13 @@
+import type { Gym as BaseGym } from '@climb-coach/grades';
+
 export type Focus = 'strength' | 'endurance' | 'technique';
 export type Style = 'boulder' | 'route';
 export type GradeSystemId = 'french' | 'yds' | 'font' | 'vscale';
 
-export type { Gym, GymColor } from '@climb-coach/grades';
+export type { GymColor } from '@climb-coach/grades';
+
+/** Salle, avec le niveau stable du compte connecté (une de ses couleurs, ou null). */
+export type Gym = BaseGym & { myLevel?: string | null };
 
 /** Corps envoyé pour créer ou modifier une salle (l'id est calculé par l'API). */
 export interface GymInput {
@@ -10,6 +15,8 @@ export interface GymInput {
   discipline: Style;
   system: GradeSystemId;
   colors: { color: string; hex?: string; min: string; max: string }[];
+  /** Couleur que le compte passe presque à coup sûr (null : non renseigné). */
+  myLevel?: string | null;
 }
 
 export interface Climb {

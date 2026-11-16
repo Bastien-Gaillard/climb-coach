@@ -23,17 +23,27 @@
 <ul class="gyms">
   @for (g of store.gyms(); track g.id) {
   <li>
-    <button type="button" class="gym card" (click)="startEdit(g)" [attr.aria-label]="'Modifier ' + g.name">
+    <button
+      type="button"
+      class="gym card"
+      (click)="startEdit(g)"
+      [attr.aria-label]="'Modifier ' + g.name"
+    >
       <span class="who">
         <strong>{{ g.name }}</strong>
         <span class="muted small">
           {{ styleLabel[g.discipline] }} · {{ scales[g.system].label }} · {{ g.colors.length }}
-          couleur{{ g.colors.length > 1 ? 's' : '' }}
+          couleur{{ g.colors.length > 1 ? 's' : '' }} @if (g.myLevel) { · ton niveau : {{ g.myLevel
+          }} }
         </span>
       </span>
       <span class="ladder">
         @for (c of g.colors; track c.color) {
-        <span class="hold" [style]="holdVars(c.hex)" [title]="c.color + ' : ' + c.min + ' → ' + c.max"></span>
+        <span
+          class="hold"
+          [style]="holdVars(c.hex)"
+          [title]="c.color + ' : ' + c.min + ' → ' + c.max"
+        ></span>
         }
         <span class="num range">{{ range(g) }}</span>
       </span>

@@ -6,6 +6,7 @@ import {
   jsonb,
   pgEnum,
   pgTable,
+  primaryKey,
   real,
   smallint,
   text,
@@ -89,6 +90,25 @@ export const gyms = pgTable('gyms', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+/**
+ * Niveau stable de chaque grimpeur dans chaque salle : une couleur de la salle, celle qu'il passe
+ * presque à coup sûr. Les salles sont partagées, le niveau est propre à chaque compte.
+ */
+export const gymLevels = pgTable(
+  'gym_levels',
+  {
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    gymId: text('gym_id')
+      .notNull()
+      .references(() => gyms.id, { onDelete: 'cascade' }),
+    color: text('color').notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.gymId] })],
+);
 
 export const generatedPlans = pgTable('generated_plans', {
   id: uuid('id').primaryKey().defaultRandom(),

@@ -1,11 +1,13 @@
+import { Gym } from '@climb-coach/grades';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { desc, eq } from 'drizzle-orm';
 import { Database, DB } from '../db/db.module';
 import { generatedPlans, schedulePlans, StoredPlannedSession } from '../db/schema';
 import { GymsService } from '../gyms/gyms.service';
-import { SessionsService } from '../sessions/sessions.service';
+import { SessionsService, SessionWithClimbs } from '../sessions/sessions.service';
 import { ClimbingPoint } from '../auth/climbing-points';
 import { Equipment } from '../auth/equipment';
+import { DeclaredLevel, declaredLevel } from './declared-level';
 import { GeneratorContext } from './generator';
 import { withGymColors } from './gym-colors';
 import { MistralGenerator } from './mistral.generator';
@@ -85,6 +87,7 @@ export class PlansService {
       this.sessions.findRecent(userId, 10),
       gymId ? this.gyms.findOne(gymId) : undefined,
     ]);
+    const level = await this.levelFor(userId, gym, history);
     const ctx: GeneratorContext = {
       availableMinutes,
       now: this.clock(),
@@ -95,6 +98,7 @@ export class PlansService {
       focusGoal: points.focusGoal ?? null,
     };
     if (gym) ctx.gym = gym;
+    if (level) ctx.level = level;
     if (requestedFocus) ctx.requestedFocus = requestedFocus;
 
     let source: GeneratedPlanResult['source'] = 'rules';
@@ -219,6 +223,23 @@ export class PlansService {
       }
     }
     return this.schedule(userId, horizonDays, sessionsPerWeek, points);
+  }
+
+  /**
+   * Niveau stable déclaré par le compte dans la salle du jour, sinon dans la salle de son dernier
+   * bloc noté en couleur.
+   */
+  private async levelFor(
+    userId: string,
+    gym: Gym | undefined,
+    history: SessionWithClimbs[],
+  ): Promise<DeclaredLevel | undefined> {
+    const gymId = gym?.id ?? history.flatMap((s) => s.climbs).find((c) => c.gymId)?.gymId;
+    if (!gymId) return undefined;
+    const color = await this.gyms.levelOf(userId, gymId);
+    if (!color) return undefined;
+    const levelGym = gym ?? (await this.gyms.findOne(gymId).catch(() => undefined));
+    return (levelGym && declaredLevel(levelGym, color)) ?? undefined;
   }
 
   /** Attend la fin du planning en cours de calcul (utile aux tests). */

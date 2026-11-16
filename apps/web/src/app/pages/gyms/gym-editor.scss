@@ -217,3 +217,15 @@
     margin-left: auto;
   }
 }
+
+.level-sec {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+
+  .level {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+}

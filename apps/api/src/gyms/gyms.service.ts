@@ -1,8 +1,8 @@
 import { defineGym, Gym, GradeError } from '@climb-coach/grades';
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { asc, eq, inArray, like } from 'drizzle-orm';
+import { and, asc, eq, inArray, like } from 'drizzle-orm';
 import { Database, DB } from '../db/db.module';
-import { gyms } from '../db/schema';
+import { gymLevels, gyms } from '../db/schema';
 import { GymInput, slugify } from './gym.dto';
 
 type GymRow = typeof gyms.$inferSelect;
@@ -54,6 +54,35 @@ export class GymsService {
       .set({ ...input, colors: gym.colors, updatedAt: new Date() })
       .where(eq(gyms.id, id));
     return gym;
+  }
+
+  /** Niveau stable du compte dans chaque salle (couleur), par id de salle. */
+  async levels(userId: string): Promise<Map<string, string>> {
+    const rows = await this.db.select().from(gymLevels).where(eq(gymLevels.userId, userId));
+    return new Map(rows.map((r) => [r.gymId, r.color]));
+  }
+
+  async levelOf(userId: string, gymId: string): Promise<string | null> {
+    const [row] = await this.db
+      .select()
+      .from(gymLevels)
+      .where(and(eq(gymLevels.userId, userId), eq(gymLevels.gymId, gymId)));
+    return row?.color ?? null;
+  }
+
+  /** Enregistre (ou efface avec null) le niveau stable du compte dans une salle. */
+  async setLevel(userId: string, gymId: string, color: string | null): Promise<void> {
+    if (!color) {
+      await this.db
+        .delete(gymLevels)
+        .where(and(eq(gymLevels.userId, userId), eq(gymLevels.gymId, gymId)));
+      return;
+    }
+    const values = { color, updatedAt: new Date() };
+    await this.db
+      .insert(gymLevels)
+      .values({ userId, gymId, ...values })
+      .onConflictDoUpdate({ target: [gymLevels.userId, gymLevels.gymId], set: values });
   }
 
   /** Les voies déjà saisies gardent leur cotation et leur couleur : rien à faire côté séances. */

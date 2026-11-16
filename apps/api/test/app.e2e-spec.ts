@@ -221,6 +221,52 @@ describe('API (e2e)', () => {
       await http().get(`/api/gyms/${gym.id}`).expect(404);
     });
 
+    it('garde le niveau stable de chaque compte, et la force vise la couleur au-dessus', async () => {
+      const digne = {
+        ...body,
+        name: 'Digne a Bloc',
+        colors: [
+          { color: 'vert', min: '5+', max: '6A' },
+          { color: 'bleu', min: '6A+', max: '6B' },
+          { color: 'rose', min: '6B+', max: '6C' },
+        ],
+      };
+      const { body: gym } = await http()
+        .post('/api/gyms')
+        .send({ ...digne, myLevel: 'Bleu' })
+        .expect(201);
+      expect(gym.myLevel).toBe('bleu');
+      // Salle partagée, niveau propre à chaque compte
+      expect((await http('tophe').get(`/api/gyms/${gym.id}`).expect(200)).body.myLevel).toBeNull();
+      await http('tophe')
+        .put(`/api/gyms/${gym.id}`)
+        .send({ ...digne, myLevel: 'vert' })
+        .expect(200);
+      const mine = (await http().get('/api/gyms').expect(200)).body;
+      expect(mine[0].myLevel).toBe('bleu');
+      // Sans myLevel, une modification de la salle garde le niveau
+      await http().put(`/api/gyms/${gym.id}`).send(digne).expect(200);
+      expect((await http().get(`/api/gyms/${gym.id}`).expect(200)).body.myLevel).toBe('bleu');
+      await http()
+        .put(`/api/gyms/${gym.id}`)
+        .send({ ...digne, myLevel: 'noir' })
+        .expect(400);
+
+      const { body: plan } = await http()
+        .post('/api/plans/generate')
+        .send({ availableMinutes: 90, gymId: gym.id, focus: 'strength' })
+        .expect(201);
+      const main = plan.plan.blocks.filter((b: { kind: string }) => b.kind === 'main');
+      expect(main[0].target.grade).toBe('6B+');
+      expect(plan.plan.summary).toContain('Niveau stable déclaré à Digne a Bloc : bleu');
+
+      await http()
+        .put(`/api/gyms/${gym.id}`)
+        .send({ ...digne, myLevel: null })
+        .expect(200);
+      expect((await http().get(`/api/gyms/${gym.id}`).expect(200)).body.myLevel).toBeNull();
+    });
+
     it('refuse une plage incohérente avec un message clair', async () => {
       const res = await http()
         .post('/api/gyms')

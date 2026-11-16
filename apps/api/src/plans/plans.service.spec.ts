@@ -26,10 +26,13 @@ function setup({
   enabled,
   mistral,
   advise,
+  level = null,
 }: {
   enabled: boolean;
   mistral?: () => Promise<Plan>;
   advise?: () => Promise<MonthPlan>;
+  /** Niveau stable déclaré par le compte dans la salle. */
+  level?: string | null;
 }) {
   const inserted: unknown[] = [];
   /** Plannings enregistrés (table schedule_plans), par compte. */
@@ -63,6 +66,7 @@ function setup({
 
   const gyms = {
     findOne: jest.fn(async (id: string) => EXAMPLE_GYMS.find((g) => g.id === id)!),
+    levelOf: jest.fn(async () => level),
   } as unknown as GymsService;
 
   const advisor = {
@@ -79,7 +83,7 @@ function setup({
     gyms,
     advisor,
   );
-  return { service, inserted, mistralGen, rulesSpy, sessions, advisor, savedPlans };
+  return { service, inserted, mistralGen, rulesSpy, sessions, advisor, savedPlans, gyms };
 }
 
 describe('PlansService.generate', () => {
@@ -131,6 +135,36 @@ describe('PlansService.generate', () => {
       likedPoints: [],
       focusGoal: null,
     });
+  });
+
+  it('passe le niveau déclaré dans la salle du jour', async () => {
+    const { service, mistralGen, gyms } = setup({ enabled: true, level: 'bleu' });
+    await service.generate('u1', 60, 'alpha-bloc');
+    expect(gyms.levelOf).toHaveBeenCalledWith('u1', 'alpha-bloc');
+    expect(mistralGen.generate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: expect.objectContaining({ color: 'bleu', next: 'rouge' }),
+      }),
+    );
+  });
+
+  it('sans salle choisie : le niveau de la salle du dernier bloc noté en couleur', async () => {
+    const { service, mistralGen, gyms, sessions } = setup({ enabled: true, level: 'bleu' });
+    const last = session(2, now, { climbList: [{ grade: '6A', value: 6 }] });
+    last.climbs[0].gymId = 'alpha-bloc';
+    (sessions.findRecent as jest.Mock).mockResolvedValue([last]);
+    await service.generate('u1', 60);
+    expect(gyms.levelOf).toHaveBeenCalledWith('u1', 'alpha-bloc');
+    expect(mistralGen.generate).toHaveBeenCalledWith(
+      expect.objectContaining({ level: expect.objectContaining({ color: 'bleu' }) }),
+    );
+  });
+
+  it('sans salle ni bloc en couleur : pas de niveau déclaré', async () => {
+    const { service, mistralGen, gyms } = setup({ enabled: true, level: 'bleu' });
+    await service.generate('u1', 60);
+    expect(gyms.levelOf).not.toHaveBeenCalled();
+    expect((mistralGen.generate as jest.Mock).mock.calls[0][0].level).toBeUndefined();
   });
 
   it('passe l’objectif et le type choisi au générateur', async () => {

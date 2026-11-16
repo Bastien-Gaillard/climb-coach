@@ -19,6 +19,14 @@ export const GymInputSchema = z.object({
 
 export type GymInput = z.infer<typeof GymInputSchema>;
 
+/** Corps de création ou de modification : la salle, et le niveau stable du compte connecté. */
+export const GymBodySchema = GymInputSchema.extend({
+  /** Couleur que le grimpeur passe presque à coup sûr (null : effacer, absent : inchangé). */
+  myLevel: z.string().trim().min(1).max(30).nullable().optional(),
+});
+
+export type GymBody = z.infer<typeof GymBodySchema>;
+
 /** « Bloc Session Digne » -> « bloc-session-digne » */
 export function slugify(name: string): string {
   const slug = name

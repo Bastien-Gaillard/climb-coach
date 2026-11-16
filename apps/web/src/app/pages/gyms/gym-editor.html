@@ -1,6 +1,11 @@
 <form [formGroup]="form" (ngSubmit)="submit()" class="editor" data-testid="gym-editor">
   <header class="bar-head">
-    <button type="button" class="ghost icon" (click)="cancelled.emit()" aria-label="Retour aux salles">
+    <button
+      type="button"
+      class="ghost icon"
+      (click)="cancelled.emit()"
+      aria-label="Retour aux salles"
+    >
       <app-icon name="back" [stroke]="2.4" />
     </button>
     <h1>{{ gym() ? 'Modifier la salle' : 'Nouvelle salle' }}</h1>
@@ -24,7 +29,11 @@
         </button>
         }
       </div>
-      <select formControlName="system" (change)="onSystemChange()" aria-label="Cotations de la salle">
+      <select
+        formControlName="system"
+        (change)="onSystemChange()"
+        aria-label="Cotations de la salle"
+      >
         @for (s of systems(); track s.system) {
         <option [value]="s.system">{{ s.label }}</option>
         }
@@ -66,14 +75,30 @@
       @for (c of colors.controls; track c; let i = $index; let first = $first; let last = $last) {
       <li [formGroupName]="i" [class.invalid]="rangeError(c)">
         <span class="order">
-          <button type="button" class="ghost" (click)="moveColor(i, -1)" [disabled]="first" aria-label="Monter">
+          <button
+            type="button"
+            class="ghost"
+            (click)="moveColor(i, -1)"
+            [disabled]="first"
+            aria-label="Monter"
+          >
             <app-icon name="up" [size]="16" [stroke]="2.6" />
           </button>
-          <button type="button" class="ghost" (click)="moveColor(i, 1)" [disabled]="last" aria-label="Descendre">
+          <button
+            type="button"
+            class="ghost"
+            (click)="moveColor(i, 1)"
+            [disabled]="last"
+            aria-label="Descendre"
+          >
             <app-icon name="chevron" [size]="16" [stroke]="2.6" />
           </button>
         </span>
-        <label class="swatch hold" [style]="holdVars(c.value.hex)" title="Changer la couleur affichée">
+        <label
+          class="swatch hold"
+          [style]="holdVars(c.value.hex)"
+          title="Changer la couleur affichée"
+        >
           <input type="color" formControlName="hex" aria-label="Couleur affichée" />
         </label>
         <input
@@ -112,6 +137,24 @@
     </ol>
   </section>
 
+  <section class="level-sec">
+    <label class="level">
+      <span class="overline">Mon niveau stable</span>
+      <select formControlName="myLevel" aria-label="Mon niveau stable" data-testid="my-level">
+        <option value="">Pas renseigné</option>
+        @for (c of levelOptions(); track c) {
+        <option [value]="c">{{ c }}</option>
+        }
+      </select>
+    </label>
+    <p class="muted small">
+      La couleur que tu passes presque à coup sûr, pas celle d'un exploit. L'appli ne descend jamais
+      en dessous pour ton niveau, @if (nextLevel(); as n) { et vise le
+      <strong>{{ n }}</strong> au max en force. } @else { et vise un cran au-dessus au max en force.
+      } Il ne vaut que pour ton compte.
+    </p>
+  </section>
+
   @if (error(); as e) {
   <p class="error">{{ e }}</p>
   }
@@ -121,7 +164,11 @@
     <button type="button" class="ghost danger" (click)="removeRequested.emit()">Supprimer</button>
     }
     <button type="button" class="ghost cancel" (click)="cancelled.emit()">Annuler</button>
-    <button type="submit" class="primary big grow" [disabled]="form.invalid || hasRangeError() || saving()">
+    <button
+      type="submit"
+      class="primary big grow"
+      [disabled]="form.invalid || hasRangeError() || saving()"
+    >
       {{ saving() ? 'Enregistrement…' : gym() ? 'Enregistrer' : 'Créer la salle' }}
     </button>
   </div>

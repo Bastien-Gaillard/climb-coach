@@ -1,4 +1,4 @@
-import { colorsForGrade, convertColor, GradeError } from '@climb-coach/grades';
+import { colorsForGrade, convertColor, GradeError, Gym } from '@climb-coach/grades';
 import {
   BadRequestException,
   Body,
@@ -12,8 +12,10 @@ import {
   Query,
 } from '@nestjs/common';
 import { z } from 'zod';
+import { CurrentUser } from '../auth/auth.decorators';
+import type { User } from '../auth/users.service';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
-import { GymInput, GymInputSchema } from './gym.dto';
+import { GymBody, GymBodySchema } from './gym.dto';
 import { GymsService } from './gyms.service';
 
 const System = z.enum(['french', 'yds', 'font', 'vscale']);
@@ -29,28 +31,59 @@ function run<T>(fn: () => T): T {
   }
 }
 
+/** La salle et le niveau du compte, s'il désigne encore une de ses couleurs. */
+function withLevel(gym: Gym, color: string | null | undefined): Gym & { myLevel: string | null } {
+  const known = gym.colors.find((c) => c.color.toLowerCase() === color?.toLowerCase());
+  return { ...gym, myLevel: known?.color ?? null };
+}
+
+/** Le niveau déclaré doit être une des couleurs de la salle (on garde son orthographe). */
+function levelColor(colors: { color: string }[], level: string | null | undefined): string | null {
+  if (!level) return null;
+  const known = colors.find((c) => c.color.trim().toLowerCase() === level.toLowerCase());
+  if (!known) throw new BadRequestException(`« ${level} » n'est pas une couleur de la salle`);
+  return known.color.trim();
+}
+
 @Controller('gyms')
 export class GymsController {
   constructor(private readonly gyms: GymsService) {}
 
   @Get()
-  list() {
-    return this.gyms.list();
+  async list(@CurrentUser() user: User) {
+    const [list, levels] = await Promise.all([this.gyms.list(), this.gyms.levels(user.id)]);
+    return list.map((g) => withLevel(g, levels.get(g.id)));
   }
 
   @Get(':id')
-  get(@Param('id') id: string) {
-    return this.gyms.findOne(id);
+  async get(@CurrentUser() user: User, @Param('id') id: string) {
+    const gym = await this.gyms.findOne(id);
+    return withLevel(gym, await this.gyms.levelOf(user.id, id));
   }
 
   @Post()
-  create(@Body(new ZodValidationPipe(GymInputSchema)) body: GymInput) {
-    return this.gyms.create(body);
+  async create(
+    @CurrentUser() user: User,
+    @Body(new ZodValidationPipe(GymBodySchema)) body: GymBody,
+  ) {
+    const { myLevel, ...input } = body;
+    const level = levelColor(input.colors, myLevel);
+    const gym = await this.gyms.create(input);
+    if (level) await this.gyms.setLevel(user.id, gym.id, level);
+    return withLevel(gym, level);
   }
 
   @Put(':id')
-  update(@Param('id') id: string, @Body(new ZodValidationPipe(GymInputSchema)) body: GymInput) {
-    return this.gyms.update(id, body);
+  async update(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(GymBodySchema)) body: GymBody,
+  ) {
+    const { myLevel, ...input } = body;
+    const level = levelColor(input.colors, myLevel);
+    const gym = await this.gyms.update(id, input);
+    if (myLevel !== undefined) await this.gyms.setLevel(user.id, id, level);
+    return withLevel(gym, myLevel !== undefined ? level : await this.gyms.levelOf(user.id, id));
   }
 
   @Delete(':id')

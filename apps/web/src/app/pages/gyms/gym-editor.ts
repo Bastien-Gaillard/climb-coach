@@ -90,6 +90,8 @@ export class GymEditor {
     discipline: this.fb.control<Style>('boulder'),
     system: this.fb.control<GradeSystem>('font'),
     colors: this.fb.array<ColorGroup>([]),
+    /** Niveau stable du compte : nom d'une des couleurs, ou '' si non renseigné. */
+    myLevel: [''],
   });
 
   protected readonly value = toSignal(this.form.valueChanges, { initialValue: this.form.value });
@@ -97,6 +99,19 @@ export class GymEditor {
   get colors(): FormArray<ColorGroup> {
     return this.form.controls.colors;
   }
+
+  /** Couleurs proposées pour le niveau : celles du formulaire, telles qu'elles sont tapées. */
+  protected readonly levelOptions = computed(() =>
+    (this.value().colors ?? []).map((c) => c?.color?.trim() ?? '').filter((c) => c.length > 0),
+  );
+
+  /** Couleur juste au-dessus du niveau : celle que la force vise au max. */
+  protected readonly nextLevel = computed(() => {
+    const options = this.levelOptions();
+    const level = (this.value().myLevel ?? '').toLowerCase();
+    const i = options.findIndex((c) => c.toLowerCase() === level);
+    return i >= 0 ? (options[i + 1] ?? null) : null;
+  });
 
   protected readonly system = computed(() => (this.value().system ?? 'font') as GradeSystem);
   protected readonly grades = computed(() => SCALES[this.system()].grades.map(([g]) => g));
@@ -138,12 +153,17 @@ export class GymEditor {
       const gym = this.gym();
       this.colors.clear();
       if (gym) {
-        this.form.patchValue({ name: gym.name, discipline: gym.discipline, system: gym.system });
+        this.form.patchValue({
+          name: gym.name,
+          discipline: gym.discipline,
+          system: gym.system,
+          myLevel: gym.myLevel ?? '',
+        });
         gym.colors.forEach((c) =>
           this.colors.push(this.colorGroup(c.color, c.hex ?? '', c.min, c.max)),
         );
       } else {
-        this.form.reset({ name: '', discipline: 'boulder', system: 'font' });
+        this.form.reset({ name: '', discipline: 'boulder', system: 'font', myLevel: '' });
         this.addColor();
       }
       this.error.set(null);
@@ -220,6 +240,8 @@ export class GymEditor {
         min: c.min,
         max: c.max,
       })),
+      // Couleur renommée ou supprimée depuis : le niveau n'est plus renseigné
+      myLevel: this.levelOptions().find((c) => c.toLowerCase() === v.myLevel.toLowerCase()) ?? null,
     };
 
     const current = this.gym();

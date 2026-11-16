@@ -2,6 +2,7 @@ import { Gym } from '@climb-coach/grades';
 import { ClimbingPoint } from '../auth/climbing-points';
 import { Equipment } from '../auth/equipment';
 import { SessionWithClimbs } from '../sessions/sessions.service';
+import { DeclaredLevel } from './declared-level';
 import { Focus, Plan } from './plan.schema';
 
 export interface GeneratorContext {
@@ -22,6 +23,11 @@ export interface GeneratorContext {
   requestedFocus?: Focus;
   /** Points faibles du profil : un exercice par séance, et le type favorisé sans objectif. */
   weakPoints?: ClimbingPoint[];
+  /**
+   * Niveau stable déclaré dans la salle du jour (ou la dernière fréquentée) : plancher du niveau
+   * max, et sa couleur suivante est visée au max en force.
+   */
+  level?: DeclaredLevel;
   /** Ce que le grimpeur aime : au moins un exercice par séance, en dernier. */
   likedPoints?: ClimbingPoint[];
 }

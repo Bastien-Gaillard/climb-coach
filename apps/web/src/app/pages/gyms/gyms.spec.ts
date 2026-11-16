@@ -55,6 +55,7 @@ describe('GymsPage', () => {
       discipline: 'boulder',
       system: 'font',
       colors: [{ color: 'jaune', hex: '#f2c230', min: '4', max: '5+' }],
+      myLevel: null,
     });
     req.flush({ id: 'bloc-session-digne', ...req.request.body });
     fixture.detectChanges();
@@ -82,6 +83,30 @@ describe('GymsPage', () => {
     expect(req.request.body.name).toBe('Alpha');
     expect(req.request.body.colors.length).toBe(6);
     req.flush({ ...EXAMPLE_GYMS[0], name: 'Alpha' });
+  });
+
+  it('choisit son niveau stable parmi les couleurs et dit ce que la force visera', () => {
+    http.expectOne('/api/gyms').flush([{ ...EXAMPLE_GYMS[0], myLevel: 'vert' }]);
+    fixture.detectChanges();
+    expect(el.textContent).toContain('ton niveau : vert');
+
+    el.querySelector<HTMLButtonElement>(
+      'button[aria-label="Modifier Salle Alpha (bloc)"]',
+    )!.click();
+    fixture.detectChanges();
+    const level = el.querySelector<HTMLSelectElement>('[data-testid=my-level]')!;
+    expect(level.value).toBe('vert');
+    expect(level.options.length).toBe(7);
+
+    level.value = 'bleu';
+    level.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    expect(el.textContent).toContain('vise le rouge au max en force');
+
+    click('Enregistrer');
+    const req = http.expectOne('/api/gyms/alpha-bloc');
+    expect(req.request.body.myLevel).toBe('bleu');
+    req.flush({ ...EXAMPLE_GYMS[0], myLevel: 'bleu' });
   });
 
   it('bloque l’enregistrement quand une plage est à l’envers', () => {
