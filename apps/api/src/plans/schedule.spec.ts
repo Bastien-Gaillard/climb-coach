@@ -128,3 +128,28 @@ describe('buildSchedule · point faible', () => {
     for (let i = 1; i < days.length; i++) expect(days[i] - days[i - 1]).toBeGreaterThanOrEqual(2);
   });
 });
+
+describe('buildSchedule · rythme tenu avec un type favorisé', () => {
+  const history = [session(1, now, { focus: 'technique' })];
+  const weeks = (sessionsPerWeek: number, focusGoal: 'strength' | 'endurance' | 'technique') => {
+    const s = buildSchedule(history, now, { horizonDays: 42, sessionsPerWeek, focusGoal });
+    return [0, 1, 2, 3, 4, 5].map(
+      (w) => s.sessions.filter((p) => Math.floor(p.inDays / 7) === w).length,
+    );
+  };
+
+  it('objectif force : une séance par jour à 7 par semaine', () => {
+    expect(weeks(7, 'strength')).toEqual(Array(6).fill(7));
+  });
+
+  it('quel que soit l’objectif : le rythme sur la durée, à une séance près par semaine', () => {
+    for (const goal of ['strength', 'endurance', 'technique'] as const) {
+      for (const n of [3, 4, 5, 6]) {
+        const counts = weeks(n, goal);
+        const total = counts.reduce((x, y) => x + y, 0);
+        expect(Math.abs(total - 6 * n)).toBeLessThanOrEqual(1);
+        for (const c of counts) expect(Math.abs(c - n)).toBeLessThanOrEqual(1);
+      }
+    }
+  });
+});

@@ -137,7 +137,7 @@ export function buildSchedule(
   // Même choix que le générateur, pour que la séance générée colle au planning
   let focus = nextFocus(pastFoci, weights);
   let intensity: PlannedSession['intensity'] = 'normal';
-  const exact = ruleGap(last.focus, focus, perWeek);
+  const exact = ruleGap(last.focus, focus, perWeek, weights);
   let gap = Math.max(1, Math.round(exact));
   let carry = exact - gap;
   const why: string[] = [];
@@ -229,7 +229,7 @@ function extendCycle(
     const prev = sessions[sessions.length - 1];
     const next = nextFocus([...sessions.map((s) => s.focus).reverse(), ...pastFoci], weights);
     // Le reste des arrondis est reporté : sur la durée, on tombe pile sur le rythme demandé
-    const exact = ruleGap(prev.focus, next, perWeek) + carry;
+    const exact = ruleGap(prev.focus, next, perWeek, weights) + carry;
     const gap = Math.max(1, Math.round(exact));
     carry = exact - gap;
     const date = addDays(prev.date, gap);
@@ -243,15 +243,33 @@ function extendCycle(
   return sessions;
 }
 
+/** Écart de base entre deux séances : la récup de la séance passée ou le repos voulu avant la suivante. */
+function rawGap(prev: Focus, next: Focus): number {
+  return Math.max(RECOVERY_DAYS[prev], READINESS_DAYS[next]);
+}
+
 /**
- * Écart (en jours, non arrondi) entre deux séances : le plus long entre la récup de la séance
- * passée et le repos voulu avant la suivante, mis à l'échelle du rythme hebdomadaire.
+ * Écart de base moyen sur un cycle complet du tourniquet : 7/3 jours en rotation égale, mais
+ * 2,5 jours quand la force est favorisée (force, endurance, force, technique).
+ */
+function meanRawGap(weights: FocusWeights): number {
+  const total = weights.strength + weights.endurance + weights.technique;
+  const played: Focus[] = ['strength'];
+  // Deux cycles pour se caler, puis on mesure les six suivants
+  const measured = 6 * total;
+  for (let i = 0; i < 2 * total + measured; i++) played.unshift(nextFocus(played, weights));
+  let sum = 0;
+  for (let i = 0; i < measured; i++) sum += rawGap(played[i + 1], played[i]);
+  return sum / measured;
+}
+
+/**
+ * Écart (en jours, non arrondi) entre deux séances : l'écart de base, mis à l'échelle pour que
+ * le cycle tienne pile le rythme hebdomadaire, quel que soit le type favorisé.
  * Avec 3 séances par semaine, le cycle force → endurance → technique dure 7 jours.
  */
-function ruleGap(prev: Focus, next: Focus, perWeek: number): number {
-  return (
-    (Math.max(RECOVERY_DAYS[prev], READINESS_DAYS[next]) * DEFAULT_SESSIONS_PER_WEEK) / perWeek
-  );
+function ruleGap(prev: Focus, next: Focus, perWeek: number, weights: FocusWeights): number {
+  return (rawGap(prev, next) * 7) / (perWeek * meanRawGap(weights));
 }
 
 function planned(
