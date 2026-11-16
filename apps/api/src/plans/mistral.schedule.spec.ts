@@ -5,6 +5,7 @@ import {
   MistralScheduleAdvisor,
   parseMonthPlan,
   shortWeeks,
+  trimMonthPlan,
 } from './mistral.schedule';
 import { buildSchedule } from './schedule';
 import { session } from './test-helpers';
@@ -172,6 +173,27 @@ describe('shortWeeks et completeMonthPlan', () => {
   });
 });
 
+describe('trimMonthPlan', () => {
+  it('retire d’abord la force collée à une autre, puis les séances les plus serrées', () => {
+    const week = [s(0, 'strength'), s(1, 'strength'), s(2), s(3, 'endurance'), s(6)];
+    const plan = trimMonthPlan(week as never, 3);
+    expect(plan).toHaveLength(3);
+    expect(plan.filter((x) => x.focus === 'strength')).toHaveLength(1);
+    expect(plan.map((x) => x.inDays)).toContain(6);
+  });
+
+  it('garde le type favorisé tant qu’il reste autre chose à retirer', () => {
+    const week = [s(0, 'strength'), s(1), s(2, 'strength'), s(3, 'endurance'), s(4, 'strength')];
+    const plan = trimMonthPlan(week as never, 3, { favored: 'strength' });
+    expect(plan.map((x) => x.focus)).toEqual(['strength', 'strength', 'strength']);
+  });
+
+  it('ne touche pas un plan au rythme ou en dessous', () => {
+    const plan = [s(1), s(3), s(8)];
+    expect(trimMonthPlan(plan as never, 3)).toEqual(plan);
+  });
+});
+
 describe('MistralScheduleAdvisor', () => {
   const advisorWith = (...answers: string[]) => {
     const chat = jest.fn();
@@ -209,29 +231,32 @@ describe('MistralScheduleAdvisor', () => {
     [0, 1, 2, 3].map((w) => plan.sessions.filter((x) => Math.floor(x.inDays / 7) === w).length);
   const full = [1, 3, 5, 8, 10, 12, 15, 17, 19, 22, 24, 26].map((d) => s(d));
 
-  it('plan sous le rythme : le dit à Mistral une fois et prend sa correction', async () => {
+  it('plan sous le rythme : complété par le code, sans rappeler Mistral', async () => {
     const { advisor, chat } = advisorWith(
-      JSON.stringify({ sessions: full.slice(0, 9) }),
-      JSON.stringify({ sessions: [...full.slice(0, 9), s(22), s(24), s(26)] }),
+      JSON.stringify({ summary: 'Mois régulier.', sessions: full.slice(0, 9) }),
     );
-    const plan = await advisor.advisePlan([session(2, now)], base);
-    expect(chat).toHaveBeenCalledTimes(2);
-    expect(chat.mock.calls[1][0].at(-1).content).toContain('jours 21 à 27 : 0 au lieu de 3');
-    expect(weekCounts(plan)).toEqual([3, 3, 3, 3]);
-    expect(plan.sessions.every((x) => x.reason === 'ok')).toBe(true);
-  });
-
-  it('correction ratée ou encore trop courte : le plan est complété sans Mistral', async () => {
-    const { advisor, chat } = advisorWith(JSON.stringify({ sessions: full.slice(0, 9) }), 'oups');
     const plan = await advisor.advisePlan(history, base);
-    expect(chat).toHaveBeenCalledTimes(2);
-    // Séance déjà faite aujourd'hui : 2 de plus la première semaine
-    expect(weekCounts(plan)).toEqual([3, 3, 3, 3]);
+    expect(chat).toHaveBeenCalledTimes(1);
+    expect(plan.summary).toBe('Mois régulier.');
+    // Séance déjà faite aujourd'hui : elle compte, il n'en reste que 2 la première semaine
+    expect(weekCounts(plan)).toEqual([2, 3, 3, 3]);
     expect(plan.sessions.some((x) => x.inDays === 0)).toBe(false);
     expect(plan.sessions.filter((x) => x.reason.startsWith('Ajoutée'))).toHaveLength(3);
   });
 
-  it('moins de séances pour raison de santé : ni relance ni complément', async () => {
+  it('semaines trop chargées : ramenées au rythme, les semaines justes restent intactes', async () => {
+    // Comme Mistral à 4 par semaine : 3, 5, 6 puis 4 séances
+    const days = [1, 3, 5, 7, 8, 9, 10, 11, 14, 15, 16, 17, 19, 20, 22, 23, 26, 27];
+    const { advisor } = advisorWith(JSON.stringify({ sessions: days.map((d) => s(d)) }));
+    const four = buildSchedule(history, now, { horizonDays: 28, sessionsPerWeek: 4 });
+    const plan = await advisor.advisePlan(history, four);
+    expect(weekCounts(plan)).toEqual([3, 4, 4, 4]);
+    expect(plan.sessions.filter((x) => x.inDays < 7 || x.inDays > 20).map((x) => x.inDays)).toEqual(
+      [1, 3, 5, 22, 23, 26, 27],
+    );
+  });
+
+  it('moins de séances pour raison de santé : pas de complément', async () => {
     const { advisor, chat } = advisorWith(
       JSON.stringify({ reducedForHealth: true, sessions: [s(6), s(9)] }),
     );

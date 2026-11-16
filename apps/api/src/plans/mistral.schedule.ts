@@ -253,6 +253,38 @@ export function shortWeeks(
 }
 
 /**
+ * Allège un plan trop chargé : dans chaque semaine au-dessus du rythme, retire les séances les
+ * plus serrées contre leurs voisines. Le type favorisé est gardé tant qu'il reste autre chose à
+ * retirer, et une force collée à une autre force part en premier.
+ */
+export function trimMonthPlan(
+  sessions: AdvisedSession[],
+  perWeek: number,
+  { doneToday = false, favored = null }: { doneToday?: boolean; favored?: Focus | null } = {},
+): AdvisedSession[] {
+  let plan = [...sessions].sort((a, b) => a.inDays - b.inDays);
+  for (let week = 0; week < WEEKS; week++) {
+    const inWeek = () =>
+      plan.filter((s) => s.inDays >= weekStart(week, doneToday) && s.inDays < week * 7 + 7);
+    const target = weekTarget(week, perWeek, doneToday);
+    while (inWeek().length > target) {
+      const taken = [...plan.map((s) => s.inDays), ...(doneToday ? [0] : [])];
+      const room = (s: AdvisedSession) =>
+        Math.min(8, ...taken.filter((t) => t !== s.inDays).map((t) => Math.abs(t - s.inDays)));
+      const stuckStrength = (s: AdvisedSession) =>
+        s.focus === 'strength' &&
+        plan.some((o) => o.focus === 'strength' && Math.abs(o.inDays - s.inDays) === 1);
+      // Du plus retirable au moins retirable
+      const rank = (s: AdvisedSession) =>
+        (stuckStrength(s) ? 0 : 100) + (s.focus === favored ? 50 : 0) + room(s);
+      const drop = inWeek().reduce((worst, s) => (rank(s) <= rank(worst) ? s : worst));
+      plan = plan.filter((s) => s !== drop);
+    }
+  }
+  return plan;
+}
+
+/**
  * Complète un plan trop léger : dans chaque semaine sous le rythme, ajoute des séances sur les
  * jours libres les plus éloignés des autres. Le type favorisé passe d'abord tant qu'il fait moins
  * d'une séance sur deux ; la force n'est jamais posée la veille ou le lendemain d'une autre force.
@@ -301,18 +333,6 @@ export function completeMonthPlan(
   return plan.sort((a, b) => a.inDays - b.inDays);
 }
 
-const missing = (weeks: ShortWeek[]) => weeks.reduce((sum, w) => sum + w.target - w.planned, 0);
-
-function shortMessage(weeks: ShortWeek[], perWeek: number, doneToday: boolean): string {
-  const detail = weeks
-    .map(
-      (w) =>
-        `jours ${weekStart(w.week, doneToday)} à ${w.week * 7 + 6} : ${w.planned} au lieu de ${w.target}`,
-    )
-    .join(' ; ');
-  return `Il manque des séances pour tenir le rythme de ${perWeek} par semaine (${detail}). Ajoute-les sur des jours libres sans retirer les autres : seules deux forces doivent être espacées de 48 h, l'endurance et la technique peuvent se suivre. Renvoie tout le JSON.`;
-}
-
 /** Demande à Mistral le plan du mois, en interprétant les notes. */
 @Injectable()
 export class MistralScheduleAdvisor {
@@ -334,13 +354,13 @@ export class MistralScheduleAdvisor {
     ];
     const perWeek = base.sessionsPerWeek;
     const doneToday = isDoneToday(history, base.today);
-    let content = await this.mistral.chat(messages, 'low');
+    const content = await this.mistral.chat(messages, 'low');
     let plan: MonthPlan;
     try {
       plan = parseMonthPlan(content, perWeek);
     } catch (e) {
       if (!(e instanceof MistralError)) throw e;
-      content = await this.mistral.chat(
+      const retry = await this.mistral.chat(
         [
           ...messages,
           { role: 'assistant', content },
@@ -351,27 +371,7 @@ export class MistralScheduleAdvisor {
         ],
         'low',
       );
-      plan = parseMonthPlan(content, perWeek);
-    }
-
-    // Sous le rythme sans raison de santé : on le dit à Mistral, une fois
-    const short = plan.reducedForHealth ? [] : shortWeeks(plan.sessions, perWeek, doneToday);
-    if (short.length) {
-      try {
-        const retry = await this.mistral.chat(
-          [
-            ...messages,
-            { role: 'assistant', content },
-            { role: 'user', content: shortMessage(short, perWeek, doneToday) },
-          ],
-          'low',
-        );
-        const second = parseMonthPlan(retry, perWeek);
-        const still = shortWeeks(second.sessions, perWeek, doneToday);
-        if (!second.reducedForHealth && missing(still) < missing(short)) plan = second;
-      } catch {
-        // Correction ratée : on garde le premier plan, complété ci-dessous
-      }
+      plan = parseMonthPlan(retry, perWeek);
     }
 
     // Jamais une deuxième séance le jour même d'une séance déjà faite
@@ -379,13 +379,13 @@ export class MistralScheduleAdvisor {
       plan.sessions = plan.sessions.filter((s) => s.inDays > 0);
       if (!plan.sessions.length) throw new MistralError('Aucune séance après aujourd’hui');
     }
-    // Ce qui manque encore est ajouté ici : le rythme demandé est toujours tenu
-    if (!plan.reducedForHealth) {
-      plan.sessions = completeMonthPlan(plan.sessions, perWeek, {
-        doneToday,
-        favored: favoredFocus(profile.focusGoal, profile.weakPoints ?? [])?.focus ?? null,
-      });
-    }
+    // Le code cale lui-même le plan sur le rythme : le surplus est retiré, ce qui manque est ajouté
+    const fit = {
+      doneToday,
+      favored: favoredFocus(profile.focusGoal, profile.weakPoints ?? [])?.focus ?? null,
+    };
+    plan.sessions = trimMonthPlan(plan.sessions, perWeek, fit);
+    if (!plan.reducedForHealth) plan.sessions = completeMonthPlan(plan.sessions, perWeek, fit);
     return plan;
   }
 }
