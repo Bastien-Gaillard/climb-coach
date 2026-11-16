@@ -6,7 +6,7 @@ import { favoredFocus } from './focus-balance';
 import { FOCUS_LABEL } from './history-analysis';
 import { ChatMessage, extractJson, MistralError, MistralGenerator } from './mistral.generator';
 import { Focus, FocusSchema } from './plan.schema';
-import { AdvisedSession, diffDays, localDay, Schedule } from './schedule';
+import { AdvisedSession, diffDays, IDEAL_MINUTES, localDay, Schedule } from './schedule';
 
 /** Ce que le planning lit du profil. */
 export interface ScheduleProfile {
@@ -33,11 +33,14 @@ const AdvisedSessionSchema = z.object({
 /** Ce que Mistral doit renvoyer : toutes les séances du mois, et un mot sur le mois. */
 export const MonthPlanSchema = z.object({
   summary: z.string().trim().max(400).optional(),
+  reducedForHealth: z.boolean().optional(),
   sessions: z.array(AdvisedSessionSchema).min(1).max(ADVICE_HORIZON_DAYS),
 });
 
 export interface MonthPlan {
   summary?: string;
+  /** Mistral a volontairement planifié moins que le rythme (douleur nette d'actualité, blessure). */
+  reducedForHealth?: boolean;
   sessions: AdvisedSession[];
 }
 
@@ -51,7 +54,7 @@ Ce que tu reçois :
 - ses dernières séances : date, type, durée, fatigue ressentie (1 = frais, 5 = épuisé), blocs tentés et ses NOTES libres, avec sa durée habituelle.
 
 Rythme :
-- Vise le rythme demandé : N séances par semaine, donc environ 4 × N séances sur les 28 jours, réparties régulièrement. Ne planifie pas moins, sauf douleur nette encore d'actualité ou blessure (voir plus bas), ni plus.
+- Tiens le rythme demandé, semaine par semaine : exactement N séances dans chaque bloc de 7 jours (jours 0 à 6, 7 à 13, 14 à 20, 21 à 27), donc 4 × N séances sur les 28 jours. Avant de répondre, recompte les séances de chaque bloc. Ne planifie pas moins, sauf douleur nette encore d'actualité ou blessure (voir plus bas), ni plus.
 - Jamais deux séances le même jour.
 - Les 48 h ne concernent QUE la force : pas de force la veille ou le lendemain d'une autre séance de force. L'endurance et la technique se placent n'importe quel jour, y compris la veille ou le lendemain d'une autre séance.
 - À partir de 4 séances par semaine, grimper deux jours de suite est normal et nécessaire pour tenir le rythme : n'espace pas toutes les séances de 48 h.
@@ -75,9 +78,12 @@ Durée de chaque séance : c'est à toi de la choisir, en minutes (par pas de 15
 Le champ "reason" de chaque séance s'adresse au grimpeur (tutoiement), en une phrase courte et concrète (pourquoi ce jour et ce type).
 Le champ "summary" résume en 1 ou 2 phrases la logique du mois (et cite la note qui a motivé un changement, s'il y en a une).
 
+Le champ "reducedForHealth" vaut true uniquement si tu planifies moins que le rythme à cause d'une douleur nette d'actualité ou d'une blessure ; sinon false, et le rythme est tenu chaque semaine.
+
 Réponds UNIQUEMENT avec un objet JSON :
 {
   "summary": "texte",
+  "reducedForHealth": true | false,
   "sessions": [
     {
       "inDays": entier entre 0 et 27, jours à partir d'aujourd'hui (0 = aujourd'hui, 1 = demain),
@@ -125,9 +131,18 @@ export function buildScheduleUserPrompt(
       `- jour ${p.inDays} (${dayLabel(p.date)}) : ${FOCUS_LABEL[p.focus]}${p.intensity === 'light' ? ' légère' : ''}`,
   );
 
+  const perWeek = base.sessionsPerWeek;
+  const doneToday = isDoneToday(history, base.today);
+
   return [
     `Aujourd'hui (jour 0) : ${dayLabel(base.today)}.`,
-    `Rythme visé : ${base.sessionsPerWeek} séance${base.sessionsPerWeek > 1 ? 's' : ''} par semaine, soit environ ${base.sessionsPerWeek * 4} séances sur 28 jours.`,
+    `Rythme visé : ${perWeek} séance${perWeek > 1 ? 's' : ''} par semaine, soit environ ${perWeek * 4} séances sur 28 jours.`,
+    `Compte par semaine : ${perWeek} dans chaque bloc de 7 jours (jours 0 à 6, 7 à 13, 14 à 20, 21 à 27).`,
+    ...(doneToday
+      ? [
+          `Il a déjà grimpé aujourd'hui : rien au jour 0. Cette séance compte dans la première semaine, il en reste ${weekTarget(0, perWeek, true)} à placer sur les jours 1 à 6.`,
+        ]
+      : []),
     `Type favorisé : ${favored ? `${FOCUS_LABEL[favored.focus]} (${favored.source === 'goal' ? 'objectif d’entraînement' : 'd’après les points faibles'})` : 'aucun, rotation égale'}.`,
     `Points faibles : ${weak.length ? pointLabels(weak) : 'aucun indiqué'}.`,
     `Ce qu'il aime faire : ${liked.length ? pointLabels(liked) : 'rien d’indiqué'}.`,
@@ -190,7 +205,112 @@ export function parseMonthPlan(content: string, sessionsPerWeek: number): MonthP
       `${sessions.length} séances sur 28 jours pour ${sessionsPerWeek} par semaine (maximum ${max})`,
     );
   }
-  return { ...(result.data.summary ? { summary: result.data.summary } : {}), sessions };
+  return {
+    ...(result.data.summary ? { summary: result.data.summary } : {}),
+    ...(result.data.reducedForHealth ? { reducedForHealth: true } : {}),
+    sessions,
+  };
+}
+
+const WEEKS = ADVICE_HORIZON_DAYS / 7;
+
+function isDoneToday(history: SessionWithClimbs[], today: string): boolean {
+  return !!history[0] && localDay(history[0].date) === today;
+}
+
+/** Premier jour planifiable d'une semaine du plan (le jour 0 est pris si la séance du jour est faite). */
+function weekStart(week: number, doneToday: boolean): number {
+  return week * 7 + (week === 0 && doneToday ? 1 : 0);
+}
+
+/** Séances à planifier dans une semaine du plan : le rythme, moins la séance déjà faite aujourd'hui. */
+function weekTarget(week: number, perWeek: number, doneToday: boolean): number {
+  const target = Math.min(7, Math.max(1, perWeek));
+  return week === 0 && doneToday ? target - 1 : target;
+}
+
+export interface ShortWeek {
+  /** 0 = jours 0 à 6, 1 = jours 7 à 13… */
+  week: number;
+  planned: number;
+  target: number;
+}
+
+/** Semaines du plan qui ont moins de séances que le rythme demandé. */
+export function shortWeeks(
+  sessions: AdvisedSession[],
+  perWeek: number,
+  doneToday = false,
+): ShortWeek[] {
+  const short: ShortWeek[] = [];
+  for (let week = 0; week < WEEKS; week++) {
+    const from = weekStart(week, doneToday);
+    const planned = sessions.filter((s) => s.inDays >= from && s.inDays < week * 7 + 7).length;
+    const target = weekTarget(week, perWeek, doneToday);
+    if (planned < target) short.push({ week, planned, target });
+  }
+  return short;
+}
+
+/**
+ * Complète un plan trop léger : dans chaque semaine sous le rythme, ajoute des séances sur les
+ * jours libres les plus éloignés des autres. Le type favorisé passe d'abord tant qu'il fait moins
+ * d'une séance sur deux ; la force n'est jamais posée la veille ou le lendemain d'une autre force.
+ */
+export function completeMonthPlan(
+  sessions: AdvisedSession[],
+  perWeek: number,
+  { doneToday = false, favored = null }: { doneToday?: boolean; favored?: Focus | null } = {},
+): AdvisedSession[] {
+  const plan = [...sessions];
+  const at = (day: number) => plan.find((s) => s.inDays === day);
+  const duration = (focus: Focus) => {
+    const same = sessions.filter((s) => s.focus === focus);
+    if (!same.length) return IDEAL_MINUTES[focus];
+    const mean = same.reduce((sum, s) => sum + s.durationMinutes, 0) / same.length;
+    return Math.max(30, Math.round(mean / 15) * 15);
+  };
+
+  for (const { week, planned, target } of shortWeeks(plan, perWeek, doneToday)) {
+    for (let n = planned; n < target; n++) {
+      const days: number[] = [];
+      for (let d = weekStart(week, doneToday); d < week * 7 + 7; d++) if (!at(d)) days.push(d);
+      if (!days.length) break;
+      // Le jour libre le plus loin d'une autre séance (la séance du jour compte)
+      const taken = [...plan.map((s) => s.inDays), ...(doneToday ? [0] : [])];
+      const room = (d: number) => Math.min(8, ...taken.map((t) => Math.abs(t - d)));
+      const day = days.reduce((best, d) => (room(d) > room(best) ? d : best));
+
+      const inWeek = plan.filter((s) => s.inDays >= week * 7 && s.inDays < week * 7 + 7);
+      const count = (f: Focus) => inWeek.filter((s) => s.focus === f).length;
+      const strengthOk = at(day - 1)?.focus !== 'strength' && at(day + 1)?.focus !== 'strength';
+      const favoredShort =
+        !!favored && plan.filter((s) => s.focus === favored).length * 2 < plan.length + 1;
+      let focus: Focus = count('endurance') < count('technique') ? 'endurance' : 'technique';
+      if (favored && favoredShort && (favored !== 'strength' || strengthOk)) focus = favored;
+
+      plan.push({
+        inDays: day,
+        focus,
+        intensity: 'normal',
+        durationMinutes: duration(focus),
+        reason: `Ajoutée pour tenir ton rythme de ${perWeek} séances par semaine.`,
+      });
+    }
+  }
+  return plan.sort((a, b) => a.inDays - b.inDays);
+}
+
+const missing = (weeks: ShortWeek[]) => weeks.reduce((sum, w) => sum + w.target - w.planned, 0);
+
+function shortMessage(weeks: ShortWeek[], perWeek: number, doneToday: boolean): string {
+  const detail = weeks
+    .map(
+      (w) =>
+        `jours ${weekStart(w.week, doneToday)} à ${w.week * 7 + 6} : ${w.planned} au lieu de ${w.target}`,
+    )
+    .join(' ; ');
+  return `Il manque des séances pour tenir le rythme de ${perWeek} par semaine (${detail}). Ajoute-les sur des jours libres sans retirer les autres : seules deux forces doivent être espacées de 48 h, l'endurance et la technique peuvent se suivre. Renvoie tout le JSON.`;
 }
 
 /** Demande à Mistral le plan du mois, en interprétant les notes. */
@@ -212,13 +332,15 @@ export class MistralScheduleAdvisor {
       { role: 'system', content: SCHEDULE_PROMPT },
       { role: 'user', content: buildScheduleUserPrompt(history, base, profile) },
     ];
-    const content = await this.mistral.chat(messages, 'low');
+    const perWeek = base.sessionsPerWeek;
+    const doneToday = isDoneToday(history, base.today);
+    let content = await this.mistral.chat(messages, 'low');
     let plan: MonthPlan;
     try {
-      plan = parseMonthPlan(content, base.sessionsPerWeek);
+      plan = parseMonthPlan(content, perWeek);
     } catch (e) {
       if (!(e instanceof MistralError)) throw e;
-      const retry = await this.mistral.chat(
+      content = await this.mistral.chat(
         [
           ...messages,
           { role: 'assistant', content },
@@ -229,14 +351,40 @@ export class MistralScheduleAdvisor {
         ],
         'low',
       );
-      plan = parseMonthPlan(retry, base.sessionsPerWeek);
+      plan = parseMonthPlan(content, perWeek);
+    }
+
+    // Sous le rythme sans raison de santé : on le dit à Mistral, une fois
+    const short = plan.reducedForHealth ? [] : shortWeeks(plan.sessions, perWeek, doneToday);
+    if (short.length) {
+      try {
+        const retry = await this.mistral.chat(
+          [
+            ...messages,
+            { role: 'assistant', content },
+            { role: 'user', content: shortMessage(short, perWeek, doneToday) },
+          ],
+          'low',
+        );
+        const second = parseMonthPlan(retry, perWeek);
+        const still = shortWeeks(second.sessions, perWeek, doneToday);
+        if (!second.reducedForHealth && missing(still) < missing(short)) plan = second;
+      } catch {
+        // Correction ratée : on garde le premier plan, complété ci-dessous
+      }
     }
 
     // Jamais une deuxième séance le jour même d'une séance déjà faite
-    const last = history[0];
-    if (last && localDay(last.date) === base.today) {
+    if (doneToday) {
       plan.sessions = plan.sessions.filter((s) => s.inDays > 0);
       if (!plan.sessions.length) throw new MistralError('Aucune séance après aujourd’hui');
+    }
+    // Ce qui manque encore est ajouté ici : le rythme demandé est toujours tenu
+    if (!plan.reducedForHealth) {
+      plan.sessions = completeMonthPlan(plan.sessions, perWeek, {
+        doneToday,
+        favored: favoredFocus(profile.focusGoal, profile.weakPoints ?? [])?.focus ?? null,
+      });
     }
     return plan;
   }
