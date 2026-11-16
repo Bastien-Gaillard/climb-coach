@@ -52,3 +52,8 @@ export function errorMessage(err: unknown): string {
   if (Array.isArray(msg)) return msg.join(' · ');
   return msg ?? 'L’API ne répond pas. Elle est bien lancée ?';
 }
+
+/** Libellé du lien vidéo d'un exercice : vidéo choisie, ou simple recherche YouTube. */
+export function videoLabel(url: string): string {
+  return url.includes('/results?') ? 'Chercher une vidéo' : 'Voir en vidéo';
+}

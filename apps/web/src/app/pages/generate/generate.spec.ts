@@ -99,6 +99,29 @@ describe('GeneratePage', () => {
     expect(plan.textContent).toContain('Total : 60 min');
   });
 
+  it('propose la vidéo des exercices, ou une recherche quand il n’y en a pas', () => {
+    click('Générer');
+    const withVideos = structuredClone(response);
+    withVideos.plan.blocks[1].video = 'https://www.youtube.com/shorts/XvcQY3qJN1Y';
+    withVideos.plan.blocks.push({
+      kind: 'main',
+      title: 'Endurance : Un bloc par minute',
+      minutes: 10,
+      instructions: ['Un bloc par minute'],
+      video: 'https://www.youtube.com/results?search_query=emom',
+    });
+    http.expectOne('/api/plans/generate').flush(withVideos);
+    fixture.detectChanges();
+
+    const links = Array.from(el.querySelectorAll<HTMLAnchorElement>('[data-testid=video-link]'));
+    expect(links.map((a) => a.textContent?.trim())).toEqual([
+      'Voir en vidéo',
+      'Chercher une vidéo',
+    ]);
+    expect(links[0].href).toBe('https://www.youtube.com/shorts/XvcQY3qJN1Y');
+    expect(links.every((a) => a.target === '_blank')).toBeTrue();
+  });
+
   it('par défaut le planning décide, sinon envoie le type choisi', () => {
     const radio = (id: string) => el.querySelector<HTMLButtonElement>(`[data-testid=focus-${id}]`)!;
     expect(radio('auto').getAttribute('aria-checked')).toBe('true');

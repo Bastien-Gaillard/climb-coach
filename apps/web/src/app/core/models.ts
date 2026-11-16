@@ -64,6 +64,8 @@ export interface PlanBlock {
   title: string;
   minutes: number;
   instructions: string[];
+  /** Vidéo YouTube qui montre l'exercice, ou une recherche YouTube à défaut. */
+  video?: string;
   target?: {
     style: Style;
     grade: string;

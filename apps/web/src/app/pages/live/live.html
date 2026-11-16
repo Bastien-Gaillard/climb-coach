@@ -76,6 +76,17 @@
     }
   </ol>
 
+  @if (b.video) {
+  <a
+    class="btn outline video"
+    [href]="b.video"
+    target="_blank"
+    rel="noopener noreferrer"
+    data-testid="video-link"
+    ><app-icon name="play" [size]="16" />{{ videoLabel(b.video) }}</a
+  >
+  }
+
   <div class="then">
     <span class="overline">Ensuite</span>
     <span class="grow">

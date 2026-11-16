@@ -86,6 +86,15 @@
         <li>{{ step }}</li>
         }
       </ul>
+      } @if (b.video) {
+      <a
+        class="video"
+        [href]="b.video"
+        target="_blank"
+        rel="noopener noreferrer"
+        data-testid="video-link"
+        ><app-icon name="play" [size]="14" />{{ videoLabel(b.video) }}</a
+      >
       }
     </li>
     }

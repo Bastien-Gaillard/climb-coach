@@ -57,6 +57,11 @@ export interface Exercise {
   minMinutes: number;
   /** Page qui décrit l'exercice ou son protocole. */
   source?: string;
+  /**
+   * Courte vidéo qui montre l'exercice (de préférence un short), ou une recherche YouTube quand
+   * aucune vidéo ne le montre assez clairement.
+   */
+  video: string;
   /** Réservé aux grimpeurs confirmés (6C et plus) : charge forte sur les doigts et les épaules. */
   advanced?: boolean;
   /** À éviter quand une douleur est signalée (sollicite fort doigts, épaules ou coudes). */
@@ -72,10 +77,15 @@ const count = (minutes: number, perItem: number, min: number, max = 12) =>
 
 const plural = (n: number, word: string) => `${n} ${word}${n > 1 ? 's' : ''}`;
 
+/** Recherche YouTube, pour les exercices sans vidéo qui les montre bien. */
+const ytSearch = (query: string) =>
+  `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
+
 export const EXERCISES: Exercise[] = [
   // ---------- Technique : blocs sous le niveau max, une consigne de mouvement précise
   {
     id: 'silent-feet',
+    video: 'https://www.youtube.com/watch?v=WbscmZDybdQ',
     source: 'https://www.99boulders.com/?p=170',
     focus: 'technique',
     points: ['footwork'],
@@ -99,6 +109,7 @@ export const EXERCISES: Exercise[] = [
   },
   {
     id: 'hover-feet',
+    video: 'https://www.youtube.com/watch?v=jQMpu64Rq6E',
     source:
       'https://www.climbstrong.com/resource-posts/fundamental-skills-precision-execution-and-balance',
     focus: 'technique',
@@ -123,6 +134,7 @@ export const EXERCISES: Exercise[] = [
   },
   {
     id: 'hover-hands',
+    video: 'https://www.youtube.com/watch?v=QZVCPF-0d9Y',
     source: 'https://www.trainingbeta.com/?p=23718',
     focus: 'technique',
     points: ['tension', 'balance'],
@@ -148,6 +160,7 @@ export const EXERCISES: Exercise[] = [
   },
   {
     id: 'one-touch',
+    video: 'https://www.youtube.com/shorts/hOmK8SKBPiE',
     source: 'https://www.trainingbeta.com/?p=23718',
     focus: 'technique',
     points: ['footwork', 'reading'],
@@ -171,6 +184,7 @@ export const EXERCISES: Exercise[] = [
   },
   {
     id: 'no-hands',
+    video: 'https://www.youtube.com/shorts/67IuHnrdlAs',
     source: 'https://www.mountainproject.com/forum/message/114032041',
     focus: 'technique',
     points: ['slab', 'balance'],
@@ -197,6 +211,7 @@ export const EXERCISES: Exercise[] = [
   },
   {
     id: 'one-arm-slab',
+    video: 'https://www.youtube.com/shorts/W7776hMH4x8',
     source:
       'https://assets01.sdd1.ch/assets/lbwp-cdn/mobilesport/files/1677975093/mobilesport-escalade-a-lecole--bloc-technique-manchot.pdf',
     focus: 'technique',
@@ -224,6 +239,7 @@ export const EXERCISES: Exercise[] = [
   },
   {
     id: 'flag',
+    video: 'https://www.youtube.com/watch?v=juPtjVgcQbg',
     source: 'https://sendedition.com/22-climbing-techniques-and-how-to-do-them',
     focus: 'technique',
     points: ['balance', 'hips'],
@@ -248,6 +264,7 @@ export const EXERCISES: Exercise[] = [
   },
   {
     id: 'straight-arms',
+    video: 'https://www.youtube.com/watch?v=xyc_VvqxPps',
     source: 'https://www.mountainproject.com/v/108661904',
     focus: 'technique',
     points: ['hips', 'resistance'],
@@ -272,6 +289,7 @@ export const EXERCISES: Exercise[] = [
   },
   {
     id: 'downclimb',
+    video: 'https://www.youtube.com/watch?v=MHb7WYn0S0E',
     source: 'https://www.99boulders.com/?p=170',
     focus: 'technique',
     points: ['footwork', 'fall'],
@@ -295,6 +313,7 @@ export const EXERCISES: Exercise[] = [
   },
   {
     id: 'sloth-monkey',
+    video: 'https://www.youtube.com/watch?v=AGjQ_U-5iuk',
     source: 'https://www.trainingbeta.com/?p=23718',
     focus: 'technique',
     points: ['coordination'],
@@ -320,6 +339,7 @@ export const EXERCISES: Exercise[] = [
   },
   {
     id: 'dead-stops',
+    video: 'https://www.youtube.com/watch?v=ggRtACYFU5Q',
     source: 'https://www.trainingbeta.com/?p=23718',
     focus: 'technique',
     points: ['coordination', 'lock-off'],
@@ -343,6 +363,7 @@ export const EXERCISES: Exercise[] = [
   },
   {
     id: 'backstep',
+    video: 'https://www.youtube.com/shorts/tpu9AOBjIy4',
     source: 'https://www.climbing.com/skills/how-to-improve-footwork-climbing/',
     focus: 'technique',
     points: ['hips'],
@@ -366,6 +387,7 @@ export const EXERCISES: Exercise[] = [
   },
   {
     id: 'heavy-feet',
+    video: 'https://www.youtube.com/shorts/mBlTrqmwPwg',
     source: 'https://www.trainingbeta.com/?p=23718',
     focus: 'technique',
     points: ['footwork', 'tension'],
@@ -391,6 +413,7 @@ export const EXERCISES: Exercise[] = [
 
   {
     id: 'toes',
+    video: 'https://www.youtube.com/shorts/6W78iUMc5Wk',
     focus: 'technique',
     points: ['footwork'],
     name: 'Sur la pointe des pieds',
@@ -414,6 +437,7 @@ export const EXERCISES: Exercise[] = [
   },
   {
     id: 'drop-knee',
+    video: 'https://www.youtube.com/watch?v=QqDebkWHaWc',
     focus: 'technique',
     points: ['hips'],
     name: 'Lolottes',
@@ -439,6 +463,7 @@ export const EXERCISES: Exercise[] = [
   },
   {
     id: 'heel-hook',
+    video: 'https://www.youtube.com/watch?v=eDmYLqBegCw',
     focus: 'technique',
     points: ['hooks'],
     name: 'Crochets talon',
@@ -463,6 +488,7 @@ export const EXERCISES: Exercise[] = [
   },
   {
     id: 'toe-hook',
+    video: 'https://www.youtube.com/shorts/D-8zwpvBJnE',
     focus: 'technique',
     points: ['hooks', 'tension'],
     name: 'Crochets pointe',
@@ -486,6 +512,7 @@ export const EXERCISES: Exercise[] = [
   },
   {
     id: 'one-foot-type',
+    video: 'https://www.youtube.com/shorts/4KmyOrQ9yaU',
     focus: 'technique',
     points: ['footwork'],
     name: 'Un seul type de pied',
@@ -510,6 +537,7 @@ export const EXERCISES: Exercise[] = [
   },
   {
     id: 'smearing',
+    video: 'https://www.youtube.com/shorts/SKTVHUaW5DY',
     focus: 'technique',
     points: ['slab'],
     name: 'Adhérence',
@@ -534,6 +562,7 @@ export const EXERCISES: Exercise[] = [
   },
   {
     id: 'mantle',
+    video: 'https://www.youtube.com/watch?v=j72cRYeQaoM',
     focus: 'technique',
     points: ['pushing'],
     name: 'Rétablissements',
@@ -559,6 +588,7 @@ export const EXERCISES: Exercise[] = [
   },
   {
     id: 'stemming',
+    video: 'https://www.youtube.com/watch?v=ZZIu_E52ui4',
     focus: 'technique',
     points: ['pushing'],
     name: 'Oppositions',
@@ -583,6 +613,7 @@ export const EXERCISES: Exercise[] = [
   },
   {
     id: 'deadpoint',
+    video: 'https://www.youtube.com/shorts/8VXkuA9Wd9Y',
     focus: 'technique',
     points: ['coordination', 'power'],
     name: 'Lancés contrôlés',
@@ -609,6 +640,7 @@ export const EXERCISES: Exercise[] = [
   },
   {
     id: 'touched-holds',
+    video: 'https://www.youtube.com/shorts/ld9smol9Ilw',
     focus: 'technique',
     points: ['reading'],
     name: 'Prises touchées',
@@ -636,6 +668,7 @@ export const EXERCISES: Exercise[] = [
   },
   {
     id: 'beta-reading',
+    video: 'https://www.youtube.com/shorts/bB3dgoOBp1E',
     focus: 'technique',
     points: ['reading'],
     name: 'Lecture du bloc',
@@ -659,6 +692,7 @@ export const EXERCISES: Exercise[] = [
   },
   {
     id: 'flash',
+    video: 'https://www.youtube.com/shorts/zBdQ7UN6Mc0',
     focus: 'technique',
     points: ['reading', 'commitment'],
     name: 'Blocs à vue',
@@ -683,6 +717,7 @@ export const EXERCISES: Exercise[] = [
   },
   {
     id: 'touch-holds',
+    video: 'https://www.youtube.com/shorts/JmCELW3sfeg',
     focus: 'technique',
     points: ['recovery'],
     name: 'Caresses',
@@ -707,6 +742,7 @@ export const EXERCISES: Exercise[] = [
   },
   {
     id: 'soft-grip',
+    video: 'https://www.youtube.com/shorts/d5g7aK70CEs',
     focus: 'technique',
     points: ['recovery'],
     name: 'Prises en douceur',
@@ -733,6 +769,7 @@ export const EXERCISES: Exercise[] = [
   },
   {
     id: 'tripod',
+    video: 'https://www.youtube.com/watch?v=xJM7zW4UXuI',
     focus: 'technique',
     points: ['balance'],
     name: 'Se figer',
@@ -758,6 +795,7 @@ export const EXERCISES: Exercise[] = [
   },
   {
     id: 'one-foot',
+    video: 'https://www.youtube.com/shorts/Cs1O6_fmEdc',
     focus: 'technique',
     points: ['balance'],
     name: 'Un seul pied',
@@ -783,6 +821,7 @@ export const EXERCISES: Exercise[] = [
   },
   {
     id: 'same-side',
+    video: ytSearch('same side in traverse drill climbing'),
     focus: 'technique',
     points: ['hips'],
     name: 'Traversée de profil',
@@ -808,6 +847,7 @@ export const EXERCISES: Exercise[] = [
   },
   {
     id: 'lemon-lime',
+    video: ytSearch('add one move downclimb drill bouldering'),
     focus: 'technique',
     points: ['footwork', 'resistance'],
     name: 'Aller-retour progressif',
@@ -834,6 +874,7 @@ export const EXERCISES: Exercise[] = [
   },
   {
     id: 'sloper-plumb',
+    video: 'https://www.youtube.com/watch?v=q00ImgzAnOI',
     source: 'https://www.trainingbeta.com/how-to-train-for-compression/',
     focus: 'technique',
     points: ['slopers'],
@@ -859,6 +900,7 @@ export const EXERCISES: Exercise[] = [
   },
   {
     id: 'wall-tour',
+    video: 'https://www.youtube.com/watch?v=mabvTT6Bm0s',
     source: 'https://www.climbstrong.com/resource-posts/boulder-strength-skill-sessions',
     focus: 'technique',
     points: ['wall-styles', 'slab'],
@@ -884,6 +926,7 @@ export const EXERCISES: Exercise[] = [
   },
   {
     id: 'build-the-move',
+    video: 'https://www.youtube.com/watch?v=rToclUrm41g',
     source: 'https://climbingcanada.ca/coaches-tool-box/technical-tactical-series-part-1/',
     focus: 'technique',
     points: ['coordination'],
@@ -917,6 +960,7 @@ export const EXERCISES: Exercise[] = [
   },
   {
     id: 'rapid-fire',
+    video: 'https://www.youtube.com/shorts/xjHSv1Vo06I',
     source: 'https://climbingcanada.ca/coaches-tool-box/technical-tactical-series-part-1/',
     focus: 'technique',
     points: ['reading', 'projecting'],
@@ -945,6 +989,7 @@ export const EXERCISES: Exercise[] = [
   },
   {
     id: 'fall-practice',
+    video: 'https://www.youtube.com/watch?v=vD4jf_iw5Dk',
     source: 'https://brooklynboulders.com/how-to-overcome-your-fear-of-falling-while-climbing/',
     focus: 'technique',
     points: ['fall'],
@@ -976,6 +1021,7 @@ export const EXERCISES: Exercise[] = [
   // ---------- Endurance (résistance) : enchaîner sous le niveau max, repos courts
   {
     id: '4x4',
+    video: 'https://www.youtube.com/shorts/XvcQY3qJN1Y',
     source: 'https://gripped.com/?p=46491',
     focus: 'endurance',
     energy: 'resistance',
@@ -1015,6 +1061,7 @@ export const EXERCISES: Exercise[] = [
   },
   {
     id: 'pyramid',
+    video: 'https://www.youtube.com/watch?v=-SbpcjMy0M8',
     source:
       'https://blog.movementgyms.com/improve-your-climbing-endurance-with-a-quick-and-effective-4x4-workout',
     focus: 'endurance',
@@ -1043,6 +1090,7 @@ export const EXERCISES: Exercise[] = [
   },
   {
     id: '20-in-20',
+    video: ytSearch('20 boulders in 20 minutes EMOM climbing'),
     source: 'https://trainingforclimbing.com/?p=12701',
     focus: 'endurance',
     energy: 'fond',
@@ -1068,6 +1116,7 @@ export const EXERCISES: Exercise[] = [
   },
   {
     id: 'up-down-up',
+    video: ytSearch('up down up boulder endurance drill'),
     source: 'https://climbinghouse.com/18-week-free-training-program/',
     focus: 'endurance',
     energy: 'resistance',
@@ -1093,6 +1142,7 @@ export const EXERCISES: Exercise[] = [
   },
   {
     id: 'linked',
+    video: 'https://www.youtube.com/shorts/bTWXhyTeXHw',
     source: 'https://www.climbstrong.com/resource-posts/progressing-endurance-training-ii',
     focus: 'endurance',
     energy: 'resistance',
@@ -1118,6 +1168,7 @@ export const EXERCISES: Exercise[] = [
   },
   {
     id: 'continuous-traverse',
+    video: 'https://www.youtube.com/shorts/c0iB-LDx4oA',
     source: 'https://www.99boulders.com/?p=170',
     focus: 'endurance',
     energy: 'fond',
@@ -1145,6 +1196,7 @@ export const EXERCISES: Exercise[] = [
 
   {
     id: 'intervals-30-30',
+    video: ytSearch('bouldering on off intervals endurance'),
     focus: 'endurance',
     energy: 'resistance',
     points: ['recovery', 'resistance'],
@@ -1170,6 +1222,7 @@ export const EXERCISES: Exercise[] = [
   },
   {
     id: 'points',
+    video: ytSearch('bouldering volume endurance session'),
     focus: 'endurance',
     energy: 'fond',
     points: ['volume', 'recovery'],
@@ -1196,6 +1249,7 @@ export const EXERCISES: Exercise[] = [
   },
   {
     id: 'grade-tour',
+    video: ytSearch('bouldering volume session same grade'),
     focus: 'endurance',
     energy: 'fond',
     points: ['volume'],
@@ -1220,6 +1274,7 @@ export const EXERCISES: Exercise[] = [
   // ---------- Force : peu de mouvements, intensité maximale, repos complets
   {
     id: 'limit',
+    video: 'https://www.youtube.com/shorts/jN5O4vo-C5Y',
     source: 'https://trainingbeta.com/?p=21508',
     focus: 'strength',
     points: ['projecting', 'commitment'],
@@ -1248,6 +1303,7 @@ export const EXERCISES: Exercise[] = [
   },
   {
     id: 'sections',
+    video: 'https://www.youtube.com/watch?v=dyAvbUvY_PU',
     source: 'https://trainingbeta.com/?p=21508',
     focus: 'strength',
     points: ['projecting'],
@@ -1274,6 +1330,7 @@ export const EXERCISES: Exercise[] = [
   },
   {
     id: 'power',
+    video: 'https://www.youtube.com/shorts/t8tJUK3PPpE',
     source: 'https://trainingforclimbing.com/?p=12288',
     focus: 'strength',
     points: ['power', 'commitment'],
@@ -1301,6 +1358,7 @@ export const EXERCISES: Exercise[] = [
   },
   {
     id: 'lock-offs',
+    video: 'https://www.youtube.com/shorts/aDeEkQ0g5cA',
     source: 'https://gripped.com/?p=48148',
     focus: 'strength',
     points: ['lock-off'],
@@ -1326,6 +1384,7 @@ export const EXERCISES: Exercise[] = [
   },
   {
     id: 'no-feet',
+    video: 'https://www.youtube.com/shorts/m1t85MABk0c',
     source: 'https://www.trainingbeta.com/?p=18674',
     focus: 'strength',
     points: ['tension', 'power'],
@@ -1370,6 +1429,7 @@ export const EXERCISES: Exercise[] = [
   },
   {
     id: 'one-arm-traverse',
+    video: 'https://www.youtube.com/watch?v=CCGgLglSbkg',
     source: 'https://nicros.com/author/brynk/page/27',
     focus: 'strength',
     points: ['power', 'lock-off'],
@@ -1397,6 +1457,7 @@ export const EXERCISES: Exercise[] = [
   },
   {
     id: 'strength-intervals',
+    video: ytSearch('bouldering strength session near max boulders'),
     focus: 'strength',
     points: ['lock-off', 'crimps'],
     name: 'Intervalles de force',
@@ -1423,6 +1484,7 @@ export const EXERCISES: Exercise[] = [
   },
   {
     id: 'one-arm-lunge',
+    video: 'https://www.youtube.com/shorts/f1PLsWbGpwY',
     focus: 'strength',
     points: ['power'],
     name: 'Lancés à un bras',
@@ -1450,6 +1512,7 @@ export const EXERCISES: Exercise[] = [
   },
   {
     id: 'dyno',
+    video: 'https://www.youtube.com/shorts/UqnkaxKLTkI',
     focus: 'strength',
     points: ['power', 'coordination', 'commitment'],
     name: 'Jetés',
@@ -1478,6 +1541,7 @@ export const EXERCISES: Exercise[] = [
   },
   {
     id: 'grip-limit',
+    video: 'https://www.youtube.com/shorts/kq9y7WnH72w',
     focus: 'strength',
     points: ['crimps', 'slopers', 'pinches'],
     name: 'Bloc au max sur un type de prise',
@@ -1504,6 +1568,7 @@ export const EXERCISES: Exercise[] = [
   },
   {
     id: 'compression',
+    video: 'https://www.youtube.com/shorts/L2nJcC1h1Vo',
     focus: 'strength',
     points: ['compression', 'tension'],
     name: 'Blocs de compression',
@@ -1531,6 +1596,7 @@ export const EXERCISES: Exercise[] = [
   },
   {
     id: 'steep-poor-feet',
+    video: 'https://www.youtube.com/shorts/HO0drIKbM3k',
     focus: 'strength',
     points: ['tension'],
     name: 'Dévers pieds fuyants',
@@ -1557,6 +1623,7 @@ export const EXERCISES: Exercise[] = [
   },
   {
     id: 'varied-dynos',
+    video: 'https://www.youtube.com/watch?v=0XhjHPvBj94',
     focus: 'strength',
     points: ['power', 'coordination'],
     name: 'Lancés variés',
@@ -1584,6 +1651,7 @@ export const EXERCISES: Exercise[] = [
   },
   {
     id: 'fall-in-move',
+    video: 'https://www.youtube.com/shorts/O2SZzi2E94s',
     focus: 'strength',
     points: ['commitment', 'fall'],
     name: 'Chuter dans le mouvement',

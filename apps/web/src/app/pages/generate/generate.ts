@@ -11,6 +11,7 @@ import {
   FOCUS_LABEL,
   relativeDay,
   STYLE_LABEL,
+  videoLabel,
 } from '../../core/labels';
 import { Focus, Gym, PlannedSession, Schedule, Session } from '../../core/models';
 import { AiStatusStore } from '../../core/ai-status.store';
@@ -41,6 +42,7 @@ export class GeneratePage implements OnInit {
   protected readonly blockLabel = BLOCK_LABEL;
   protected readonly today = new Date();
   protected readonly holdVars = holdVars;
+  protected readonly videoLabel = videoLabel;
 
   protected readonly gyms = signal<Gym[]>([]);
   protected readonly gymId = signal<string | null>(readGym());

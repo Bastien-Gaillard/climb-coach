@@ -86,6 +86,23 @@ describe('LivePage · minuteur', () => {
     expect(rows[1].textContent).toContain('rouge');
   });
 
+  it('ouvre la vidéo de l’exercice dans un nouvel onglet, seulement quand il y en a une', () => {
+    expect(el.querySelector('[data-testid=video-link]')).toBeNull();
+
+    fixture.destroy();
+    const withVideo = structuredClone(plan);
+    withVideo.plan.blocks[0].video = 'https://www.youtube.com/shorts/hOmK8SKBPiE';
+    TestBed.inject(PlanStore).set(withVideo);
+    fixture = TestBed.createComponent(LivePage);
+    el = fixture.nativeElement;
+    fixture.detectChanges();
+
+    const link = el.querySelector<HTMLAnchorElement>('[data-testid=video-link]')!;
+    expect(link.href).toBe('https://www.youtube.com/shorts/hOmK8SKBPiE');
+    expect(link.target).toBe('_blank');
+    expect(link.textContent?.trim()).toBe('Voir en vidéo');
+  });
+
   it('décompte le temps réel', () => {
     expect(clock()).toBe('15:00');
     jasmine.clock().tick(61_000);

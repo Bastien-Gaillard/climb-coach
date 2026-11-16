@@ -178,6 +178,13 @@
   }
 }
 
+.video {
+  align-self: flex-start;
+  min-height: 44px;
+  padding: 0 14px;
+  font-size: 15px;
+}
+
 .then {
   margin-top: auto;
   display: flex;

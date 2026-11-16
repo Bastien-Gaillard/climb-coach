@@ -7,6 +7,8 @@ export const PlanBlockSchema = z.object({
   title: z.string().min(1).max(80),
   minutes: z.number().int().min(1).max(240),
   instructions: z.array(z.string().min(1).max(300)).min(1).max(10),
+  /** Vidéo qui montre l'exercice, tirée du catalogue (ajoutée par l'API). */
+  video: z.string().url().optional(),
   /** Niveau visé pour le bloc, dans le système de référence du style. */
   target: z
     .object({

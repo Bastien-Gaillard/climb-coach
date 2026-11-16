@@ -1,6 +1,6 @@
 import { Component, computed, DestroyRef, effect, inject, OnInit, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
-import { BLOCK_LABEL, FOCUS_LABEL, STYLE_LABEL } from '../../core/labels';
+import { BLOCK_LABEL, FOCUS_LABEL, STYLE_LABEL, videoLabel } from '../../core/labels';
 import { PlanStore } from '../../core/plan.store';
 import { PushAlerts, vibrate } from '../../core/push-alerts';
 import { holdVars } from '../../shared/hold';
@@ -23,6 +23,7 @@ export class LivePage implements OnInit {
 
   protected readonly styleLabel = STYLE_LABEL;
   protected readonly holdVars = holdVars;
+  protected readonly videoLabel = videoLabel;
   protected readonly generated = this.store.plan;
   protected readonly blocks = computed(() => this.generated()?.plan.blocks ?? []);
 

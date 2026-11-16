@@ -9,6 +9,7 @@ import { ClimbingPoint } from '../auth/climbing-points';
 import { Equipment } from '../auth/equipment';
 import { DeclaredLevel, declaredLevel } from './declared-level';
 import { GeneratorContext } from './generator';
+import { withVideos } from './exercise-videos';
 import { withGymColors } from './gym-colors';
 import { MistralGenerator } from './mistral.generator';
 import { ADVICE_HORIZON_DAYS, MistralScheduleAdvisor } from './mistral.schedule';
@@ -115,7 +116,7 @@ export class PlansService {
       }
     }
     plan ??= await this.rules.generate(ctx);
-    plan = withGymColors(plan, gym);
+    plan = withVideos(withGymColors(plan, gym));
 
     const [saved] = await this.db
       .insert(generatedPlans)

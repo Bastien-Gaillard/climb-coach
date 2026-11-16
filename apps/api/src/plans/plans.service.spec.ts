@@ -99,6 +99,27 @@ describe('PlansService.generate', () => {
     ]);
   });
 
+  it('ajoute la vidéo de chaque exercice du cœur de séance, Mistral comme règles', async () => {
+    const named = setup({
+      enabled: true,
+      mistral: async () => ({
+        ...mistralPlan,
+        blocks: [
+          mistralPlan.blocks[0],
+          { kind: 'main', title: 'Pieds silencieux', minutes: 45, instructions: ['Sans bruit'] },
+        ],
+      }),
+    });
+    const fromMistral = await named.service.generate('u1', 60);
+    expect(fromMistral.plan.blocks[0].video).toBeUndefined();
+    expect(fromMistral.plan.blocks[1].video).toMatch(/^https:\/\/www\.youtube\.com\//);
+
+    const fromRules = await setup({ enabled: false }).service.generate('u1', 90);
+    const mains = fromRules.plan.blocks.filter((b) => b.kind === 'main');
+    expect(mains.length).toBeGreaterThan(0);
+    for (const b of mains) expect(b.video).toMatch(/^https:\/\/www\.youtube\.com\//);
+  });
+
   it('retombe sur les règles si Mistral échoue, en gardant la raison', async () => {
     const { service, rulesSpy } = setup({
       enabled: true,

@@ -273,6 +273,18 @@ h2.overline {
   }
 }
 
+.blocks .video {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  font-size: 14px;
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .block-head {
   display: flex;
   justify-content: space-between;
