@@ -3,12 +3,13 @@ import { EQUIPMENT_LABEL } from '../auth/equipment';
 import { gradeFromValue, gradeValue } from '@climb-coach/grades';
 import { Injectable, Logger } from '@nestjs/common';
 import { catalogForPrompt, pickExercises } from './exercises';
+import { exerciseForTitle } from './exercise-videos';
 import { ConfigService } from '@nestjs/config';
 import { Env } from '../config/env';
 import { REFERENCE_SYSTEM } from '../sessions/climb-normalizer';
 import { GeneratorContext, PlanGenerator, splitTime } from './generator';
 import { cleanGrade, describeGym } from './gym-colors';
-import { analyzeHistory, FOCUS_LABEL } from './history-analysis';
+import { analyzeHistory, FOCUS_LABEL, ofFocus } from './history-analysis';
 import { Plan, planFitsTime, PlanSchema } from './plan.schema';
 
 export class MistralError extends Error {
@@ -120,6 +121,34 @@ const DEFAULT_TITLES: Record<string, string> = {
 };
 
 /**
+ * Vérifie que la séance a un vrai cœur de séance : au moins une partie "main", chacune
+ * nommée d'après un exercice du catalogue du bon type, et un seul gainage.
+ * Sans ça, Mistral peut ranger ses exercices en "core" (tout s'affiche « Gainage »)
+ * ou glisser des exercices d'un autre type que celui de la séance.
+ */
+export function checkStructure(plan: Plan): void {
+  const cores = plan.blocks.filter((b) => b.kind === 'core').length;
+  if (cores > 1)
+    throw new MistralError(
+      `${cores} parties "core" : le gainage tient en une seule partie, les exercices du catalogue vont chacun dans une partie "main"`,
+    );
+  const mains = plan.blocks.filter((b) => b.kind === 'main');
+  if (!mains.length)
+    throw new MistralError('aucune partie "main" : le cœur de séance est obligatoire');
+  for (const block of mains) {
+    const exercise = exerciseForTitle(block.title);
+    if (!exercise)
+      throw new MistralError(
+        `partie "main" « ${block.title} » : son titre doit être le nom d'un exercice du catalogue`,
+      );
+    if (exercise.focus !== plan.focus)
+      throw new MistralError(
+        `« ${exercise.name} » est un exercice ${ofFocus(exercise.focus)}, pas ${ofFocus(plan.focus)}`,
+      );
+  }
+}
+
+/**
  * Corrige les petits écarts sans conséquence avant la validation zod :
  * titre manquant, minutes en texte, consigne unique en chaîne.
  * Le reste (focus, durées, cotations) reste validé strictement.
@@ -221,6 +250,8 @@ Catalogue d'exercices (choisis dans cette liste, en variant d'une séance à l'a
 ${catalogForPrompt()}
 
 Le cœur de séance contient 1 à 3 exercices du catalogue (1 si le temps est court, 2 ou 3 au-delà de 25 min), chacun dans sa propre partie "main", dont le titre est le nom de l'exercice. Tu peux adapter un exercice, mais garde son principe.
+Les exercices du cœur de séance sont tous du type de la séance (une séance d'endurance ne prend que des exercices d'endurance).
+Types des parties : "warmup" = échauffement, "main" = un exercice du catalogue, "core" = gainage (au sol, une seule partie, jamais un exercice du catalogue), "cooldown" = retour au calme.
 
 Structure de la séance :
 - Respecte le focus et l'intensité proposés, sauf raison évidente dans l'historique. Quand le grimpeur a choisi lui-même le type de la séance, ce focus est imposé : garde-le toujours.
@@ -434,6 +465,8 @@ export class MistralGenerator implements PlanGenerator {
       const total = plan.blocks.reduce((s, b) => s + b.minutes, 0);
       throw new MistralError(`Séance de ${total} min pour ${availableMinutes} min dispo`);
     }
+
+    checkStructure(plan);
 
     for (const block of plan.blocks) {
       block.instructions = block.instructions.map(bracketGrades);

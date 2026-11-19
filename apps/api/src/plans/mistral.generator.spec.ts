@@ -110,6 +110,39 @@ describe('MistralGenerator.parse', () => {
     expect(gen.parse(JSON.stringify(plan), 60).blocks[1].target?.grade).toBe('6A+');
   });
 
+  it('rejette des exercices rangés en gainage, sans partie "main"', () => {
+    const plan = structuredClone(validPlan);
+    plan.blocks[1] = { ...plan.blocks[1], kind: 'core', title: 'Gainage', minutes: 20 };
+    plan.blocks.push({ ...plan.blocks[1], minutes: 25 });
+    expect(() => gen.parse(JSON.stringify(plan), 60)).toThrow(/2 parties "core"/);
+    plan.blocks.pop();
+    plan.blocks[1].minutes = 45;
+    expect(() => gen.parse(JSON.stringify(plan), 60)).toThrow(/aucune partie "main"/);
+  });
+
+  it('rejette une partie "main" qui n’est pas un exercice du catalogue', () => {
+    const plan = structuredClone(validPlan);
+    plan.blocks[1].title = 'Gainage';
+    expect(() => gen.parse(JSON.stringify(plan), 60)).toThrow(
+      /« Gainage » : son titre doit être le nom d'un exercice du catalogue/,
+    );
+  });
+
+  it('rejette un exercice d’un autre type que la séance', () => {
+    const plan = structuredClone(validPlan);
+    plan.blocks[1].title = 'Lancés variés';
+    expect(() => gen.parse(JSON.stringify(plan), 60)).toThrow(
+      '« Lancés variés » est un exercice de force, pas d’endurance',
+    );
+  });
+
+  it('accepte un nom d’exercice précédé du type, avec un seul gainage', () => {
+    const plan = structuredClone(validPlan);
+    plan.blocks[1] = { ...plan.blocks[1], title: 'Endurance : 4×4', minutes: 35 };
+    plan.blocks.push({ kind: 'core', title: 'Gainage', minutes: 10, instructions: ['Planche'] });
+    expect(gen.parse(JSON.stringify(plan), 60).blocks).toHaveLength(3);
+  });
+
   it('rejette une cotation inventée', () => {
     const plan = structuredClone(validPlan);
     plan.blocks[1].target = { style: 'boulder', grade: '6Z' };
@@ -165,7 +198,11 @@ describe('MistralGenerator.generate', () => {
   });
 
   it('type choisi par le grimpeur : refuse puis relance une séance d’un autre type', async () => {
-    const strength = { ...validPlan, focus: 'strength' as const };
+    const strength: Plan = {
+      ...validPlan,
+      focus: 'strength',
+      blocks: [validPlan.blocks[0], { ...validPlan.blocks[1], title: 'Lancés variés' }],
+    };
     const fetchMock = jest
       .spyOn(global, 'fetch')
       .mockResolvedValueOnce({
