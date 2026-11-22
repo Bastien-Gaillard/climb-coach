@@ -13,7 +13,7 @@ const BY_NAME = [...EXERCISES]
 const isWordChar = (c: string | undefined) => !!c && /[a-z0-9]/.test(c);
 
 /**
- * L'exercice du catalogue dont le nom figure dans le titre d'une partie (« Technique : Lolottes »,
+ * L'exercice du catalogue dont le nom figure dans le titre d'une partie (« Force : Projets »,
  * ou le nom seul chez Mistral), en mot entier. Undefined si aucun ne correspond.
  */
 export function exerciseForTitle(title: string): Exercise | undefined {
@@ -29,15 +29,18 @@ export function exerciseForTitle(title: string): Exercise | undefined {
 }
 
 /**
- * Ajoute à chaque exercice du cœur de séance le lien vers sa vidéo, retrouvé par son nom.
- * Les liens éventuellement inventés par le modèle sont retirés : seul le catalogue fait foi.
+ * Ajoute à chaque format du cœur de séance sa vidéo et son détail (ⓘ), retrouvés par son nom.
+ * Ceux éventuellement inventés par le modèle sont retirés : seul le catalogue fait foi. Les
+ * bonus, construits par l'API, gardent les leurs.
  */
-export function withVideos(plan: Plan): Plan {
+export function withCatalog(plan: Plan): Plan {
   return {
     ...plan,
-    blocks: plan.blocks.map(({ video: _ignored, ...block }) => {
+    blocks: plan.blocks.map((block) => {
+      if (block.kind === 'bonus') return block;
+      const { video: _video, info: _info, ...rest } = block;
       const exercise = block.kind === 'main' ? exerciseForTitle(block.title) : undefined;
-      return exercise ? { ...block, video: exercise.video } : block;
+      return exercise ? { ...rest, video: exercise.video, info: exercise.info } : rest;
     }),
   };
 }

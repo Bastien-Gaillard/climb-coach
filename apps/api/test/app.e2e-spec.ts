@@ -389,14 +389,26 @@ describe('API (e2e)', () => {
         .expect(201);
       expect(res.body.source).toBe('rules');
       expect(res.body.plan.focus).toBe('endurance');
-      const total = res.body.plan.blocks.reduce(
-        (s: number, b: { minutes: number }) => s + b.minutes,
-        0,
-      );
+      // Le bonus facultatif vient en plus du temps dispo
+      const blocks: { kind: string; minutes: number }[] = res.body.plan.blocks;
+      const total = blocks
+        .filter((b) => b.kind !== 'bonus')
+        .reduce((s: number, b) => s + b.minutes, 0);
       expect(total).toBe(60);
+      expect(blocks.some((b) => b.kind === 'bonus')).toBe(true);
+
+      // Consigne du jour : la même à la séance suivante, « Changer » passe à une autre
+      const cue = res.body.plan.cue;
+      expect(cue).toMatchObject({ id: expect.any(String), text: expect.any(String) });
+      const again = await http().post('/api/plans/generate').send({ availableMinutes: 60 });
+      expect(again.body.plan.cue.id).toBe(cue.id);
+      const changed = await http().post('/api/plans/cue/next').expect(201);
+      expect(changed.body.id).not.toBe(cue.id);
+      const after = await http().post('/api/plans/generate').send({ availableMinutes: 60 });
+      expect(after.body.plan.cue.id).toBe(changed.body.id);
 
       const history = await http().get('/api/plans').expect(200);
-      expect(history.body).toHaveLength(1);
+      expect(history.body).toHaveLength(3);
     });
 
     it('refuse moins de 30 min', () =>

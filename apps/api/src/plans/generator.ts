@@ -12,7 +12,7 @@ export interface GeneratorContext {
   history: SessionWithClimbs[];
   /** Salle du jour : impose le style (bloc ou voie) et permet de parler en couleurs. */
   gym?: Gym;
-  /** Matériel coché dans le profil : l'échauffement s'en sert s'il est là. */
+  /** Matériel coché dans le profil (à la salle ou chez soi) : le bonus s'en sert. */
   equipment?: Equipment[];
   /** Objectif d'entraînement du profil : son type de séance revient environ une fois sur deux. */
   focusGoal?: Focus | null;
@@ -44,9 +44,12 @@ export interface TimeSplit {
   cooldown: number;
 }
 
-/** Échauffement et retour au calme quasi fixes, le cœur de séance prend le reste. */
+/**
+ * Échauffement (15 min, 20 dès 60 min) et retour au calme quasi fixes, le cœur de séance prend
+ * le reste. Le bonus facultatif vient en plus.
+ */
 export function splitTime(available: number): TimeSplit {
-  const warmup = Math.min(20, Math.max(10, Math.round(available * 0.2)));
+  const warmup = available >= 60 ? 20 : 15;
   const core = available >= 90 ? 15 : available >= 45 ? 10 : 0;
   const cooldown = available >= 60 ? 5 : 0;
   return { warmup, core, cooldown, main: available - warmup - core - cooldown };

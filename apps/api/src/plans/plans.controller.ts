@@ -44,6 +44,12 @@ export class PlansController {
     );
   }
 
+  /** Bouton « Changer » de la consigne du jour : la suivante, pour 10 séances. */
+  @Post('cue/next')
+  nextCue(@CurrentUser() user: User) {
+    return this.plans.changeCue(user.id, profilePoints(user).weakPoints);
+  }
+
   /** Planning des prochains jours : quand grimper, quel type de séance, combien de temps. */
   @Get('schedule')
   schedule(

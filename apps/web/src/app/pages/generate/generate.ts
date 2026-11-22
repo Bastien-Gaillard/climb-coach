@@ -18,6 +18,7 @@ import { AiStatusStore } from '../../core/ai-status.store';
 import { PlanStore } from '../../core/plan.store';
 import { holdVars } from '../../shared/hold';
 import { Icon } from '../../shared/icon';
+import { InfoPanel } from '../../shared/info';
 
 const MIN = 30;
 /** Dernière salle choisie, retenue d'une fois sur l'autre. */
@@ -26,7 +27,7 @@ const MAX = 300;
 
 @Component({
   selector: 'app-generate',
-  imports: [DatePipe, RouterLink, Icon],
+  imports: [DatePipe, RouterLink, Icon, InfoPanel],
   templateUrl: './generate.html',
   styleUrl: './generate.scss',
 })
@@ -76,9 +77,20 @@ export class GeneratePage implements OnInit {
   protected readonly relativeDay = relativeDay;
   protected readonly dayDate = dayDate;
 
+  /** Durée de la séance, sans le bonus facultatif (qui vient en plus). */
   protected readonly total = computed(
-    () => this.result()?.plan.blocks.reduce((sum, b) => sum + b.minutes, 0) ?? 0,
+    () =>
+      this.result()
+        ?.plan.blocks.filter((b) => b.kind !== 'bonus')
+        .reduce((sum, b) => sum + b.minutes, 0) ?? 0,
   );
+  protected readonly bonusMinutes = computed(
+    () =>
+      this.result()
+        ?.plan.blocks.filter((b) => b.kind === 'bonus')
+        .reduce((sum, b) => sum + b.minutes, 0) ?? 0,
+  );
+  protected readonly cueLoading = signal(false);
 
   /** Ce que la génération prend en compte : dernière séance, fatigue, meilleure réussite. */
   protected readonly context = computed(() => {
@@ -165,6 +177,21 @@ export class GeneratePage implements OnInit {
       error: (err) => {
         this.error.set(errorMessage(err));
         this.loading.set(false);
+      },
+    });
+  }
+
+  /** « Changer » : la consigne suivante, gardée 10 séances. */
+  protected changeCue(): void {
+    this.cueLoading.set(true);
+    this.api.nextCue().subscribe({
+      next: (cue) => {
+        this.store.setCue(cue);
+        this.cueLoading.set(false);
+      },
+      error: (err) => {
+        this.error.set(errorMessage(err));
+        this.cueLoading.set(false);
       },
     });
   }

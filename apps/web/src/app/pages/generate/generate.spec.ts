@@ -122,6 +122,55 @@ describe('GeneratePage', () => {
     expect(links.every((a) => a.target === '_blank')).toBeTrue();
   });
 
+  it('consigne du jour : affichée avec son ⓘ, « Changer » la remplace sans toucher au reste', () => {
+    click('Générer');
+    const withCue = structuredClone(response);
+    withCue.plan.cue = {
+      id: 'silent-feet',
+      text: 'Pieds silencieux',
+      info: { why: 'Précision', how: ['Regarde le pied'], pitfalls: ['Aller vite'] },
+    };
+    http.expectOne('/api/plans/generate').flush(withCue);
+    fixture.detectChanges();
+
+    const cue = () => el.querySelector('[data-testid=cue]')!;
+    expect(cue().textContent).toContain('Pieds silencieux');
+    expect(cue().querySelector('[data-testid=info]')?.textContent).toContain('Regarde le pied');
+
+    el.querySelector<HTMLButtonElement>('[data-testid=cue-change]')!.click();
+    const req = http.expectOne('/api/plans/cue/next');
+    expect(req.request.method).toBe('POST');
+    req.flush({ id: 'slow', text: 'Au ralenti : 3 temps par mouvement' });
+    fixture.detectChanges();
+    expect(cue().textContent).toContain('Au ralenti');
+    expect(el.querySelector('[data-testid=plan]')!.textContent).toContain('Endurance : 4x4');
+  });
+
+  it('le bonus facultatif vient en plus du temps, avec son ⓘ et sa vidéo', () => {
+    click('Générer');
+    const withBonus = structuredClone(response);
+    withBonus.plan.blocks.push({
+      kind: 'bonus',
+      title: 'Suspensions max',
+      minutes: 10,
+      instructions: ['6 à 10 suspensions de 10 s'],
+      video: 'https://www.youtube.com/results?search_query=max+hangs',
+      info: { why: 'Doigts', how: ['13 s au max'], pitfalls: ['Échec'] },
+    });
+    http.expectOne('/api/plans/generate').flush(withBonus);
+    fixture.detectChanges();
+
+    const plan = el.querySelector('[data-testid=plan]')!;
+    expect(plan.textContent).toContain('Bonus · facultatif');
+    expect(plan.textContent).toContain('Total : 60 min sur 60 min dispo.');
+    expect(plan.textContent).toContain('+ 10 min de bonus facultatif.');
+    const info = plan.querySelector('li.bonus [data-testid=info]')!;
+    expect(info.textContent).toContain('13 s au max');
+    expect(info.querySelector('[data-testid=video-link]')?.textContent?.trim()).toBe(
+      'Chercher une vidéo',
+    );
+  });
+
   it('par défaut le planning décide, sinon envoie le type choisi', () => {
     const radio = (id: string) => el.querySelector<HTMLButtonElement>(`[data-testid=focus-${id}]`)!;
     expect(radio('auto').getAttribute('aria-checked')).toBe('true');

@@ -1,29 +1,30 @@
 import { ClimbingPoint, POINT_LABEL } from '../auth/climbing-points';
-import { Focus } from './plan.schema';
+import { Focus, PlanInfo } from './plan.schema';
 
 /**
- * Catalogue des exercices de bloc, par type de séance. Il sert au générateur par règles (qui
- * y pioche en variant d'une séance à l'autre) et à Mistral (qui le reçoit dans son prompt).
+ * Catalogue des formats de cœur de séance, par type. Chaque format se fait avec les blocs déjà
+ * tracés dans une salle commerciale : on choisit des blocs d'une couleur, on les grimpe selon une
+ * règle simple (nombre, essais, repos). Rien ne dépend d'un mur, d'une prise ou d'une inclinaison.
+ * Il sert au générateur par règles et à Mistral (qui le reçoit dans son prompt).
  *
- * Sources principales : protocoles du 4×4 et des circuits de résistance (Gripped, ClimbStrong),
- * exercices de mouvement de Kris Hampton (TrainingBeta), exercices de placement de pieds
- * (99Boulders, Climbing), protocole du bloc au max (TrainingBeta). Points faibles (types de prise,
- * compression, tension, coordination, style de mur, chute) : Lattice, Neil Gresham, Climbing
- * Canada, Gripped, ClimbStrong, Brooklyn Boulders, Strong Mind Climbing.
+ * Sources : ClimbStrong (« sessions any gym », densité, compétence sur 10 séances), Gripped
+ * (3 essais max, course aux points en doublé), La Sportiva (Bouldering Power Hour : circuit dur,
+ * répétitions parfaites, volume technique ; Climbing Technique : tes 5 plus durs),
+ * TrainingForClimbing et Mojagear (bloc au max), Lattice (flash), Petzl / Charlotte Durif (volume).
  */
 
-/** De quoi rédiger un exercice : niveau du grimpeur et temps alloué. */
+/** De quoi rédiger un format : niveau du grimpeur et temps alloué. */
 export interface ExerciseContext {
-  /** Meilleure réussite récente (valeur sur l'échelle Fontainebleau). */
+  /** Niveau stable (valeur sur l'échelle Fontainebleau) : la couleur passée presque à coup sûr. */
   maxSent: number;
-  /** Niveau à viser en force (maxSent, ou un cran au-dessus). */
+  /** Niveau visé en force : la couleur au-dessus. */
   project: number;
   /** 1 pour une séance légère, 0 sinon : on baisse les cotations d'un cran. */
   light: number;
-  /** Minutes accordées à l'exercice. */
+  /** Minutes accordées au format. */
   minutes: number;
-  /** Fait alterner les variantes d'un exercice d'une séance à l'autre (ex. numéro du jour). */
-  variant?: number;
+  /** Types de prise cochés en points faibles (« plats, pinces »), pour orienter le choix des blocs. */
+  grips?: string;
   /** Cotation affichée pour une valeur (avec la couleur de la salle si elle est connue). */
   grade: (value: number) => string;
 }
@@ -36,7 +37,7 @@ export interface ExerciseBlock {
 }
 
 /**
- * Filière d'un exercice d'endurance. Fond : effort long et continu, peu intense. Résistance :
+ * Filière d'un format d'endurance. Fond : effort long et continu, peu intense. Résistance :
  * effort court et intense, les avant-bras gonflent. Une séance ne mélange pas les deux.
  */
 export type Energy = 'fond' | 'resistance';
@@ -51,1702 +52,613 @@ export interface Exercise {
   /** Points faibles qu'il travaille (ou plaisirs qu'il offre), pour le profil du grimpeur. */
   points: ClimbingPoint[];
   name: string;
-  /** Une phrase : le but et le principe, pour Mistral et pour s'y retrouver. */
+  /** Une phrase : le principe, pour Mistral et pour s'y retrouver. */
   summary: string;
-  /** Temps minimal pour que l'exercice ait du sens. */
+  /** Temps minimal pour que le format ait du sens. */
   minMinutes: number;
-  /** Page qui décrit l'exercice ou son protocole. */
+  /** Temps maximal : au-delà, le format n'a plus de sens (on en prend un autre). */
+  maxMinutes?: number;
+  /** Format lourd, proposé seulement une séance de force sur trois. */
+  rare?: boolean;
+  /** Page qui décrit le format. */
   source?: string;
-  /**
-   * Courte vidéo qui montre l'exercice (de préférence un short), ou une recherche YouTube quand
-   * aucune vidéo ne le montre assez clairement.
-   */
+  /** Vidéo qui le montre, ou une recherche YouTube faute de bonne démo. */
   video: string;
-  /** Réservé aux grimpeurs confirmés (6C et plus) : charge forte sur les doigts et les épaules. */
-  advanced?: boolean;
-  /** À éviter quand une douleur est signalée (sollicite fort doigts, épaules ou coudes). */
+  /** À éviter quand une douleur est signalée ou que la séance est allégée. */
   stressful?: boolean;
+  /** Le détail affiché derrière le ⓘ. */
+  info: PlanInfo;
   build: (c: ExerciseContext) => ExerciseBlock;
 }
 
-/** 6C : en dessous, on évite le travail sans les pieds et à un bras. */
-export const ADVANCED_LEVEL = 8;
-
-const count = (minutes: number, perItem: number, min: number, max = 12) =>
+const count = (minutes: number, perItem: number, min: number, max = 25) =>
   Math.min(max, Math.max(min, Math.floor(minutes / perItem)));
 
 const plural = (n: number, word: string) => `${n} ${word}${n > 1 ? 's' : ''}`;
 
-/** Recherche YouTube, pour les exercices sans vidéo qui les montre bien. */
-const ytSearch = (query: string) =>
+/** Recherche YouTube, pour les formats sans vidéo qui les montre bien. */
+export const ytSearch = (query: string) =>
   `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
 
 export const EXERCISES: Exercise[] = [
-  // ---------- Technique : blocs sous le niveau max, une consigne de mouvement précise
+  // ---------- Force : peu de blocs durs, essais courts, longs repos
   {
-    id: 'silent-feet',
-    video: 'https://www.youtube.com/watch?v=WbscmZDybdQ',
-    source: 'https://www.99boulders.com/?p=170',
-    focus: 'technique',
-    points: ['footwork'],
-    name: 'Pieds silencieux',
-    summary: 'Poser chaque pied sans aucun bruit, en le regardant jusqu’au contact : précision.',
-    minMinutes: 10,
-    build: (c) => {
-      const v = c.maxSent - 2 - c.light;
-      return {
-        title: 'Pieds silencieux',
-        target: v,
-        instructions: [
-          `${plural(count(c.minutes, 4, 3), 'bloc')} en ${c.grade(v)}`,
-          'Objectif : des pieds précis, posés du premier coup',
-          'Regarde la prise de pied jusqu’à ce que le chausson la touche',
-          'Pose le pied sans aucun bruit, puis seulement lève les yeux',
-          'Repère : aucun bruit de pied sur tout le bloc. Un bruit : redescends d’un mouvement et refais-le',
-        ],
-      };
-    },
-  },
-  {
-    id: 'hover-feet',
-    video: 'https://www.youtube.com/watch?v=jQMpu64Rq6E',
+    id: 'projects',
+    focus: 'strength',
+    points: ['projecting', 'crimps', 'slopers', 'pinches', 'compression', 'tension'],
+    name: 'Projets',
+    summary:
+      '3 ou 4 blocs très différents dans la couleur au-dessus, de vrais repos entre les essais.',
+    minMinutes: 20,
     source:
-      'https://www.climbstrong.com/resource-posts/fundamental-skills-precision-execution-and-balance',
-    focus: 'technique',
-    points: ['footwork', 'balance'],
-    name: 'Pieds en survol',
-    summary: 'Garder chaque pied 3 s au-dessus de la prise avant de le poser, sans réajuster.',
-    minMinutes: 10,
+      'https://trainingforclimbing.com/limit-bouldering-for-building-max-climbing-strength-and-power/',
+    video: 'https://www.youtube.com/shorts/jN5O4vo-C5Y',
+    info: {
+      why: 'Grimper à sa limite est ce qui fait le plus gagner en force et en puissance sur le mur.',
+      how: [
+        'Choisis des blocs qui ne se ressemblent pas : dévers et vertical, réglettes et plats, statique et dynamique',
+        'Chaque essai à fond, puis 5 min de vrai repos : un essai fatigué n’apprend rien',
+        'Travaille les mouvements un par un si le bloc entier ne passe pas',
+      ],
+      pitfalls: [
+        'Enchaîner les essais sans repos : on accumule de la fatigue, pas de la force',
+        'S’acharner : quand plus rien n’avance, on change de bloc',
+      ],
+    },
     build: (c) => {
-      const v = c.maxSent - 2 - c.light;
+      const n = c.minutes >= 40 ? 4 : 3;
       return {
-        title: 'Pieds en survol',
-        target: v,
+        title: 'Projets',
+        target: c.project,
         instructions: [
-          `${plural(count(c.minutes, 4, 3), 'bloc')} en ${c.grade(v)}`,
-          'Objectif : viser l’endroit exact de la prise avant de poser le pied',
-          'Arrête le pied 3 s juste au-dessus de la prise, immobile',
-          'Pose-le une seule fois, sans le réajuster',
-          'Repère : tu tiens les 3 s sans trembler et le pied ne bouge plus une fois posé',
+          `${n} blocs en ${c.grade(c.project)}`,
+          'Choisis-les très différents : inclinaison, prises, style',
+          ...(c.grips ? [`Prends-en un en ${c.grips} si la salle en a`] : []),
+          'Repos 5 min entre chaque essai, on change de bloc quand les essais n’avancent plus',
         ],
       };
     },
   },
   {
-    id: 'hover-hands',
-    video: 'https://www.youtube.com/watch?v=QZVCPF-0d9Y',
-    source: 'https://www.trainingbeta.com/?p=23718',
-    focus: 'technique',
-    points: ['tension', 'balance'],
-    name: 'Mains en survol',
+    id: 'three-tries',
+    focus: 'strength',
+    points: ['commitment', 'power', 'reading'],
+    name: '3 essais max',
     summary:
-      'Garder chaque main 2 à 3 s au-dessus de la prise avant de la prendre : gainage et placement.',
-    minMinutes: 10,
-    build: (c) => {
-      const v = c.maxSent - 2 - c.light;
-      return {
-        title: 'Mains en survol',
-        target: v,
-        instructions: [
-          `${plural(count(c.minutes, 5, 3), 'bloc')} en ${c.grade(v)}`,
-          'Objectif : tenir la position par le gainage, pas par les bras',
-          'Avant chaque prise de main, arrête la main 2 s juste au-dessus',
-          'Pendant ces 2 s, ventre serré et hanches collées au mur',
-          'Prends la prise une seule fois, sans la réajuster',
-          'Repère : tu peux tenir les 2 s sans que les pieds ou les hanches décollent',
-        ],
-      };
-    },
-  },
-  {
-    id: 'one-touch',
-    video: 'https://www.youtube.com/shorts/hOmK8SKBPiE',
-    source: 'https://www.trainingbeta.com/?p=23718',
-    focus: 'technique',
-    points: ['footwork', 'reading'],
-    name: 'Une seule touche',
-    summary: 'Chaque main et chaque pied se posent une seule fois : interdit de réajuster.',
-    minMinutes: 10,
-    build: (c) => {
-      const v = c.maxSent - 2 - c.light;
-      return {
-        title: 'Une seule touche',
-        target: v,
-        instructions: [
-          `${plural(count(c.minutes, 4, 3), 'bloc')}, du plus facile au plus dur, jusqu’en ${c.grade(v)}`,
-          'Objectif : décider où va chaque main et chaque pied avant de bouger',
-          'Regarde la prise, choisis l’endroit exact, puis pose-toi dessus une seule fois',
-          'Interdit de réajuster : un pied ou une main qui bouge, c’est raté',
-          'Repère : le bloc entier sans un seul réajustement',
-        ],
-      };
-    },
-  },
-  {
-    id: 'no-hands',
-    video: 'https://www.youtube.com/shorts/67IuHnrdlAs',
-    source: 'https://www.mountainproject.com/forum/message/114032041',
-    focus: 'technique',
-    points: ['slab', 'balance'],
-    name: 'Équilibre sans les mains',
-    summary:
-      'Monter une dalle facile sans les mains : confiance dans les pieds et placement du bassin.',
-    minMinutes: 10,
-    build: (c) => {
-      const v = c.maxSent - 4 - c.light;
-      const n = count(c.minutes, 2, 4, 8);
-      return {
-        title: 'Équilibre sans les mains',
-        target: v,
-        instructions: [
-          `Dalle facile, en ${c.grade(v)} ou moins : ${plural(n, 'passage')}, monte puis redescends`,
-          'Objectif : faire confiance aux pieds et garder le bassin au-dessus d’eux',
-          'Mains dans le dos, du début à la fin',
-          'Petits pas, regard sur chaque prise de pied, bassin au-dessus des pieds',
-          'Repère : tu montes et redescends sans toucher le mur avec les mains',
-          'Repos 1 min entre chaque passage',
-        ],
-      };
-    },
-  },
-  {
-    id: 'one-arm-slab',
-    video: 'https://www.youtube.com/shorts/W7776hMH4x8',
+      '6 à 8 blocs à son niveau et au-dessus, 3 essais par bloc pour le réussir, pas un de plus.',
+    minMinutes: 25,
     source:
-      'https://assets01.sdd1.ch/assets/lbwp-cdn/mobilesport/files/1677975093/mobilesport-escalade-a-lecole--bloc-technique-manchot.pdf',
-    focus: 'technique',
-    points: ['balance', 'hips'],
-    name: 'Un bras en moins',
+      'https://gripped.com/sections/training/develop-your-try-hard-mindset-with-this-workout/',
+    video: ytSearch('3 attempts bouldering session try hard'),
+    info: {
+      why: 'Avec seulement trois essais, chaque essai compte : on apprend à tout donner du premier coup.',
+      how: [
+        'Lis bien le bloc avant le premier essai',
+        'Raté au 3e essai : tu passes au suivant, sans exception',
+        'Plus de la moitié des blocs réussis : la prochaine fois, prends-les un cran au-dessus',
+      ],
+      pitfalls: ['Commencer par les blocs à petites réglettes : garde-les pour quand tu es chaud'],
+    },
+    build: (c) => {
+      const n = count(c.minutes, 5, 6, 8);
+      const above = Math.floor(n / 2);
+      // Sans couleur au-dessus connue, tous à son niveau
+      const volume =
+        c.project > c.maxSent
+          ? [
+              `${n - above} blocs en ${c.grade(c.maxSent)}`,
+              `${above} blocs en ${c.grade(c.project)}`,
+            ]
+          : [`${n} blocs en ${c.grade(c.maxSent)}`];
+      return {
+        title: '3 essais max',
+        target: c.project,
+        instructions: [
+          ...volume,
+          '3 essais max par bloc : raté au 3e, tu passes au suivant',
+          'Repos 3 min entre chaque essai',
+          'Plus de la moitié réussis : un cran au-dessus la prochaine fois',
+        ],
+      };
+    },
+  },
+  {
+    id: 'hard-circuit',
+    focus: 'strength',
+    points: ['power', 'lock-off', 'pushing'],
+    name: 'Circuit dur',
     summary:
-      'Grimper un bloc facile avec une seule main : équilibre, pieds et rotations du bassin.',
-    minMinutes: 10,
-    build: (c) => {
-      const v = c.maxSent - 4 - c.light;
-      const n = count(c.minutes, 2, 4, 8);
-      return {
-        title: 'Un bras en moins',
-        target: v,
-        instructions: [
-          `Dalle ou mur vertical facile, en ${c.grade(v)} ou moins : ${plural(n, 'passage')}, en alternant main droite et main gauche`,
-          'Objectif : monter avec les pieds et les rotations du bassin, pas avec les bras',
-          'Une seule main, l’autre dans le dos',
-          'Tourne le bassin vers la main qui tient pour aller chercher la prise suivante',
-          'Repère : la main sert seulement à l’équilibre, jamais à tirer',
-          'Repos 1 min entre chaque passage',
-        ],
-      };
+      '5 blocs durs à réussir en 30 min ; quand ils passent tous, on remplace le plus facile.',
+    minMinutes: 30,
+    stressful: true,
+    source: 'https://www.lasportivausa.com/blogs/blog/gym-series-bouldering-power-hour',
+    video: ytSearch('bouldering hard circuit 5 problems 30 minutes'),
+    info: {
+      why: 'Un même circuit d’une séance à l’autre montre tes progrès, et la règle de remplacement fait monter le niveau tout seul.',
+      how: [
+        'Garde les mêmes 5 blocs tant qu’ils ne passent pas tous en 30 min',
+        'Commence par les blocs à grosses prises (plats, pinces), finis par les réglettes',
+        'Tous réussis en 30 min : la prochaine fois, remplace le plus facile par un plus dur',
+      ],
+      pitfalls: [
+        'Se reposer moins de 3 min entre deux efforts : le circuit devient de l’endurance',
+      ],
     },
+    build: (c) => ({
+      title: 'Circuit dur',
+      target: c.project,
+      instructions: [
+        `5 blocs en ${c.grade(c.project)}`,
+        'À réussir en 30 min, des grosses prises vers les réglettes',
+        'Repos 3 min minimum entre deux efforts',
+        ...(c.minutes > 35 ? ['Temps restant : reprends les blocs ratés'] : []),
+        'Les 5 passent : la prochaine fois, remplace le plus facile par un plus dur',
+      ],
+    }),
   },
   {
-    id: 'flag',
-    video: 'https://www.youtube.com/watch?v=juPtjVgcQbg',
-    source: 'https://sendedition.com/22-climbing-techniques-and-how-to-do-them',
-    focus: 'technique',
-    points: ['balance', 'hips'],
-    name: 'Drapeaux',
+    id: 'work-session',
+    focus: 'strength',
+    points: ['projecting', 'lock-off', 'tension'],
+    name: 'Séance de travail',
     summary:
-      'Un mouvement sur deux, un seul pied sur une prise et l’autre jambe tendue en contrepoids.',
-    minMinutes: 10,
-    build: (c) => {
-      const v = c.maxSent - 2 - c.light;
-      return {
-        title: 'Drapeaux',
-        target: v,
-        instructions: [
-          `${plural(count(c.minutes, 5, 3), 'bloc')} en ${c.grade(v)}`,
-          'Objectif : t’équilibrer avec la jambe libre au lieu de chercher un pied',
-          'Un mouvement sur deux, garde un seul pied sur une prise',
-          'Tends l’autre jambe sur le côté, contre le mur, en contrepoids (drapeau)',
-          'Repère : tu attrapes la prise suivante sans que le corps pivote',
-        ],
-      };
+      '5 ou 6 blocs durs, 8 min d’essais chacun puis 2 min de repos. Une fois toutes les 2 à 3 semaines.',
+    minMinutes: 40,
+    rare: true,
+    stressful: true,
+    source: 'https://climbstrong.com/education-center/sessions-any-gym',
+    video: 'https://www.youtube.com/watch?v=dyAvbUvY_PU',
+    info: {
+      why: 'Beaucoup d’essais de qualité sur des blocs durs : on comprend et on construit des mouvements nouveaux.',
+      how: [
+        '8 min par bloc : essais, travail des mouvements, essais encore',
+        'Puis 2 min de repos et on passe au bloc suivant',
+        'Prends 1 ou 2 blocs encore plus durs si tu te sens bien',
+      ],
+      pitfalls: [
+        'Séance très chargée pour les doigts : pas plus d’une fois toutes les 2 à 3 semaines',
+        'Pas de suspensions max à la poutre après',
+      ],
     },
-  },
-  {
-    id: 'straight-arms',
-    video: 'https://www.youtube.com/watch?v=xyc_VvqxPps',
-    source: 'https://www.mountainproject.com/v/108661904',
-    focus: 'technique',
-    points: ['hips', 'resistance'],
-    name: 'Bras tendus',
-    summary: 'Rester bras tendus, monter avec les jambes et la rotation des hanches.',
-    minMinutes: 10,
     build: (c) => {
-      const v = c.maxSent - 2 - c.light;
+      const n = count(c.minutes, 10, 3, 6);
       return {
-        title: 'Bras tendus',
-        target: v,
+        title: 'Séance de travail',
+        target: c.project,
         instructions: [
-          `${plural(count(c.minutes, 4, 3), 'bloc')} en ${c.grade(v)}`,
-          'Objectif : monter avec les jambes et économiser les bras',
-          'Garde les bras tendus, bassin bas',
-          'Monte avec une poussée de jambe et une rotation des hanches',
-          'Plie le bras seulement au moment d’attraper la prise suivante',
-          'Repère : les avant-bras restent frais sur tout le bloc',
-        ],
-      };
-    },
-  },
-  {
-    id: 'downclimb',
-    video: 'https://www.youtube.com/watch?v=MHb7WYn0S0E',
-    source: 'https://www.99boulders.com/?p=170',
-    focus: 'technique',
-    points: ['footwork', 'fall'],
-    name: 'Désescalade',
-    summary: 'Redescendre chaque bloc par le même chemin : lecture et placement des pieds.',
-    minMinutes: 10,
-    build: (c) => {
-      const v = c.maxSent - 3 - c.light;
-      return {
-        title: 'Désescalade',
-        target: v,
-        instructions: [
-          `${plural(count(c.minutes, 4, 3), 'bloc')} en ${c.grade(v)}, montés puis désescaladés`,
-          'Objectif : voir et placer les pieds sans les avoir sous les yeux',
-          'Après le sommet, redescends par le même chemin au lieu de sauter',
-          'Regarde chaque prise de pied avant de la charger',
-          'Repère : tu arrives en bas sans un seul pied posé au hasard',
-        ],
-      };
-    },
-  },
-  {
-    id: 'sloth-monkey',
-    video: 'https://www.youtube.com/watch?v=AGjQ_U-5iuk',
-    source: 'https://www.trainingbeta.com/?p=23718',
-    focus: 'technique',
-    points: ['coordination'],
-    name: 'Paresseux / singe',
-    summary: 'Grimper un même bloc très lentement, puis vite et fluide : maîtriser le rythme.',
-    minMinutes: 12,
-    build: (c) => {
-      const v = c.maxSent - 2 - c.light;
-      const n = count(c.minutes, 6, 2, 6);
-      return {
-        title: 'Paresseux / singe',
-        target: v,
-        instructions: [
-          `${plural(n, 'bloc')} en ${c.grade(v)}, 2 passages par bloc`,
-          'Objectif : choisir ton rythme au lieu de le subir',
-          '1er passage « paresseux » : très lent, chaque position tenue 2 s',
-          '2e passage « singe » : vite et fluide, sans aucun arrêt',
-          'Repère : le passage rapide est aussi propre que le lent',
-          'Repos 2 min avant de changer de bloc',
-        ],
-      };
-    },
-  },
-  {
-    id: 'dead-stops',
-    video: 'https://www.youtube.com/watch?v=ggRtACYFU5Q',
-    source: 'https://www.trainingbeta.com/?p=23718',
-    focus: 'technique',
-    points: ['coordination', 'lock-off'],
-    name: 'Arrêts nets',
-    summary: 'Freiner l’élan juste avant chaque prise pour la prendre sans à-coup : gainage.',
-    minMinutes: 10,
-    build: (c) => {
-      const v = c.maxSent - 1 - c.light;
-      return {
-        title: 'Arrêts nets',
-        target: v,
-        instructions: [
-          `${plural(count(c.minutes, 5, 3), 'bloc')} en ${c.grade(v)}`,
-          'Objectif : arriver sur chaque prise en douceur grâce au gainage',
-          'Juste avant d’attraper la prise, freine le mouvement avec le ventre',
-          'Prends la prise sans à-coup, comme si elle était fragile',
-          'Repère : aucun claquement de main, le corps ne balance pas après la prise',
-        ],
-      };
-    },
-  },
-  {
-    id: 'backstep',
-    video: 'https://www.youtube.com/shorts/tpu9AOBjIy4',
-    source: 'https://www.climbing.com/skills/how-to-improve-footwork-climbing/',
-    focus: 'technique',
-    points: ['hips'],
-    name: 'Carre externe et hanche au mur',
-    summary: 'Pied sur la carre externe et hanche collée au mur sur les grands mouvements.',
-    minMinutes: 10,
-    build: (c) => {
-      const v = c.maxSent - 2 - c.light;
-      return {
-        title: 'Carre externe et hanche au mur',
-        target: v,
-        instructions: [
-          `${plural(count(c.minutes, 5, 3), 'bloc')} en ${c.grade(v)}, sur du vertical ou du léger dévers`,
-          'Objectif : gagner de l’allonge en tournant la hanche contre le mur',
-          'À chaque grand mouvement, pose le pied sur sa carre externe',
-          'Tourne la hanche du même côté contre le mur, puis allonge le bras',
-          'Repère : tu atteins la prise bras tendu, sans sauter',
-        ],
-      };
-    },
-  },
-  {
-    id: 'heavy-feet',
-    video: 'https://www.youtube.com/shorts/mBlTrqmwPwg',
-    source: 'https://www.trainingbeta.com/?p=23718',
-    focus: 'technique',
-    points: ['footwork', 'tension'],
-    name: 'Pieds lourds',
-    summary:
-      'Laisser le poids descendre dans les pieds et monter par les jambes : économiser les bras.',
-    minMinutes: 10,
-    build: (c) => {
-      const v = c.maxSent - 2 - c.light;
-      return {
-        title: 'Pieds lourds',
-        target: v,
-        instructions: [
-          `${plural(count(c.minutes, 4, 3), 'bloc')} en ${c.grade(v)}`,
-          'Objectif : mettre le poids dans les pieds, pas dans les bras',
-          'Imagine tout ton poids qui tombe dans les pieds, bassin bas',
-          'Pousse sur les jambes pour monter ; les bras ne font que tenir',
-          'Repère : tu sens la poussée dans les cuisses, pas la traction dans les bras',
+          `${n} blocs en ${c.grade(c.project)}`,
+          '8 min d’essais par bloc, puis repos 2 min avant de changer de bloc',
+          'Un ou deux plus durs si tu te sens bien',
         ],
       };
     },
   },
 
+  // ---------- Endurance, fond : beaucoup de blocs faciles, peu de repos
   {
-    id: 'toes',
-    video: 'https://www.youtube.com/shorts/6W78iUMc5Wk',
-    focus: 'technique',
-    points: ['footwork'],
-    name: 'Sur la pointe des pieds',
-    summary: 'Poser uniquement la pointe du chausson, talon haut, pour pouvoir pivoter.',
-    source: 'https://sendedition.com/22-climbing-techniques-and-how-to-do-them',
-    minMinutes: 10,
-    build: (c) => {
-      const v = c.maxSent - 3 - c.light;
-      return {
-        title: 'Sur la pointe des pieds',
-        target: v,
-        instructions: [
-          `${plural(count(c.minutes, 4, 3), 'bloc')} en ${c.grade(v)}`,
-          'Objectif : des pieds précis qui te laissent pivoter librement',
-          'Pose seulement la pointe du chausson sur la prise, talon haut',
-          'Pivote sur cette pointe pour tourner les hanches vers la prise suivante',
-          'Repère : le pied ne bouge plus une fois posé, et il tourne sans se décoller',
-        ],
-      };
-    },
-  },
-  {
-    id: 'drop-knee',
-    video: 'https://www.youtube.com/watch?v=QqDebkWHaWc',
-    focus: 'technique',
-    points: ['hips'],
-    name: 'Lolottes',
-    summary:
-      'Genou tourné vers le bas et hanche au mur pour allonger le bras, à placer le plus souvent possible.',
-    source: 'https://blog.movementgyms.com/7-more-moves-every-climber-should-know',
-    minMinutes: 10,
-    build: (c) => {
-      const v = c.maxSent - 2 - c.light;
-      return {
-        title: 'Lolottes',
-        target: v,
-        instructions: [
-          `${plural(count(c.minutes, 5, 3), 'bloc')} en ${c.grade(v)}, sur du léger dévers avec des prises de côté`,
-          'Objectif : gagner de l’allonge en dévers sans tirer sur les bras',
-          'Pose le pied sur la carre externe, pointe vers l’extérieur',
-          'Tourne le genou vers le bas et vers le mur',
-          'Colle la hanche au mur, puis allonge le bras',
-          'Repère : tu atteins la prise bras tendu, sans à-coup',
-        ],
-      };
-    },
-  },
-  {
-    id: 'heel-hook',
-    video: 'https://www.youtube.com/watch?v=eDmYLqBegCw',
-    focus: 'technique',
-    points: ['hooks'],
-    name: 'Crochets talon',
-    summary:
-      'Accrocher le talon et tirer avec l’arrière de la cuisse, sur des blocs qui s’y prêtent.',
-    source: 'https://www.publiclands.com/blog/a/indoor-rock-climbing-201',
-    minMinutes: 10,
-    build: (c) => {
-      const v = c.maxSent - 2 - c.light;
-      return {
-        title: 'Crochets talon',
-        target: v,
-        instructions: [
-          `${plural(count(c.minutes, 5, 3), 'bloc')} en ${c.grade(v)}, en dévers ou avec des volumes`,
-          'Objectif : faire porter une jambe à la place d’un bras',
-          'Pose le talon sur la prise, pointe du pied tirée vers le bas',
-          'Tire avec l’arrière de la cuisse pour coller le bassin au mur',
-          'Repère : le bras du même côté se relâche quand le talon tire',
-        ],
-      };
-    },
-  },
-  {
-    id: 'toe-hook',
-    video: 'https://www.youtube.com/shorts/D-8zwpvBJnE',
-    focus: 'technique',
-    points: ['hooks', 'tension'],
-    name: 'Crochets pointe',
-    summary: 'Accrocher le dessus du pied pour empêcher le corps de partir en dévers.',
-    source: 'https://blog.movementgyms.com/7-more-moves-every-climber-should-know',
-    minMinutes: 10,
-    build: (c) => {
-      const v = c.maxSent - 2 - c.light;
-      return {
-        title: 'Crochets pointe',
-        target: v,
-        instructions: [
-          `${plural(count(c.minutes, 5, 3), 'bloc')} en ${c.grade(v)}, en dévers`,
-          'Objectif : empêcher le corps de partir en arrière dans le dévers',
-          'Dès que les pieds risquent de partir, accroche le dessus du pied derrière une prise',
-          'Serre la jambe pour garder le corps au mur',
-          'Repère : tu peux relâcher une main sans que le corps parte',
-        ],
-      };
-    },
-  },
-  {
-    id: 'one-foot-type',
-    video: 'https://www.youtube.com/shorts/4KmyOrQ9yaU',
-    focus: 'technique',
-    points: ['footwork'],
-    name: 'Un seul type de pied',
-    summary:
-      'Monter un même bloc plusieurs fois en s’imposant à chaque fois un seul placement de pied.',
-    source: 'https://www.mountainproject.com/v/108661904',
-    minMinutes: 12,
-    build: (c) => {
-      const v = c.maxSent - 3 - c.light;
-      return {
-        title: 'Un seul type de pied',
-        target: v,
-        instructions: [
-          `1 ou 2 blocs en ${c.grade(v)} avec beaucoup de prises, plusieurs passages`,
-          'Objectif : maîtriser chaque placement de pied en l’isolant',
-          'À chaque passage, un seul placement autorisé : que des lolottes, puis que des drapeaux intérieurs, puis extérieurs, puis que des crochets talon',
-          'Repère : chaque passage réussi sans tricher avec un autre placement',
-          'Repos 1 min entre chaque passage',
-        ],
-      };
-    },
-  },
-  {
-    id: 'smearing',
-    video: 'https://www.youtube.com/shorts/SKTVHUaW5DY',
-    focus: 'technique',
-    points: ['slab'],
-    name: 'Adhérence',
-    summary:
-      'Sur une dalle, poser les pieds à plat sur le mur, sans prise, et faire confiance au frottement.',
-    source: 'https://sendedition.com/22-climbing-techniques-and-how-to-do-them',
-    minMinutes: 10,
-    build: (c) => {
-      const v = c.maxSent - 4 - c.light;
-      return {
-        title: 'Adhérence',
-        target: v,
-        instructions: [
-          `${plural(count(c.minutes, 4, 3), 'bloc')} en dalle, en ${c.grade(v)} ou moins`,
-          'Objectif : faire confiance au frottement du chausson',
-          'Mains sur les prises, mais pieds posés à plat sur le mur, sans prise',
-          'Talon bas, poids au-dessus des pieds, bouge lentement',
-          'Repère : un pied posé en adhérence ne glisse pas',
-        ],
-      };
-    },
-  },
-  {
-    id: 'mantle',
-    video: 'https://www.youtube.com/watch?v=j72cRYeQaoM',
-    focus: 'technique',
-    points: ['pushing'],
-    name: 'Rétablissements',
-    summary: 'Passer au-dessus d’une prise ou d’un volume en poussant sur les mains, pied haut.',
-    source: 'https://www.vdiffclimbing.com/sport-technique-movement/',
-    minMinutes: 10,
-    build: (c) => {
-      const v = c.maxSent - 3 - c.light;
-      return {
-        title: 'Rétablissements',
-        target: v,
-        instructions: [
-          `${plural(count(c.minutes, 5, 2, 6), 'bloc')} en ${c.grade(v)} qui finissent sur une sortie ou un volume, 3 passages par bloc`,
-          'Objectif : passer au-dessus d’une prise en poussant au lieu de tirer',
-          'Monte un pied le plus haut possible',
-          'Tourne les mains paumes vers le bas et pousse dessus',
-          'Monte le second pied à côté des mains, sans poser le genou',
-          'Repère : la sortie se fait en poussant, genou jamais posé',
-          'Repos 1 min entre chaque passage',
-        ],
-      };
-    },
-  },
-  {
-    id: 'stemming',
-    video: 'https://www.youtube.com/watch?v=ZZIu_E52ui4',
-    focus: 'technique',
-    points: ['pushing'],
-    name: 'Oppositions',
-    summary:
-      'Dièdres et dulfers : pousser avec les pieds contre le tirer des mains, ou s’écarter entre deux pans.',
-    source: 'https://sendedition.com/22-climbing-techniques-and-how-to-do-them',
-    minMinutes: 10,
-    build: (c) => {
-      const v = c.maxSent - 3 - c.light;
-      return {
-        title: 'Oppositions',
-        target: v,
-        instructions: [
-          `${plural(count(c.minutes, 5, 3), 'bloc')} en ${c.grade(v)} dans un dièdre, un angle ou sur une arête`,
-          'Objectif : tenir par des forces opposées plutôt qu’en tirant',
-          'Pieds qui poussent contre les mains qui tirent (dulfer)',
-          'Ou mains et pieds écartés sur les deux pans, paumes comprises (cheminée)',
-          'Repère : tu peux lâcher une main et rester en place',
-        ],
-      };
-    },
-  },
-  {
-    id: 'deadpoint',
-    video: 'https://www.youtube.com/shorts/8VXkuA9Wd9Y',
-    focus: 'technique',
-    points: ['coordination', 'power'],
-    name: 'Lancés contrôlés',
-    summary:
-      'Aller chercher une prise hors d’atteinte d’un élan des jambes, pieds au mur, et la saisir au point mort.',
-    source: 'https://sendedition.com/22-climbing-techniques-and-how-to-do-them',
-    minMinutes: 10,
-    stressful: true,
-    build: (c) => {
-      const v = c.maxSent - 2 - c.light;
-      return {
-        title: 'Lancés contrôlés',
-        target: v,
-        instructions: [
-          `${plural(count(c.minutes, 5, 2, 5), 'bloc')} en ${c.grade(v)} avec un mouvement un peu loin, 3 essais max par mouvement`,
-          'Objectif : saisir une prise lointaine au moment où le corps ne monte plus',
-          'Pieds au mur, prends l’élan avec les jambes',
-          'Attrape la prise au sommet de l’élan, au point mort, sans la claquer',
-          'Repère : la prise est saisie en douceur, les pieds restent au mur',
-          'Repos 2 min entre chaque essai',
-        ],
-      };
-    },
-  },
-  {
-    id: 'touched-holds',
-    video: 'https://www.youtube.com/shorts/ld9smol9Ilw',
-    focus: 'technique',
-    points: ['reading'],
-    name: 'Prises touchées',
-    summary:
-      'Depuis le sol, sauter attraper une prise avec une main sans la réajuster : précision du geste.',
-    source: 'https://www.lacrux.com/fr/?p=57206',
-    minMinutes: 10,
-    stressful: true,
-    build: (c) => {
-      const n = count(c.minutes, 1, 6, 12);
-      return {
-        title: 'Prises touchées',
-        target: c.maxSent - 3,
-        instructions: [
-          `${plural(n, 'saut')}, en alternant les mains`,
-          'Objectif : viser juste du premier coup',
-          'En dévers, une main sur une bonne prise de départ',
-          'Saute attraper une prise plus haute avec l’autre main, sans la réajuster',
-          'Commence sur des grosses prises, puis vise plus petit',
-          'Repère : la main arrive exactement où tu voulais',
-          'Repos 1 min entre chaque saut',
-        ],
-      };
-    },
-  },
-  {
-    id: 'beta-reading',
-    video: 'https://www.youtube.com/shorts/bB3dgoOBp1E',
-    focus: 'technique',
-    points: ['reading'],
-    name: 'Lecture du bloc',
-    summary: 'Prévoir chaque mouvement et chaque pied depuis le sol, puis vérifier sur le mur.',
-    source: 'https://www.lacrux.com/fr/?p=57206',
-    minMinutes: 10,
-    build: (c) => {
-      const v = c.maxSent - 1 - c.light;
-      return {
-        title: 'Lecture du bloc',
-        target: v,
-        instructions: [
-          `${plural(count(c.minutes, 6, 2, 6), 'bloc')} en ${c.grade(v)} que tu n’as jamais faits`,
-          'Objectif : trouver la méthode depuis le sol',
-          'Avant de grimper, prévois chaque main, chaque pied et la position du corps',
-          'Grimpe le bloc en suivant ton plan',
-          'Repère : note ce qui différait de ton plan, de moins en moins à chaque bloc',
-        ],
-      };
-    },
-  },
-  {
-    id: 'flash',
-    video: 'https://www.youtube.com/shorts/zBdQ7UN6Mc0',
-    focus: 'technique',
-    points: ['reading', 'commitment'],
-    name: 'Blocs à vue',
-    summary: 'Enchaîner des blocs jamais essayés, un seul essai chacun : lecture et engagement.',
-    source: 'https://www.lacrux.com/fr/?p=57206',
-    minMinutes: 10,
-    build: (c) => {
-      const v = c.maxSent - 1 - c.light;
-      return {
-        title: 'Blocs à vue',
-        target: v,
-        instructions: [
-          `${plural(count(c.minutes, 4, 3), 'bloc')} jamais essayés, jusqu’en ${c.grade(v)}, 1 seul essai par bloc`,
-          'Objectif : lire vite et s’engager du premier coup',
-          'Lis le bloc depuis le sol, puis pars sans hésiter',
-          'Un seul essai, réussi ou non : passe au suivant',
-          'Repère : le nombre de blocs réussis du premier coup',
-          'Repos 2 min avant de changer de bloc',
-        ],
-      };
-    },
-  },
-  {
-    id: 'touch-holds',
-    video: 'https://www.youtube.com/shorts/JmCELW3sfeg',
-    focus: 'technique',
-    points: ['recovery'],
-    name: 'Caresses',
-    summary: 'Toucher toute la prise avant de la saisir pour trouver où elle se tient le mieux.',
-    source:
-      'https://assets01.sdd1.ch/assets/lbwp-cdn/mobilesport/files/1693404564/mobilesport-escalade-sportive--formes-dentranement-technique-descalade--se-saisir-des-prises-avec-precision.pdf',
-    minMinutes: 10,
-    build: (c) => {
-      const v = c.maxSent - 2 - c.light;
-      return {
-        title: 'Caresses',
-        target: v,
-        instructions: [
-          `${plural(count(c.minutes, 4, 3), 'bloc')} en ${c.grade(v)}`,
-          'Objectif : trouver le meilleur endroit de chaque prise',
-          'Avant de saisir la prise, parcours-la entièrement avec la main',
-          'Prends-la à l’endroit où elle se tient le mieux',
-          'Repère : tu serres moins fort qu’avant sur la même prise',
-        ],
-      };
-    },
-  },
-  {
-    id: 'soft-grip',
-    video: 'https://www.youtube.com/shorts/d5g7aK70CEs',
-    focus: 'technique',
-    points: ['recovery'],
-    name: 'Prises en douceur',
-    summary:
-      'Serrer chaque prise juste ce qu’il faut : comparer un passage en serrant fort et un passage relâché.',
-    source:
-      'https://assets01.sdd1.ch/assets/lbwp-cdn/mobilesport/files/1693404564/mobilesport-escalade-sportive--formes-dentranement-technique-descalade--se-saisir-des-prises-avec-precision.pdf',
-    minMinutes: 10,
-    build: (c) => {
-      const v = c.maxSent - 3 - c.light;
-      return {
-        title: 'Prises en douceur',
-        target: v,
-        instructions: [
-          `${plural(count(c.minutes, 5, 2, 5), 'bloc')} en ${c.grade(v)}, 2 passages par bloc`,
-          'Objectif : serrer juste ce qu’il faut pour tenir',
-          '1er passage : serre chaque prise le plus fort possible',
-          '2e passage : serre le minimum qui te permet de rester sur la prise',
-          'Repère : tu sens la différence dans les avant-bras à la fin du 2e passage',
-          'Repos 1 min entre chaque passage',
-        ],
-      };
-    },
-  },
-  {
-    id: 'tripod',
-    video: 'https://www.youtube.com/watch?v=xJM7zW4UXuI',
-    focus: 'technique',
-    points: ['balance'],
-    name: 'Se figer',
-    summary:
-      'Avant chaque mouvement, se stabiliser sur trois appuis et ne bouger qu’un membre à la fois.',
-    source:
-      'https://assets01.sdd1.ch/assets/lbwp-cdn/mobilesport/files/1693404333/mobilesport-escalade-sportive--formes-dentranement-en-lien-avec-la-technique-se-stabiliser-efficacement.pdf',
-    minMinutes: 10,
-    build: (c) => {
-      const v = c.maxSent - 2 - c.light;
-      return {
-        title: 'Se figer',
-        target: v,
-        instructions: [
-          `${plural(count(c.minutes, 5, 3), 'bloc')} en ${c.grade(v)}`,
-          'Objectif : être stable avant chaque mouvement',
-          'Avant de bouger, fige-toi 2 s sur trois appuis (trépied)',
-          'Ne bouge qu’une main ou qu’un pied à la fois',
-          'Repère : tu peux tenir les 2 s sans que rien ne bouge',
-        ],
-      };
-    },
-  },
-  {
-    id: 'one-foot',
-    video: 'https://www.youtube.com/shorts/Cs1O6_fmEdc',
-    focus: 'technique',
-    points: ['balance'],
-    name: 'Un seul pied',
-    summary:
-      'Grimper avec un seul pied (l’autre jambe libre) : équilibre et précision du pied d’appui.',
-    source: 'https://www.shedreamsofalpine.com/blog/climbing-games',
-    minMinutes: 10,
-    build: (c) => {
-      const v = c.maxSent - 4 - c.light;
-      const n = count(c.minutes, 2, 4, 8);
-      return {
-        title: 'Un seul pied',
-        target: v,
-        instructions: [
-          `Blocs faciles en ${c.grade(v)} ou moins : ${plural(n, 'passage')}, en alternant pied droit et pied gauche`,
-          'Objectif : rendre le pied d’appui précis et fiable',
-          'Un seul pied sur les prises, l’autre jambe libre pour l’équilibre',
-          'Repère : tu montes sans que le pied d’appui glisse ni se réajuste',
-          'Repos 1 min entre chaque passage',
-        ],
-      };
-    },
-  },
-  {
-    id: 'same-side',
-    video: ytSearch('same side in traverse drill climbing'),
-    focus: 'technique',
-    points: ['hips'],
-    name: 'Traversée de profil',
-    summary:
-      'Traverser en gardant toujours le même côté du corps contre le mur : hanches, carres, rotations.',
-    source: 'https://www.mountainproject.com/forum/message/114032041',
-    minMinutes: 10,
-    build: (c) => {
-      const v = c.maxSent - 4 - c.light;
-      return {
-        title: 'Traversée de profil',
-        target: v,
-        instructions: [
-          `Traversée sur prises faciles (${c.grade(v)} ou moins) : 3 allers-retours`,
-          'Objectif : grimper de profil, sur les carres et les hanches',
-          'Garde toujours la même hanche contre le mur, pieds sur les carres',
-          'Aller vers la droite, retour vers la gauche',
-          'Repère : la hanche ne décolle pas du mur de toute la traversée',
-          'Repos 2 min entre chaque traversée',
-        ],
-      };
-    },
-  },
-  {
-    id: 'lemon-lime',
-    video: ytSearch('add one move downclimb drill bouldering'),
-    focus: 'technique',
-    points: ['footwork', 'resistance'],
-    name: 'Aller-retour progressif',
-    summary:
-      'Ajouter un mouvement à la fois puis redescendre au départ à chaque fois : contrôle et désescalade.',
-    source: 'https://www.shedreamsofalpine.com/blog/climbing-games',
-    minMinutes: 10,
-    build: (c) => {
-      const v = c.maxSent - 3 - c.light;
-      return {
-        title: 'Aller-retour progressif',
-        target: v,
-        instructions: [
-          `${plural(count(c.minutes, 6, 2, 5), 'bloc')} en ${c.grade(v)}`,
-          'Objectif : contrôler chaque mouvement dans les deux sens',
-          'Fais le 1er mouvement et redescends au départ',
-          'Puis les 2 premiers et redescends, et ainsi de suite jusqu’en haut',
-          'Sans poser le pied au sol entre deux allers-retours',
-          'Repère : tu arrives en haut sans avoir touché le sol',
-          'Repos 3 min avant de changer de bloc',
-        ],
-      };
-    },
-  },
-  {
-    id: 'sloper-plumb',
-    video: 'https://www.youtube.com/watch?v=q00ImgzAnOI',
-    source: 'https://www.trainingbeta.com/how-to-train-for-compression/',
-    focus: 'technique',
-    points: ['slopers'],
-    name: 'Plats : ligne d’aplomb',
-    summary:
-      'Sur des blocs à plats, placer le bassin sous la prise, bras tendus : les plats tiennent par la position.',
-    minMinutes: 10,
-    build: (c) => {
-      const v = c.maxSent - 2 - c.light;
-      return {
-        title: 'Plats : ligne d’aplomb',
-        target: v,
-        instructions: [
-          `${plural(count(c.minutes, 5, 2, 6), 'bloc')} à plats en ${c.grade(v)}, 2 passages par bloc`,
-          'Objectif : tenir les plats par la position, pas par la force',
-          'Sur chaque plat, place le bassin juste sous la prise, bras tendu',
-          'Pousse dans les pieds pour rester sous le plat',
-          'Repère : le plat tient sans serrer fort, et il lâche dès que le bassin s’écarte',
-          'Repos 2 min avant de changer de bloc',
-        ],
-      };
-    },
-  },
-  {
-    id: 'wall-tour',
-    video: 'https://www.youtube.com/watch?v=mabvTT6Bm0s',
-    source: 'https://www.climbstrong.com/resource-posts/boulder-strength-skill-sessions',
-    focus: 'technique',
-    points: ['wall-styles', 'slab'],
-    name: 'Tour des inclinaisons',
-    summary:
-      'La même cotation en dalle, en vertical et en dévers, pour repérer et travailler le style où l’on casse.',
-    minMinutes: 10,
-    build: (c) => {
-      const v = c.maxSent - 2 - c.light;
-      const rounds = count(c.minutes, 10, 1, 3);
-      return {
-        title: 'Tour des inclinaisons',
-        target: v,
-        instructions: [
-          `${3 * rounds} blocs en ${c.grade(v)}, 1 passage par bloc`,
-          'Objectif : repérer l’inclinaison où tu casses',
-          `${rounds > 1 ? `${rounds} tours, chacun` : 'Un tour'} : un bloc en dalle, un en vertical, un en dévers`,
-          'Repère : l’inclinaison où tu tombes ou hésites le plus, c’est elle à travailler',
-          'Repos 2 min avant de changer de bloc',
-        ],
-      };
-    },
-  },
-  {
-    id: 'build-the-move',
-    video: 'https://www.youtube.com/watch?v=rToclUrm41g',
-    source: 'https://climbingcanada.ca/coaches-tool-box/technical-tactical-series-part-1/',
-    focus: 'technique',
-    points: ['coordination'],
-    name: 'Construis-moi le mouvement',
-    summary:
-      'Reproduire et répéter des mouvements de compétition sur prises faciles : coordination et confiance.',
-    minMinutes: 10,
-    stressful: true,
-    build: (c) => {
-      const v = c.maxSent - 3 - c.light;
-      const moves = [
-        'Pas croisé façon « skate »',
-        'Saut avec accroche d’un pied',
-        'Allonge dynamique avec crochet de pointe opposé',
-        'Rétablissement poussé bras tendu au-dessus de la tête',
-      ];
-      const n = count(c.minutes, 6, 2, moves.length);
-      return {
-        title: 'Construis-moi le mouvement',
-        target: v,
-        instructions: [
-          `Prises faciles (${c.grade(v)} ou moins) : 5 passages par mouvement`,
-          'Objectif : apprivoiser les mouvements de compétition par la répétition',
-          ...moves.slice(0, n).map((m, i) => `Mouvement ${i + 1} : ${m}`),
-          'Même réussi, refais-le : c’est la répétition qui donne confiance',
-          'Repère : le 5e passage est plus fluide que le 1er',
-          'Repos 1 min entre chaque passage',
-        ],
-      };
-    },
-  },
-  {
-    id: 'rapid-fire',
-    video: 'https://www.youtube.com/shorts/xjHSv1Vo06I',
-    source: 'https://climbingcanada.ca/coaches-tool-box/technical-tactical-series-part-1/',
-    focus: 'technique',
-    points: ['reading', 'projecting'],
-    name: 'Blocs en rafale',
-    summary:
-      'Plusieurs blocs nouveaux dont un à son max : 30 s de lecture, 3 passages chacun, puis on passe au suivant.',
+    id: 'volume',
+    focus: 'endurance',
+    energy: 'fond',
+    points: ['volume', 'recovery'],
+    name: 'Volume',
+    summary: 'Beaucoup de blocs sous son niveau, sans trop se reposer entre chacun.',
     minMinutes: 15,
-    stressful: true,
+    source:
+      'https://www.petzl.com/FR/fr/Sport/Actu/2018-10-5/Les-conseils-d-entrainement-de-Charlotte-Durif',
+    video: ytSearch('bouldering volume session easy problems'),
+    info: {
+      why: 'Enchaîner beaucoup de mouvements faciles construit l’endurance de base et rode les gestes.',
+      how: [
+        'Des blocs que tu passes du premier coup, sur tous les murs',
+        'Environ 1 min de repos entre deux blocs',
+      ],
+      pitfalls: ['Monter en couleur en cours de route : ça devient une séance de force ratée'],
+    },
     build: (c) => {
-      const top = c.maxSent - c.light;
-      const n = count(c.minutes, 6, 3, 5);
+      const v = c.maxSent - 2 - c.light;
       return {
-        title: 'Blocs en rafale',
-        target: top,
+        title: 'Volume',
+        target: v,
         instructions: [
-          `${n} blocs jamais faits : ${n - 1} entre ${c.grade(top - 3)} et ${c.grade(top - 1)}, et 1 en ${c.grade(top)}, 3 passages par bloc`,
-          'Objectif : décider vite et rester calme quand ça ne passe pas',
-          '30 s pour lire le bloc depuis le sol, puis 3 passages, même si tu réussis au 1er',
-          'Change de méthode entre deux passages si besoin',
-          'Après le 3e passage, passe au suivant sans y revenir, réussi ou non',
-          'Repère : tu enchaînes les blocs sans t’énerver ni t’attarder',
-          'Repos 2 min entre chaque passage',
+          `${count(c.minutes, 2, 8, 25)} blocs en ${c.grade(v)}`,
+          'Repos 1 min environ avant de changer de bloc',
+          'Les avant-bras chauffent un peu, jamais au point de rater un bloc facile',
         ],
       };
     },
   },
   {
-    id: 'fall-practice',
-    video: 'https://www.youtube.com/watch?v=vD4jf_iw5Dk',
-    source: 'https://brooklynboulders.com/how-to-overcome-your-fear-of-falling-while-climbing/',
-    focus: 'technique',
-    points: ['fall'],
-    name: 'Chutes volontaires',
+    id: 'emom',
+    focus: 'endurance',
+    energy: 'fond',
+    points: ['volume', 'recovery', 'resistance'],
+    name: 'Un bloc par minute',
     summary:
-      'Lâcher volontairement en pleine grimpe, en partant bas et en montant peu à peu : apprivoiser la chute.',
-    minMinutes: 10,
-    stressful: true,
+      'Circuit de 6 à 8 blocs faciles en boucle : un bloc au début de chaque minute, 20 à 25 min.',
+    minMinutes: 15,
+    maxMinutes: 25,
+    video: ytSearch('20 boulders in 20 minutes EMOM climbing'),
+    info: {
+      why: 'Le rythme imposé apprend à récupérer vite entre deux efforts.',
+      how: [
+        'Repère ton circuit de 6 à 8 blocs avant de lancer le chrono',
+        'Au bout de la liste, tu repars du premier',
+        'Si tu rates des blocs, mets plus de faciles dans le mélange',
+      ],
+      pitfalls: ['Prendre des blocs trop durs : il faut en réussir 8 à 9 sur 10'],
+    },
     build: (c) => {
-      const v = c.maxSent - 4 - c.light;
-      const n = count(c.minutes, 2, 5, 10);
+      const minutes = Math.min(25, c.minutes);
+      const easy = c.maxSent - 4 - c.light;
+      const medium = c.maxSent - 2 - c.light;
       return {
-        title: 'Chutes volontaires',
-        target: v,
+        title: 'Un bloc par minute',
+        target: medium,
         instructions: [
-          `Bloc facile (${c.grade(v)} ou moins), au-dessus d’un tapis épais : ${plural(n, 'chute')}`,
-          'Objectif : apprivoiser la chute en la choisissant',
-          'Commence les pieds à 50 cm du sol, et lâche volontairement en pleine grimpe',
-          'Lâche en position de grimpe, sans regarder en bas',
-          'Réception sur les pieds, genoux fléchis, puis fesses et dos, bras près du corps',
-          'Monte d’une prise à chaque chute tant que tu restes à l’aise, jamais au-delà de la mi-hauteur',
-          'Repère : tu lâches sans hésiter et tu te réceptionnes sans te raidir',
-          'Repos 1 min entre chaque chute',
+          `4 blocs en ${c.grade(easy)}`,
+          `3 blocs en ${c.grade(medium)}`,
+          'Un bloc au début de chaque minute, le reste de la minute pour récupérer',
+          `En boucle pendant ${minutes} min : au bout de la liste, tu repars du premier`,
         ],
       };
     },
   },
 
-  // ---------- Endurance (résistance) : enchaîner sous le niveau max, repos courts
+  // ---------- Endurance, résistance : efforts courts et intenses, les avant-bras gonflent
   {
     id: '4x4',
-    video: 'https://www.youtube.com/shorts/XvcQY3qJN1Y',
-    source: 'https://gripped.com/?p=46491',
     focus: 'endurance',
     energy: 'resistance',
-    points: ['resistance', 'volume'],
+    points: ['resistance'],
     name: '4×4',
     summary:
-      '4 blocs enchaînés sans pause = 1 série (variante : le même bloc 4 fois) ; 2 à 5 séries, 3 min de repos entre.',
+      '4 blocs enchaînés sans pause = 1 série, 2 à 5 séries, 3 min de repos entre les séries.',
     minMinutes: 15,
+    source: 'https://climbstrong.com/education-center/sessions-any-gym',
+    video: 'https://www.youtube.com/shorts/XvcQY3qJN1Y',
+    info: {
+      why: 'Apprendre à continuer de grimper proprement avec les avant-bras qui gonflent.',
+      how: [
+        'Choisis 4 blocs proches les uns des autres',
+        'Enchaîne-les sans pause : c’est une série',
+        'Garde les mêmes blocs pour toutes les séries',
+      ],
+      pitfalls: ['Raccourcir le repos entre les séries : tu ne finiras pas les dernières'],
+    },
     build: (c) => {
-      const v = c.maxSent - 3 - c.light;
-      const sets = count(c.minutes + 3, 8, 2, 5);
-      // Une séance sur deux : le même bloc 4 fois par série
-      if ((c.variant ?? 0) % 2 === 1)
-        return {
-          title: `4×4 sur un même bloc · ${plural(sets, 'série')}`,
-          target: v,
-          instructions: [
-            `${plural(sets, 'bloc')} en ${c.grade(v)}, un par série`,
-            'Objectif : tenir des mouvements connus sous la fatigue',
-            'Une série = le même bloc 4 fois de suite, juste le temps de redescendre entre deux passages',
-            'Repère : le 4e passage reste propre, même s’il est plus dur',
-            'Repos 3 min entre les séries',
-          ],
-        };
+      const v = c.maxSent - 2 - c.light;
+      const sets = count(c.minutes, 8, 2, 5);
       return {
-        title: `4×4 · ${plural(sets, 'série')}`,
+        title: '4×4',
         target: v,
         instructions: [
-          `Choisis 4 blocs en ${c.grade(v)}`,
-          'Objectif : tenir l’effort quand les avant-bras gonflent',
-          `${plural(sets, 'série')} : une série = enchaîner les 4 blocs sans pause (désescalade ou retour rapide au pied du bloc suivant)`,
-          'Repère : les avant-bras gonflent sur les dernières séries, mais tu finis chaque série',
-          'Repos 3 min entre les séries',
+          `4 blocs en ${c.grade(v)}`,
+          'Série = les 4 blocs enchaînés sans pause',
+          `${plural(sets, 'série')}, repos 3 min entre les séries`,
         ],
       };
     },
   },
   {
     id: 'pyramid',
-    video: 'https://www.youtube.com/watch?v=-SbpcjMy0M8',
-    source:
-      'https://blog.movementgyms.com/improve-your-climbing-endurance-with-a-quick-and-effective-4x4-workout',
     focus: 'endurance',
     energy: 'resistance',
     points: ['resistance', 'recovery'],
     name: 'Pyramide',
-    summary: 'Monter en cotation bloc après bloc jusqu’au sommet, puis redescendre, repos courts.',
-    minMinutes: 12,
-    build: (c) => {
-      const top = c.maxSent - 1 - c.light;
-      const steps = [top - 3, top - 2, top - 1, top, top - 1, top - 2, top - 3];
-      const rounds = c.minutes >= 26 ? 2 : 1;
-      return {
-        title: rounds > 1 ? 'Pyramide · 2 tours' : 'Pyramide',
-        target: top,
-        instructions: [
-          `Enchaîne 7 blocs en montant puis en redescendant en cotation : ${steps.map(c.grade).join(' → ')}`,
-          'Objectif : grimper dur en étant déjà fatigué',
-          '1 passage par bloc, du plus facile au sommet, puis retour',
-          'Repère : les blocs de la descente passent aussi bien que ceux de la montée',
-          ...(rounds > 1 ? ['Fais la pyramide 2 fois'] : []),
-          `Repos 1 min entre chaque passage${rounds > 1 ? ', 4 min entre les deux pyramides' : ''}`,
-        ],
-      };
-    },
-  },
-  {
-    id: '20-in-20',
-    video: ytSearch('20 boulders in 20 minutes EMOM climbing'),
-    source: 'https://trainingforclimbing.com/?p=12701',
-    focus: 'endurance',
-    energy: 'fond',
-    points: ['recovery', 'volume'],
-    name: 'Un bloc par minute',
     summary:
-      'Un bloc à chaque minute (ex. 20 blocs en 20 min), le reste de la minute sert de repos.',
-    minMinutes: 12,
+      '10 blocs déjà réussis, du plus dur au plus facile, 2 min entre les blocs, 1 ou 2 tours.',
+    minMinutes: 25,
+    source: 'https://climbstrong.com/education-center/sessions-any-gym',
+    video: 'https://www.youtube.com/watch?v=-SbpcjMy0M8',
+    info: {
+      why: 'Beaucoup d’efforts proches de son niveau avec peu de repos : on tient plus longtemps sur un bloc dur.',
+      how: [
+        'Uniquement des blocs que tu as déjà réussis',
+        'Commence par les plus durs, finis par les plus faciles',
+        'Chaque semaine : un bloc de plus ou 15 s de repos en moins',
+      ],
+      pitfalls: ['Y mettre des blocs jamais faits : on passe son temps à chercher les méthodes'],
+    },
     build: (c) => {
-      const v = c.maxSent - 2 - c.light;
-      const n = Math.min(25, c.minutes - 2);
+      const rounds = c.minutes >= 60 ? 2 : 1;
+      const n = count((c.minutes - (rounds - 1) * 12) / rounds, 2.5, 6, 10);
+      const hard = Math.round(n / 3);
+      const mid = Math.round(n / 3);
       return {
-        title: `${n} blocs en ${n} min`,
-        target: v,
+        title: 'Pyramide',
+        target: c.maxSent - c.light,
         instructions: [
-          `${n} blocs différents en ${c.grade(v)}, un au début de chaque minute`,
-          'Objectif : récupérer vite entre deux efforts',
-          'Le reste de la minute sert de repos : plus tu vas vite, plus tu récupères',
-          'Repère : 80 à 90 % de réussite. Si tu tombes souvent, prends des blocs plus faciles',
+          `${hard} blocs en ${c.grade(c.maxSent - c.light)}`,
+          `${mid} blocs en ${c.grade(c.maxSent - 2 - c.light)}`,
+          `${n - hard - mid} blocs en ${c.grade(c.maxSent - 4 - c.light)}`,
+          'Des blocs déjà réussis, du plus dur au plus facile',
+          'Repos 2 min avant de changer de bloc',
+          ...(rounds > 1 ? ['2 tours, repos 12 min entre les tours'] : []),
         ],
       };
     },
   },
   {
-    id: 'up-down-up',
-    video: ytSearch('up down up boulder endurance drill'),
-    source: 'https://climbinghouse.com/18-week-free-training-program/',
+    id: 'density',
     focus: 'endurance',
     energy: 'resistance',
-    points: ['resistance', 'footwork'],
-    name: 'Monter-descendre-monter',
-    summary: 'Monter un bloc, le désescalader, le remonter sans poser le pied au sol.',
-    minMinutes: 12,
+    points: ['resistance', 'recovery'],
+    name: 'Densité',
+    summary:
+      '3 ou 4 blocs à son niveau en boucle pendant 20 min ; on compte, et on refait la même séance.',
+    minMinutes: 20,
+    source: 'https://climbstrong.com/education-center/introduction-density-training',
+    video: ytSearch('density bouldering training climbstrong'),
+    info: {
+      why: 'Faire plus de blocs dans le même temps : un progrès qu’on peut compter d’une séance à l’autre.',
+      how: [
+        'Toujours les mêmes blocs et la même durée',
+        'Note combien de blocs tu as faits',
+        'La fois suivante, vise un bloc de plus',
+      ],
+      pitfalls: ['Changer de blocs à chaque fois : on ne peut plus comparer'],
+    },
     build: (c) => {
-      const v = c.maxSent - 3 - c.light;
-      const n = count(c.minutes, 5, 3, 6);
+      const v = c.maxSent - 1 - c.light;
+      const bouts = c.minutes >= 55 ? 2 : 1;
+      const bout = bouts === 2 ? 20 : Math.min(25, c.minutes);
       return {
-        title: 'Monter-descendre-monter',
+        title: 'Densité',
         target: v,
         instructions: [
-          `${plural(n, 'bloc')} en ${c.grade(v)}, sans mouvement dur ni saut en haut`,
-          'Objectif : doubler la longueur de l’effort sans monter en difficulté',
-          'Monte, désescalade, puis remonte, sans poser le pied au sol',
-          'Repère : la 2e montée reste propre malgré la fatigue',
-          'Repos 3 min avant de changer de bloc',
+          `4 blocs en ${c.grade(v)}`,
+          `En boucle pendant ${bout} min : un bloc, environ 1 min de repos, le suivant`,
+          ...(bouts > 1 ? ['Repos 15 min, puis 20 min de plus sur les mêmes blocs'] : []),
+          'Note le nombre de blocs faits : un de plus la prochaine fois',
         ],
       };
     },
   },
   {
-    id: 'linked',
-    video: 'https://www.youtube.com/shorts/bTWXhyTeXHw',
-    source: 'https://www.climbstrong.com/resource-posts/progressing-endurance-training-ii',
+    id: 'doubles',
     focus: 'endurance',
     energy: 'resistance',
     points: ['resistance'],
-    name: 'Blocs enchaînés',
-    summary: 'Enchaîner 3 blocs voisins sans toucher le sol, en désescaladant entre eux.',
-    minMinutes: 12,
-    build: (c) => {
-      const v = c.maxSent - 3 - c.light;
-      const n = count(c.minutes, 6, 2, 5);
-      return {
-        title: 'Blocs enchaînés',
-        target: v,
-        instructions: [
-          `Choisis 3 blocs voisins en ${c.grade(v)} : ${plural(n, 'enchaînement')}`,
-          'Objectif : grimper longtemps sans jamais lâcher le mur',
-          'Désescalade le 1er bloc et passe directement au suivant, sans poser le pied au sol',
-          'Repère : les 3 blocs enchaînés sans toucher le sol',
-          'Repos 3 min entre chaque enchaînement',
-        ],
-      };
+    name: 'Course aux points en doublé',
+    summary: 'Un maximum de points en 30 min, mais un bloc ne compte que grimpé 2 fois de suite.',
+    minMinutes: 20,
+    maxMinutes: 45,
+    source:
+      'https://gripped.com/indoor-climbing/turn-power-endurance-training-into-a-game-with-this-workout/',
+    video: ytSearch('bouldering points game power endurance doubles'),
+    info: {
+      why: 'Un jeu qui fait enchaîner des efforts intenses sans y penser.',
+      how: [
+        'Un bloc compte s’il est grimpé 2 fois de suite, sans repos entre les deux',
+        'Plus le bloc est dur, plus il rapporte : 1 point par cran au-dessus du plus facile',
+        'Alterne dévers et vertical pour récupérer',
+      ],
+      pitfalls: ['Les avant-bras gonflent, mais on ne doit pas tomber à chaque bloc'],
     },
-  },
-  {
-    id: 'continuous-traverse',
-    video: 'https://www.youtube.com/shorts/c0iB-LDx4oA',
-    source: 'https://www.99boulders.com/?p=170',
-    focus: 'endurance',
-    energy: 'fond',
-    points: ['resistance'],
-    name: 'Traversée continue',
-    summary:
-      'Grimper sans s’arrêter plusieurs minutes sur des prises faciles, sans jamais être daubé.',
-    minMinutes: 15,
     build: (c) => {
-      const v = c.maxSent - 4 - c.light;
-      const each = Math.max(5, Math.floor((c.minutes - 4) / 2));
+      const minutes = Math.min(45, c.minutes);
+      const v = c.maxSent - 1 - c.light;
       return {
-        title: 'Traversée continue',
+        title: 'Course aux points en doublé',
         target: v,
         instructions: [
-          `2 traversées de ${each} min sans t’arrêter, sur des prises faciles (${c.grade(v)} ou moins)`,
-          'Objectif : grimper longtemps sans jamais être daubé',
-          'Bouge en continu, lentement, bras tendus le plus possible',
-          'Repère : tu finis essoufflé mais sans avant-bras durs. S’ils gonflent, prends des prises plus grosses',
-          'Repos 4 min entre les deux traversées',
+          `Blocs en ${c.grade(c.maxSent - 3 - c.light)} à ${c.grade(v)}, au choix`,
+          'Un bloc compte s’il est grimpé 2 fois de suite, sans repos entre les deux',
+          `Le plus de points en ${minutes} min : les plus durs rapportent plus`,
         ],
       };
     },
   },
 
+  // ---------- Technique : la qualité du mouvement avant la difficulté
   {
-    id: 'intervals-30-30',
-    video: ytSearch('bouldering on off intervals endurance'),
-    focus: 'endurance',
-    energy: 'resistance',
-    points: ['recovery', 'resistance'],
-    name: 'Intervalles 30/30',
-    summary: '30 s de grimpe continue, 30 s de repos, 6 fois ; 5 min de repos entre les séries.',
-    source: 'https://trainingforclimbing.com/?p=12701',
-    minMinutes: 12,
+    id: 'perfect-repeats',
+    focus: 'technique',
+    points: ['footwork', 'hips', 'wall-styles', 'slab', 'hooks', 'coordination'],
+    name: 'Répétitions parfaites',
+    summary:
+      '2 blocs à son niveau, dans un style à améliorer, refaits 3 à 5 fois en 15 min chacun.',
+    minMinutes: 15,
+    source: 'https://www.lasportivausa.com/blogs/blog/gym-series-bouldering-power-hour',
+    video: ytSearch('bouldering perfect repeats technique drill'),
+    info: {
+      why: 'Refaire le même bloc en cherchant à mieux le grimper grave la bonne façon de bouger.',
+      how: [
+        'Choisis des blocs dans un style où tu es moins à l’aise',
+        'À chaque passage : moins de bruit, moins d’effort, plus de fluidité',
+        'Repos complet entre deux passages',
+      ],
+      pitfalls: ['Prendre des blocs trop durs : on lutte au lieu de soigner le mouvement'],
+    },
     build: (c) => {
-      const v = c.maxSent - 3 - c.light;
-      const sets = count(c.minutes, 12, 1, 4);
+      const n = count(c.minutes, 15, 1, 4);
       return {
-        title: `Intervalles 30/30 · ${plural(sets, 'série')}`,
-        target: v,
+        title: 'Répétitions parfaites',
+        target: c.maxSent - c.light,
         instructions: [
-          `Pan ou zone de mur facile (${c.grade(v)} ou moins) : ${plural(sets, 'série')}`,
-          'Objectif : enchaîner des efforts courts avec peu de repos',
-          '30 s de grimpe sans t’arrêter, 30 s de repos au sol, 6 fois = 1 série',
-          'Repère : la 6e grimpe de la série reste continue, sans arrêt sur le mur',
-          'Repos 5 min entre les séries',
+          `${plural(n, 'bloc')} en ${c.grade(c.maxSent - c.light)}, 3 à 5 passages par bloc`,
+          '15 min par bloc, repos complet entre chaque passage',
+          'Chaque passage plus fluide que le précédent',
         ],
       };
     },
   },
   {
-    id: 'points',
-    video: ytSearch('bouldering volume endurance session'),
-    focus: 'endurance',
-    energy: 'fond',
-    points: ['volume', 'recovery'],
-    name: 'Course aux points',
-    summary:
-      'Pendant 30 à 45 min, chaque bloc se grimpe 2 fois d’affilée ; il rapporte des points selon sa cotation.',
-    source:
-      'https://gripped.com/indoor-climbing/turn-power-endurance-training-into-a-game-with-this-workout/',
+    id: 'top-five',
+    focus: 'technique',
+    points: ['commitment', 'coordination', 'balance'],
+    name: 'Tes 5 plus durs',
+    summary: 'Refaire les 5 blocs les plus durs déjà réussis dans la salle, 3 essais max chacun.',
     minMinutes: 20,
-    build: (c) => {
-      const v = c.maxSent - 2 - c.light;
-      return {
-        title: `Course aux points · ${c.minutes} min`,
-        target: v,
-        instructions: [
-          `Pendant ${c.minutes} min, des blocs jusqu’en ${c.grade(v)}, chacun grimpé 2 fois de suite`,
-          'Objectif : accumuler du volume en jouant',
-          'Grimpe chaque bloc 2 fois d’affilée, sans repos entre les 2',
-          'Alterne un bloc dur et un bloc facile pour récupérer en grimpant',
-          'Repère : un bloc réussi 2 fois rapporte 1 point par cran au-dessus de 4. Note ton total pour le battre la prochaine fois',
-        ],
-      };
+    maxMinutes: 40,
+    source: 'https://www.lasportivausa.com/blogs/blog/gym-series-climbing-technique',
+    video: ytSearch('repeat hardest boulders 3 attempts technique'),
+    info: {
+      why: 'Refaire ses meilleurs blocs les rend faciles : la méthode devient un automatisme.',
+      how: [
+        'Les 5 blocs les plus durs que tu as réussis dans cette salle',
+        '3 essais max : raté au 3e, tu passes au suivant, sans exception',
+        'Cherche à les grimper plus proprement que la première fois',
+      ],
+      pitfalls: ['S’entêter au-delà de 3 essais'],
     },
+    build: (c) => ({
+      title: 'Tes 5 plus durs',
+      target: c.maxSent,
+      instructions: [
+        `5 blocs en ${c.grade(c.maxSent)}, 3 essais max par bloc`,
+        'Les plus durs que tu as déjà réussis ici',
+        'Repos 3 min entre chaque essai',
+      ],
+    }),
   },
   {
-    id: 'grade-tour',
-    video: ytSearch('bouldering volume session same grade'),
-    focus: 'endurance',
-    energy: 'fond',
-    points: ['volume'],
-    name: 'Tour d’une cotation',
-    summary: 'Faire tous les blocs d’une même cotation de la salle, à la suite, repos courts.',
-    source: 'https://mojagear.com/?p=2345',
+    id: 'flash',
+    focus: 'technique',
+    points: ['reading', 'commitment'],
+    name: 'Flash',
+    summary: 'Les nouveautés de la salle à son niveau : une lecture au sol, un seul essai à fond.',
     minMinutes: 15,
-    build: (c) => {
-      const v = c.maxSent - 3 - c.light;
-      return {
-        title: 'Tour d’une cotation',
-        target: v,
-        instructions: [
-          `Un maximum de blocs en ${c.grade(v)} de la salle, à la suite`,
-          'Objectif : du volume à une cotation que tu maîtrises',
-          'Repère : note combien tu en as fait, pour faire mieux la prochaine fois',
-          'Repos 1 min entre chaque bloc',
-        ],
-      };
-    },
-  },
-  // ---------- Force : peu de mouvements, intensité maximale, repos complets
-  {
-    id: 'limit',
-    video: 'https://www.youtube.com/shorts/jN5O4vo-C5Y',
-    source: 'https://trainingbeta.com/?p=21508',
-    focus: 'strength',
-    points: ['projecting', 'commitment'],
-    name: 'Bloc au max',
-    summary: 'Quelques blocs au niveau max, essais courts à 100 %, 3 à 5 min de repos complet.',
-    minMinutes: 15,
-    stressful: true,
-    build: (c) => {
-      // Un essai à fond + son repos : environ 4 min
-      const attempts = Math.max(3, Math.floor(c.minutes / 4));
-      const n = Math.max(1, Math.min(4, Math.round(attempts / 4)));
-      const per = Math.max(2, Math.floor(attempts / n));
-      return {
-        title: 'Bloc au max',
-        target: c.project,
-        instructions: [
-          `${plural(n, 'bloc')} en ${c.grade(c.project)}, ${per} essais max par bloc`,
-          'Objectif : produire ta force maximale sur peu de mouvements',
-          'Chaque essai à fond, après un repos complet',
-          'Arrête un bloc dès que les essais n’avancent plus',
-          'Repère : chaque essai est aussi explosif que le premier',
-          'Repos 3 à 5 min entre chaque essai (enlève les chaussons)',
-        ],
-      };
-    },
-  },
-  {
-    id: 'sections',
-    video: 'https://www.youtube.com/watch?v=dyAvbUvY_PU',
-    source: 'https://trainingbeta.com/?p=21508',
-    focus: 'strength',
-    points: ['projecting'],
-    name: 'Travail par sections',
-    summary:
-      'Découper un bloc au-dessus de son niveau et travailler ses 3 à 4 mouvements les plus durs.',
-    minMinutes: 15,
-    stressful: true,
-    build: (c) => {
-      const v = c.project + 1;
-      return {
-        title: 'Travail par sections',
-        target: v,
-        instructions: [
-          `1 ou 2 blocs en ${c.grade(v)} (au-dessus de ton niveau)`,
-          'Objectif : apprendre des mouvements trop durs pour toi en les isolant',
-          'Travaille séparément les 3 ou 4 mouvements les plus durs',
-          'Puis essaie de les relier deux par deux',
-          'Repère : un mouvement impossible au départ qui passe en fin d’exercice',
-          'Repos 3 min entre chaque essai, arrête dès que tu perds en explosivité',
-        ],
-      };
-    },
-  },
-  {
-    id: 'power',
-    video: 'https://www.youtube.com/shorts/t8tJUK3PPpE',
-    source: 'https://trainingforclimbing.com/?p=12288',
-    focus: 'strength',
-    points: ['power', 'commitment'],
-    name: 'Mouvements puissants',
-    summary: 'Blocs à grands mouvements dynamiques sur bonnes prises : explosivité et engagement.',
-    minMinutes: 12,
-    stressful: true,
-    build: (c) => {
-      const v = c.project - 1;
-      // 3 essais + repos : environ 10 min par bloc
-      const n = count(c.minutes, 10, 1, 4);
-      return {
-        title: 'Mouvements puissants',
-        target: v,
-        instructions: [
-          `${plural(n, 'bloc')} en ${c.grade(v)} avec de grands mouvements sur de bonnes prises (lancés, jetés), 3 essais max par bloc`,
-          'Objectif : produire de la vitesse avec tout le corps',
-          'Engage-toi à fond sur chaque mouvement, sans hésiter',
-          'Réception bras légèrement fléchis, épaules engagées',
-          'Repère : le mouvement passe en un seul élan, sans mouvement intermédiaire',
-          'Repos 3 min entre chaque essai',
-        ],
-      };
-    },
-  },
-  {
-    id: 'lock-offs',
-    video: 'https://www.youtube.com/shorts/aDeEkQ0g5cA',
-    source: 'https://gripped.com/?p=48148',
-    focus: 'strength',
-    points: ['lock-off'],
-    name: 'Blocages',
-    summary: 'Bloquer 3 s bras plié avant chaque prise : force de traction et de verrouillage.',
-    minMinutes: 10,
-    stressful: true,
-    build: (c) => {
-      const v = c.maxSent - 1;
-      const n = count(c.minutes, 4, 3, 6);
-      return {
-        title: 'Blocages',
-        target: v,
-        instructions: [
-          `${plural(n, 'bloc')} en ${c.grade(v)}`,
-          'Objectif : tenir bras plié pendant que l’autre main cherche',
-          'Sur chaque prise, bloque 3 s bras plié à 90° avant d’aller chercher la suivante',
-          'Repère : pas de tremblement pendant les 3 s. S’il apparaît, prends un bloc plus facile',
-          'Repos 3 min avant de changer de bloc',
-        ],
-      };
-    },
-  },
-  {
-    id: 'no-feet',
-    video: 'https://www.youtube.com/shorts/m1t85MABk0c',
-    source: 'https://www.trainingbeta.com/?p=18674',
-    focus: 'strength',
-    points: ['tension', 'power'],
-    name: 'Sans les pieds',
-    summary:
-      'Grimper un dévers à bonnes prises avec les mains seules (« no foot ») ; variante : un bloc facile 3 fois par série, 4 séries.',
-    minMinutes: 10,
-    advanced: true,
-    stressful: true,
-    build: (c) => {
-      // Une séance sur deux : le protocole de Lattice, un même bloc facile répété
-      if ((c.variant ?? 0) % 2 === 1) {
-        const v = c.maxSent - 5;
-        const sets = count(c.minutes, 10, 1, 4);
-        return {
-          title: `Sans les pieds (protocole) · ${plural(sets, 'série')}`,
-          target: v,
-          instructions: [
-            `1 bloc en dévers à bonnes prises, en ${c.grade(v)}, grimpé sans les pieds : ${plural(sets, 'série')} de 3 passages`,
-            'Objectif : de la puissance de bras sur un bloc facile, répétée',
-            'Mains seules, et rattrape chaque prise bras légèrement fléchi, épaules engagées',
-            'Repère : le 3e passage d’une série reste aussi propre que le 1er',
-            'Repos 3 min entre chaque passage et entre les séries',
-          ],
-        };
-      }
-      const v = c.maxSent - 3;
-      const n = count(c.minutes, 3, 3, 6);
-      return {
-        title: 'Sans les pieds',
-        target: v,
-        instructions: [
-          `Dévers à bonnes prises (${c.grade(v)} ou moins) : ${plural(n, 'passage')} courts, sans les pieds`,
-          'Objectif : de la puissance de bras pure',
-          'Mains seules, pieds libres, et rattrape chaque prise bras légèrement fléchi',
-          'Épaules engagées, jamais bras tendu à l’arrivée',
-          'Repère : chaque prise est rattrapée sans balancer',
-          'Repos 3 min entre chaque passage',
-        ],
-      };
-    },
-  },
-  {
-    id: 'one-arm-traverse',
-    video: 'https://www.youtube.com/watch?v=CCGgLglSbkg',
-    source: 'https://nicros.com/author/brynk/page/27',
-    focus: 'strength',
-    points: ['power', 'lock-off'],
-    name: 'Traversée à un bras',
-    summary:
-      'Traverser des grosses prises avec une seule main en lâchant-rattrapant : force de contact.',
-    minMinutes: 10,
-    advanced: true,
-    stressful: true,
-    build: (c) => {
-      const v = c.maxSent - 4;
-      const n = count(c.minutes, 3, 4, 8);
-      return {
-        title: 'Traversée à un bras',
-        target: v,
-        instructions: [
-          `Dévers à très bonnes prises (${c.grade(v)} ou moins) : ${plural(n, 'passage')}, en alternant main droite et main gauche`,
-          'Objectif : de la force de contact à une main',
-          'Une seule main : lâche la prise et rattrape la suivante, pieds posés',
-          'Repère : tu rattrapes chaque prise sans que les pieds partent',
-          'Repos 3 min entre chaque passage',
-        ],
-      };
-    },
-  },
-  {
-    id: 'strength-intervals',
-    video: ytSearch('bouldering strength session near max boulders'),
-    focus: 'strength',
-    points: ['lock-off', 'crimps'],
-    name: 'Intervalles de force',
-    summary: 'Séries de 3 blocs durs (1 à 2 crans sous le max), 3 min de repos entre chaque bloc.',
+    maxMinutes: 40,
     source:
-      'https://www.ukclimbing.com/articles/features/lattice_training_series_with_tom_randall_-_part_3_strength+power-11368',
-    minMinutes: 15,
-    stressful: true,
+      'https://latticetraining.com/workout/e743fca6-16fe-4fac-9a91-c568971926a6/flashing-boulders',
+    video: 'https://www.youtube.com/shorts/zBdQ7UN6Mc0',
+    info: {
+      why: 'Lire un bloc et le réussir du premier coup, c’est une compétence qui se travaille.',
+      how: [
+        'Seulement des blocs jamais essayés',
+        'Au sol : repère les prises de pieds, les mains, l’endroit dur',
+        'Un seul essai, à fond, et on passe au suivant',
+      ],
+      pitfalls: ['Regarder quelqu’un d’autre le faire avant : ce n’est plus un flash'],
+    },
+    build: (c) => ({
+      title: 'Flash',
+      target: c.maxSent,
+      instructions: [
+        `${count(c.minutes, 5, 3, 8)} blocs en ${c.grade(c.maxSent)}, jamais essayés`,
+        'Lis le bloc au sol, puis un seul essai, à fond',
+        'Repos 3 min avant de changer de bloc',
+      ],
+    }),
+  },
+  {
+    id: 'tech-volume',
+    focus: 'technique',
+    points: ['footwork', 'balance', 'slab', 'hips'],
+    name: 'Volume technique',
+    summary: 'Beaucoup de blocs faciles, avec la consigne du jour comme seul objectif.',
+    minMinutes: 20,
+    source: 'https://www.lasportivausa.com/blogs/blog/gym-series-bouldering-power-hour',
+    video: 'https://www.youtube.com/watch?v=WbscmZDybdQ',
+    info: {
+      why: 'Sur des blocs faciles, toute l’attention va au geste : c’est là qu’une nouvelle habitude se prend.',
+      how: [
+        'Applique la consigne du jour à chaque mouvement',
+        'Un mouvement bâclé : redescends d’un mouvement et refais-le',
+      ],
+      pitfalls: ['Aller vite : le but n’est pas le nombre de blocs'],
+    },
     build: (c) => {
-      const v = c.maxSent - 1;
-      const sets = count(c.minutes, 10, 1, 6);
+      const v = c.maxSent - 4 - c.light;
       return {
-        title: `Intervalles de force · ${plural(sets, 'série')}`,
+        title: 'Volume technique',
         target: v,
         instructions: [
-          `Choisis ${3 * Math.min(2, sets)} blocs connus en ${c.grade(v)}`,
-          'Objectif : de la force de qualité, sans fatigue qui s’accumule',
-          `${plural(sets, 'série')} de 3 blocs, 1 passage par bloc`,
-          'Repère : chaque passage reste propre. Arrête si la qualité baisse',
-          'Repos 3 min entre chaque passage et entre les séries',
-        ],
-      };
-    },
-  },
-  {
-    id: 'one-arm-lunge',
-    video: 'https://www.youtube.com/shorts/f1PLsWbGpwY',
-    focus: 'strength',
-    points: ['power'],
-    name: 'Lancés à un bras',
-    summary:
-      'Depuis une bonne prise, lancer une seule main vers une prise plus haute : vitesse de contact.',
-    source: 'https://www.scribd.com/document/367937845/T4C-Intermediate-Program',
-    minMinutes: 10,
-    advanced: true,
-    stressful: true,
-    build: (c) => {
-      const n = count(c.minutes, 2, 4, 8);
-      return {
-        title: 'Lancés à un bras',
-        target: c.maxSent - 4,
-        instructions: [
-          `${plural(n, 'lancé')}, en alternant les mains`,
-          'Objectif : de la vitesse de contact sur une seule main',
-          'En dévers, pieds posés, une main sur une très bonne prise',
-          'Lance l’autre main vers une bonne prise plus haute et rattrape-la',
-          'Repère : tu rattrapes la prise sans que les pieds décollent',
-          'Repos 2 min entre chaque lancé',
-        ],
-      };
-    },
-  },
-  {
-    id: 'dyno',
-    video: 'https://www.youtube.com/shorts/UqnkaxKLTkI',
-    focus: 'strength',
-    points: ['power', 'coordination', 'commitment'],
-    name: 'Jetés',
-    summary:
-      'Sauter des deux mains vers une prise lointaine : coordination et puissance de tout le corps.',
-    source: 'https://www.shedreamsofalpine.com/blog/climbing-games',
-    minMinutes: 10,
-    stressful: true,
-    build: (c) => {
-      const v = c.maxSent - 2;
-      const n = count(c.minutes, 8, 1, 4);
-      return {
-        title: 'Jetés',
-        target: v,
-        instructions: [
-          `${plural(n, 'bloc')} en ${c.grade(v)} avec un jeté (les deux mains quittent le mur), 4 essais max par jeté`,
-          'Objectif : coordonner jambes, bras et regard dans un seul élan',
-          'Charge avec les jambes, les yeux sur la prise cible',
-          'Attrape-la bras légèrement fléchis',
-          'Sans jeté dans la salle : choisis toi-même une prise de départ et une grosse prise cible',
-          'Repère : tu arrives sur la cible sans la dépasser ni la claquer',
-          'Repos 2 min entre chaque essai',
-        ],
-      };
-    },
-  },
-  {
-    id: 'grip-limit',
-    video: 'https://www.youtube.com/shorts/kq9y7WnH72w',
-    focus: 'strength',
-    points: ['crimps', 'slopers', 'pinches'],
-    name: 'Bloc au max sur un type de prise',
-    summary:
-      'Blocs au niveau max dont le pas dur se fait sur un type de prise qu’on évite (réglettes, plats ou pinces).',
-    source: 'https://latticetraining.com/blog/why-do-we-train-half-crimp',
-    minMinutes: 12,
-    stressful: true,
-    build: (c) => {
-      const n = count(c.minutes, 12, 1, 3);
-      return {
-        title: 'Bloc au max sur un type de prise',
-        target: c.project,
-        instructions: [
-          `${plural(n, 'bloc')} en ${c.grade(c.project)}, 4 essais max par bloc`,
-          'Objectif : renforcer le type de prise que tu évites',
-          'Choisis des blocs dont le pas dur se fait sur ce type de prise : réglettes, plats ou pinces',
-          'Chaque essai à fond, après un repos complet',
-          'Repère : le pas dur sur cette prise passe de plus en plus loin',
-          'Repos 3 à 5 min entre chaque essai',
-        ],
-      };
-    },
-  },
-  {
-    id: 'compression',
-    video: 'https://www.youtube.com/shorts/L2nJcC1h1Vo',
-    focus: 'strength',
-    points: ['compression', 'tension'],
-    name: 'Blocs de compression',
-    summary:
-      'Blocs où il faut serrer (volumes, arêtes, prises opposées) : force de compression et gainage.',
-    source: 'https://www.trainingbeta.com/how-to-train-for-compression/',
-    minMinutes: 10,
-    stressful: true,
-    build: (c) => {
-      const v = c.project - 1;
-      const n = count(c.minutes, 10, 1, 4);
-      return {
-        title: 'Blocs de compression',
-        target: v,
-        instructions: [
-          `${plural(n, 'bloc')} en ${c.grade(v)}, 4 essais max par bloc`,
-          'Objectif : tenir en serrant entre deux prises opposées',
-          'Choisis des blocs où il faut serrer : volumes, arêtes, prises opposées',
-          'Pousse vers l’intérieur avec les deux mains, hanches près du mur',
-          'Repère : tu tiens la position même quand une main n’a presque rien',
-          'Repos 3 min entre chaque essai',
-        ],
-      };
-    },
-  },
-  {
-    id: 'steep-poor-feet',
-    video: 'https://www.youtube.com/shorts/HO0drIKbM3k',
-    focus: 'strength',
-    points: ['tension'],
-    name: 'Dévers pieds fuyants',
-    summary:
-      'En dévers, bonnes prises de main mais mauvais pieds : tenir les pieds au mur, c’est la tension du corps.',
-    source: 'https://ukbouldering.com/board/index.php/topic,23121.0.html',
-    minMinutes: 10,
-    build: (c) => {
-      const v = c.maxSent - 2;
-      const n = count(c.minutes, 6, 2, 5);
-      return {
-        title: 'Dévers pieds fuyants',
-        target: v,
-        instructions: [
-          `${plural(n, 'bloc')} en ${c.grade(v)}, 3 essais max par bloc`,
-          'Objectif : garder les pieds au mur dans le dévers',
-          'Choisis des blocs en dévers avec de bonnes prises de main et de mauvais pieds',
-          'Pousse sur les pointes et tire les pieds vers le mur avec le ventre, hanches près du mur',
-          'Repère : les pieds restent au mur sur tout le bloc. S’ils partent, tu tombes',
-          'Repos 3 min entre chaque essai',
-        ],
-      };
-    },
-  },
-  {
-    id: 'varied-dynos',
-    video: 'https://www.youtube.com/watch?v=0XhjHPvBj94',
-    focus: 'strength',
-    points: ['power', 'coordination'],
-    name: 'Lancés variés',
-    summary:
-      'Lancés et jetés sur des prises, inclinaisons et distances différentes : coordination dynamique.',
-    source: 'https://gripped.com/?p=46803',
-    minMinutes: 10,
-    stressful: true,
-    build: (c) => {
-      const v = c.maxSent - 2;
-      return {
-        title: 'Lancés variés',
-        target: v,
-        instructions: [
-          `3 lancés différents en ${c.grade(v)} ou moins, 4 essais max par lancé`,
-          'Objectif : rendre le lancé fiable dans toutes les situations',
-          'Change à chaque lancé de type de prise, d’inclinaison ou de distance',
-          'Charge avec les jambes, regarde la cible, attrape-la bras légèrement fléchis',
-          'Si tu trouves un crochet de pointe à prendre en dynamique, ajoute-le',
-          'Repère : chaque lancé passe en 4 essais ou moins',
-          'Repos 2 min entre chaque essai',
-        ],
-      };
-    },
-  },
-  {
-    id: 'fall-in-move',
-    video: 'https://www.youtube.com/shorts/O2SZzi2E94s',
-    focus: 'strength',
-    points: ['commitment', 'fall'],
-    name: 'Chuter dans le mouvement',
-    summary:
-      'Sur des blocs à son max, s’engager dans le pas dur jusqu’au bout plutôt que de renoncer, quitte à tomber.',
-    source:
-      'https://www.strongmindclimbing.com/news-resources/where-do-people-go-wrong-with-fall-practice',
-    minMinutes: 12,
-    stressful: true,
-    build: (c) => {
-      const n = count(c.minutes, 12, 1, 3);
-      return {
-        title: 'Chuter dans le mouvement',
-        target: c.project,
-        instructions: [
-          `${plural(n, 'bloc')} en ${c.grade(c.project)}, 4 essais max par bloc`,
-          'Objectif : aller au bout du pas dur au lieu de renoncer',
-          'Choisis des blocs où l’on tombe sur les pieds, au-dessus d’un tapis épais',
-          'À chaque essai, engage-toi dans le pas dur jusqu’au bout, quitte à tomber',
-          'Ne redescends jamais avant d’avoir essayé',
-          'Repère : tu tombes en essayant, jamais en renonçant',
-          'Repos 3 min entre chaque essai',
+          `${count(c.minutes, 3, 6, 20)} blocs en ${c.grade(v)}`,
+          'Un seul objectif : la consigne du jour, sur chaque mouvement',
+          'Repos 1 min avant de changer de bloc',
         ],
       };
     },
   },
 ];
 
+/** Types de prise qu'un projet peut cibler quand ils sont cochés en points faibles. */
+export const GRIP_POINTS: readonly ClimbingPoint[] = [
+  'crimps',
+  'slopers',
+  'pinches',
+  'compression',
+];
+
 export interface PickOptions {
   focus: Focus;
   minutes: number;
-  maxSent: number;
-  /** Douleur signalée ou séance légère : pas d'exercice éprouvant ni réservé aux confirmés. */
+  /** Douleur signalée ou séance légère : pas de format éprouvant. */
   careful: boolean;
-  /** Fait varier les exercices d'une séance à l'autre (ex. numéro du jour). */
+  /** Fait varier les formats d'une séance à l'autre (ex. numéro du jour). */
   seed: number;
-  /** Points faibles du profil : au plus un exercice qui les travaille, en premier. */
+  /** Points faibles du profil : au plus un format qui les travaille, en premier. */
   weakPoints?: ClimbingPoint[];
-  /** Ce que le grimpeur aime : au moins un exercice qui en fait, en dernier. */
+  /** Ce que le grimpeur aime : au moins un format qui en fait, en dernier. */
   likedPoints?: ClimbingPoint[];
 }
 
-/** Pourquoi un exercice est là : point faible, plaisir, ou simple variété. */
+/** Pourquoi un format est là : point faible, plaisir, ou simple variété. */
 export type PickRole = 'weak' | 'liked' | 'other';
 
 export interface Pick {
   exercise: Exercise;
   minutes: number;
   role: PickRole;
-  /** Points du profil que l'exercice travaille (vides pour « other »). */
+  /** Points du profil que le format travaille (vides pour « other »). */
   points: ClimbingPoint[];
 }
 
+/** Moins de 50 min de cœur : un seul format. Au-delà : deux. */
+export const formatsFor = (minutes: number) => (minutes >= 50 ? 2 : 1);
+
+const fitsIn = (e: Exercise, minutes: number) =>
+  minutes >= e.minMinutes && (e.maxMinutes === undefined || minutes <= e.maxMinutes);
+
 /**
- * Choisit les exercices du cœur de séance : 1 si le temps est court, jusqu'à 3 sinon, différents,
- * en tournant dans le catalogue selon `seed`, avec leurs minutes (la somme fait `minutes`).
+ * Choisit les formats du cœur de séance : 1 sous 50 min, 2 au-delà, différents, en tournant dans
+ * le catalogue selon `seed`, avec leurs minutes (la somme fait `minutes`).
  *
- * Avec un profil : au plus un exercice sur un point faible, en premier (quand on est frais), et
- * au moins un exercice qu'on aime, en dernier (pour finir sur une bonne sensation). Avec un seul
- * exercice, on alterne d'une séance à l'autre. Sans profil, en force, le bloc au max passe d'abord.
- *
- * En endurance, tous les exercices d'une séance travaillent la même filière (fond ou résistance) :
- * celle du point faible s'il y en a un, sinon celle de l'exercice aimé, sinon celle du jour.
+ * Avec un profil : au plus un format sur un point faible, en premier, et au moins un format qu'on
+ * aime, en dernier. Avec un seul format, on alterne d'une séance à l'autre.
+ * En endurance, les deux formats travaillent la même filière (fond ou résistance).
  */
 export function pickExercises(o: PickOptions): Pick[] {
   const pool = EXERCISES.filter(
     (e) =>
       e.focus === o.focus &&
-      (!e.advanced || o.maxSent >= ADVANCED_LEVEL) &&
-      !((o.careful && e.stressful) || (o.careful && e.advanced)),
+      !(o.careful && e.stressful) &&
+      !(e.rare && ((o.seed % 3) + 3) % 3 !== 0),
   );
   if (!pool.length || o.minutes <= 0) return [];
 
-  const howMany = o.minutes >= 45 ? 3 : o.minutes >= 25 ? 2 : 1;
+  const howMany = Math.min(formatsFor(o.minutes), pool.length);
+  const share = Math.floor(o.minutes / howMany);
   const start = ((o.seed % pool.length) + pool.length) % pool.length;
   let ordered = [...pool.slice(start), ...pool.slice(0, start)];
+  // Ce qui tient dans le temps d'abord ; le reste ne sert qu'en dernier recours
+  ordered = [
+    ...ordered.filter((e) => fitsIn(e, share)),
+    ...ordered.filter((e) => !fitsIn(e, share)),
+  ];
 
   const weak = new Set(o.weakPoints ?? []);
   const liked = new Set(o.likedPoints ?? []);
   const isWeak = (e: Exercise) => e.points.some((p) => weak.has(p));
   const isLiked = (e: Exercise) => !isWeak(e) && e.points.some((p) => liked.has(p));
-  const fits = (e: Exercise) => Math.floor(o.minutes / howMany) >= e.minMinutes;
+  const fits = (e: Exercise) => fitsIn(e, share);
 
   if (howMany > 1 && o.focus === 'endurance') {
     // Fond et résistance ne se mélangent pas dans une même séance
-    const anchor = ordered.find(isWeak) ?? ordered.find(isLiked) ?? ordered[0];
+    const anchor =
+      ordered.find((e) => isWeak(e) && fits(e)) ??
+      ordered.find((e) => isLiked(e) && fits(e)) ??
+      ordered[0];
     if (anchor.energy) ordered = ordered.filter((e) => e.energy === anchor.energy);
   }
-  const first = (test: (e: Exercise) => boolean) =>
-    ordered.find((e) => test(e) && fits(e)) ?? ordered.find(test);
+  const first = (test: (e: Exercise) => boolean) => ordered.find((e) => test(e) && fits(e));
 
   let weakPick = first(isWeak);
   let likedPick = first(isLiked);
   if (howMany === 1) {
-    // Un seul exercice : point faible et plaisir (ou variété) chacun leur tour
+    // Un seul format : point faible et plaisir (ou variété) chacun leur tour
     const turn = ((o.seed % 2) + 2) % 2;
     if (weakPick && likedPick) {
       if (turn) weakPick = undefined;
@@ -1758,17 +670,15 @@ export function pickExercises(o: PickOptions): Pick[] {
 
   const chosen: Exercise[] = [];
   if (weakPick) chosen.push(weakPick);
-  // Le reste : variété, sans second exercice sur un point faible
   const others = ordered.filter((e) => e !== weakPick && e !== likedPick && !isWeak(e));
   if (o.focus === 'strength' && !weakPick) {
-    const limit = others.findIndex((e) => e.id === 'limit');
-    if (limit > 0) others.unshift(...others.splice(limit, 1));
+    // Sans point faible, la force commence par des projets
+    const projects = others.findIndex((e) => e.id === 'projects' && fits(e));
+    if (projects > 0) others.unshift(...others.splice(projects, 1));
   }
-  const slots = howMany - chosen.length - (likedPick ? 1 : 0);
   for (const e of others) {
     if (chosen.length >= howMany - (likedPick ? 1 : 0)) break;
-    const share = Math.floor(o.minutes / (chosen.length + 1));
-    if (share >= e.minMinutes || (chosen.length === 0 && slots > 0)) chosen.push(e);
+    chosen.push(e);
   }
   if (likedPick) chosen.push(likedPick);
 
@@ -1779,15 +689,20 @@ export function pickExercises(o: PickOptions): Pick[] {
     return e.points.filter((p) => set.has(p));
   };
 
-  // Minutes réparties à parts égales, arrondies à 5, le reste sur le premier
+  // Minutes réparties à parts égales, arrondies à 5 et plafonnées, le reste sur un format sans plafond
   const each = Math.max(5, Math.floor(o.minutes / chosen.length / 5) * 5);
   const split = chosen.map((exercise) => ({
     exercise,
-    minutes: each,
+    minutes: Math.min(each, exercise.maxMinutes ?? each),
     role: role(exercise),
     points: profilePoints(exercise),
   }));
-  split[0].minutes += o.minutes - each * chosen.length;
+  const rest = o.minutes - split.reduce((sum, p) => sum + p.minutes, 0);
+  const taker =
+    split.find((p) => p.exercise.maxMinutes === undefined) ??
+    split.find((p) => fitsIn(p.exercise, p.minutes + rest)) ??
+    split[0];
+  taker.minutes += rest;
   return split;
 }
 
@@ -1802,7 +717,7 @@ export function catalogForPrompt(): string {
     .map((f) => {
       const lines = EXERCISES.filter((e) => e.focus === f).map(
         (e) =>
-          `- ${e.name}${e.energy ? ` (${ENERGY_LABEL[e.energy]})` : ''} : ${e.summary} Travaille : ${e.points.map((p) => POINT_LABEL[p]).join(', ')}.${e.advanced ? ' (seulement à partir de 6C, jamais en cas de douleur)' : e.stressful ? ' (jamais en cas de douleur)' : ''}`,
+          `- ${e.name}${e.energy ? ` (${ENERGY_LABEL[e.energy]})` : ''} : ${e.summary} Au moins ${e.minMinutes} min${e.maxMinutes ? `, au plus ${e.maxMinutes}` : ''}. Travaille : ${e.points.map((p) => POINT_LABEL[p]).join(', ')}.${e.stressful ? ' (jamais en cas de douleur ni de séance légère)' : ''}`,
       );
       return `${label[f]} :\n${lines.join('\n')}`;
     })

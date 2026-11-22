@@ -7,6 +7,7 @@ import {
   CreateSession,
   Equipment,
   Focus,
+  Cue,
   GeneratedPlan,
   Gym,
   GymInput,
@@ -38,6 +39,11 @@ export class ApiService {
   }
 
   /** `focus` : type de séance choisi à la place du planning. */
+  /** « Changer » la consigne du jour : la suivante, pour 10 séances. */
+  nextCue(): Observable<Cue> {
+    return this.http.post<Cue>(`${this.base}/plans/cue/next`, {});
+  }
+
   generatePlan(
     availableMinutes: number,
     gymId?: string | null,

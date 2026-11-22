@@ -76,7 +76,21 @@
     }
   </ol>
 
-  @if (b.video) {
+  @if (b.kind === 'warmup' && cue(); as c) {
+  <div class="cue" data-testid="cue">
+    <span class="overline">Consigne du jour</span>
+    <strong>{{ c.text }}</strong>
+    @if (c.info) {
+    <app-info [info]="c.info" [video]="c.video" />
+    }
+  </div>
+  } @if (b.kind === 'bonus') {
+  <button type="button" class="btn outline skip" (click)="skipBonus()" data-testid="skip-bonus">
+    <app-icon name="next" [size]="18" />Passer le bonus
+  </button>
+  } @if (b.info) {
+  <app-info [info]="b.info" [video]="b.video" />
+  } @else if (b.video) {
   <a
     class="btn outline video"
     [href]="b.video"

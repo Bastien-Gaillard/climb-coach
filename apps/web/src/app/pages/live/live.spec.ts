@@ -103,6 +103,48 @@ describe('LivePage · minuteur', () => {
     expect(link.textContent?.trim()).toBe('Voir en vidéo');
   });
 
+  it('rappelle la consigne du jour pendant l’échauffement', () => {
+    fixture.destroy();
+    const withCue = structuredClone(plan);
+    withCue.plan.cue = { id: 'slow', text: 'Au ralenti : 3 temps par mouvement' };
+    TestBed.inject(PlanStore).set(withCue);
+    fixture = TestBed.createComponent(LivePage);
+    el = fixture.nativeElement;
+    fixture.detectChanges();
+    expect(el.querySelector('[data-testid=cue]')?.textContent).toContain('Au ralenti');
+
+    el.querySelector<HTMLButtonElement>('[aria-label="Bloc suivant"]')!.click();
+    fixture.detectChanges();
+    expect(el.querySelector('[data-testid=cue]')).toBeNull();
+  });
+
+  it('« Passer le bonus » saute tous les exercices facultatifs', () => {
+    fixture.destroy();
+    const withBonus = structuredClone(plan);
+    const bonus = { kind: 'bonus' as const, minutes: 10, instructions: ['10 s'] };
+    withBonus.plan.blocks.splice(
+      2,
+      0,
+      { ...bonus, title: 'Tractions' },
+      { ...bonus, title: 'Équilibre', minutes: 5 },
+    );
+    TestBed.inject(PlanStore).set(withBonus);
+    fixture = TestBed.createComponent(LivePage);
+    el = fixture.nativeElement;
+    fixture.detectChanges();
+    expect(el.querySelector('[data-testid=skip-bonus]')).toBeNull();
+
+    el.querySelector<HTMLButtonElement>('[aria-label="Bloc suivant"]')!.click();
+    el.querySelector<HTMLButtonElement>('[aria-label="Bloc suivant"]')!.click();
+    fixture.detectChanges();
+    expect(title()).toBe('Tractions');
+    expect(el.querySelector('.kind')?.textContent).toContain('Bonus · facultatif');
+
+    el.querySelector<HTMLButtonElement>('[data-testid=skip-bonus]')!.click();
+    fixture.detectChanges();
+    expect(title()).toBe('Retour au calme');
+  });
+
   it('décompte le temps réel', () => {
     expect(clock()).toBe('15:00');
     jasmine.clock().tick(61_000);

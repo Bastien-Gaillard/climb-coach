@@ -48,7 +48,8 @@ describe('ProfilePage', () => {
     expect(box('elastic').getAttribute('role')).toBe('checkbox');
     expect(box('elastic').getAttribute('aria-checked')).toBe('true');
     expect(box('hangboard').getAttribute('aria-checked')).toBe('false');
-    expect(el.querySelectorAll('[data-testid^=equipment-]').length).toBe(4);
+    expect(el.querySelectorAll('[data-testid^=equipment-]').length).toBe(3);
+    expect(el.textContent).toContain('À la salle ou chez toi');
   });
 
   it('enregistre tout de suite le matériel coché', () => {

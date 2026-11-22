@@ -1,19 +1,34 @@
 import { Gym } from '@climb-coach/grades';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { desc, eq } from 'drizzle-orm';
+import { count, desc, eq } from 'drizzle-orm';
 import { Database, DB } from '../db/db.module';
-import { generatedPlans, schedulePlans, StoredPlannedSession } from '../db/schema';
+import {
+  generatedPlans,
+  schedulePlans,
+  sessions as sessionsTable,
+  StoredPlannedSession,
+  users,
+} from '../db/schema';
 import { GymsService } from '../gyms/gyms.service';
 import { SessionsService, SessionWithClimbs } from '../sessions/sessions.service';
 import { ClimbingPoint } from '../auth/climbing-points';
 import { Equipment } from '../auth/equipment';
+import { Cue, currentCue, nextCue } from './cues';
 import { DeclaredLevel, declaredLevel } from './declared-level';
 import { GeneratorContext } from './generator';
-import { withVideos } from './exercise-videos';
+import { withCatalog } from './exercise-videos';
 import { withGymColors } from './gym-colors';
 import { MistralGenerator } from './mistral.generator';
 import { ADVICE_HORIZON_DAYS, MistralScheduleAdvisor } from './mistral.schedule';
 import { Focus, Plan } from './plan.schema';
+
+/** La consigne du jour telle qu'elle part dans la séance. */
+export const cueView = (c: Cue): NonNullable<Plan['cue']> => ({
+  id: c.id,
+  text: c.text,
+  info: c.info,
+  video: c.video,
+});
 import { RuleBasedGenerator } from './rule-based.generator';
 import { addDays, buildSchedule, diffDays, Schedule } from './schedule';
 
@@ -116,7 +131,8 @@ export class PlansService {
       }
     }
     plan ??= await this.rules.generate(ctx);
-    plan = withVideos(withGymColors(plan, gym));
+    plan = withCatalog(withGymColors(plan, gym));
+    plan = { ...plan, cue: cueView(await this.dailyCue(userId, points.weakPoints ?? [])) };
 
     const [saved] = await this.db
       .insert(generatedPlans)
@@ -241,6 +257,48 @@ export class PlansService {
     if (!color) return undefined;
     const levelGym = gym ?? (await this.gyms.findOne(gymId).catch(() => undefined));
     return (levelGym && declaredLevel(levelGym, color)) ?? undefined;
+  }
+
+  /** Consigne du jour : la même 10 séances, puis la suivante (enregistrée au changement). */
+  private async dailyCue(userId: string, weakPoints: ClimbingPoint[]): Promise<Cue> {
+    const [state, sessionCount] = await Promise.all([
+      this.cueState(userId),
+      this.sessionCount(userId),
+    ]);
+    const { cue, since, changed } = currentCue(state, sessionCount, weakPoints);
+    if (changed) await this.saveCue(userId, cue.id, since);
+    return cue;
+  }
+
+  /** Bouton « Changer » : passe tout de suite à la consigne suivante, pour 10 séances. */
+  async changeCue(userId: string, weakPoints: ClimbingPoint[] = []) {
+    const [state, sessionCount] = await Promise.all([
+      this.cueState(userId),
+      this.sessionCount(userId),
+    ]);
+    const cue = nextCue(state.cue, weakPoints);
+    await this.saveCue(userId, cue.id, sessionCount);
+    return cueView(cue);
+  }
+
+  private async cueState(userId: string) {
+    const [row] = await this.db
+      .select({ cue: users.cue, since: users.cueSince })
+      .from(users)
+      .where(eq(users.id, userId));
+    return row ?? { cue: null, since: 0 };
+  }
+
+  private async sessionCount(userId: string): Promise<number> {
+    const [row] = await this.db
+      .select({ n: count() })
+      .from(sessionsTable)
+      .where(eq(sessionsTable.userId, userId));
+    return Number(row?.n ?? 0);
+  }
+
+  private async saveCue(userId: string, cue: string, since: number): Promise<void> {
+    await this.db.update(users).set({ cue, cueSince: since }).where(eq(users.id, userId));
   }
 
   /** Attend la fin du planning en cours de calcul (utile aux tests). */

@@ -30,6 +30,27 @@
   <p class="muted small">
     Mistral n'a pas pu répondre ({{ r.fallbackReason }}), les règles ont pris le relais.
   </p>
+  } @if (r.plan.cue; as cue) {
+  <section class="card cue" data-testid="cue">
+    <div class="cue-head">
+      <div>
+        <span class="overline">Consigne du jour · 10 séances</span>
+        <strong>{{ cue.text }}</strong>
+      </div>
+      <button
+        type="button"
+        class="ghost small"
+        (click)="changeCue()"
+        [disabled]="cueLoading()"
+        data-testid="cue-change"
+      >
+        Changer
+      </button>
+    </div>
+    @if (cue.info) {
+    <app-info [info]="cue.info" [video]="cue.video" />
+    }
+  </section>
   }
 
   <div class="timeline" aria-label="Répartition du temps">
@@ -44,7 +65,7 @@
 
   <ol class="blocks">
     @for (b of r.plan.blocks; track $index; let i = $index) {
-    <li [class.main]="b.kind === 'main'">
+    <li [class.main]="b.kind === 'main'" [class.bonus]="b.kind === 'bonus'">
       <div class="block-head">
         <div>
           <span class="overline">{{ overline(i) }}</span>
@@ -86,7 +107,9 @@
         <li>{{ step }}</li>
         }
       </ul>
-      } @if (b.video) {
+      } @if (b.info) {
+      <app-info [info]="b.info" [video]="b.video" />
+      } @else if (b.video) {
       <a
         class="video"
         [href]="b.video"
@@ -99,7 +122,10 @@
     </li>
     }
   </ol>
-  <p class="muted small">Total : {{ total() }} min sur {{ r.availableMinutes }} min dispo.</p>
+  <p class="muted small">
+    Total : {{ total() }} min sur {{ r.availableMinutes }} min dispo. @if (bonusMinutes()) { + {{
+    bonusMinutes() }} min de bonus facultatif. }
+  </p>
 
   <div class="action-bar">
     <button

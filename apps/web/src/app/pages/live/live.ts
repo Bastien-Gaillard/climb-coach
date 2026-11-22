@@ -5,12 +5,13 @@ import { PlanStore } from '../../core/plan.store';
 import { PushAlerts, vibrate } from '../../core/push-alerts';
 import { holdVars } from '../../shared/hold';
 import { Icon } from '../../shared/icon';
+import { InfoPanel } from '../../shared/info';
 import { ScreenWakeLock } from '../../shared/wake-lock';
 
 /** Séance guidée : un bloc à la fois, minuteur lisible à 3 m, gros boutons. */
 @Component({
   selector: 'app-live',
-  imports: [Icon, RouterLink],
+  imports: [Icon, InfoPanel, RouterLink],
   templateUrl: './live.html',
   styleUrl: './live.scss',
 })
@@ -52,6 +53,8 @@ export class LivePage implements OnInit {
   protected readonly block = computed(() => this.blocks()[this.index()]);
   protected readonly next = computed(() => this.blocks()[this.index() + 1] ?? null);
   protected readonly isLast = computed(() => this.index() >= this.blocks().length - 1);
+  /** Consigne du jour : rappelée pendant l'échauffement. */
+  protected readonly cue = computed(() => this.generated()?.plan.cue ?? null);
 
   protected readonly kind = computed(() => {
     const b = this.block();
@@ -164,6 +167,13 @@ export class LivePage implements OnInit {
     this.index.set(j);
     this.endsAt.set(now + seconds * 1000);
     this.pausedLeft.set(seconds);
+  }
+
+  /** « Passer le bonus » : saute tous les exercices facultatifs qui se suivent. */
+  protected skipBonus(): void {
+    let i = this.index();
+    while (this.blocks()[i]?.kind === 'bonus') i++;
+    this.go(i);
   }
 
   protected toggle(): void {

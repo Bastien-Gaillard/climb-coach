@@ -59,13 +59,31 @@ export interface CreateSession {
   climbs: ClimbInput[];
 }
 
+/** Détail derrière le ⓘ : pourquoi, comment s'y prendre, pièges à éviter. */
+export interface PlanInfo {
+  why: string;
+  how: string[];
+  pitfalls: string[];
+}
+
+/** Consigne du jour : une ligne de technique, la même 10 séances. */
+export interface Cue {
+  id: string;
+  text: string;
+  info?: PlanInfo;
+  video?: string;
+}
+
 export interface PlanBlock {
-  kind: 'warmup' | 'main' | 'core' | 'cooldown';
+  /** « bonus » : exercice facultatif hors du mur, en plus du temps dispo. */
+  kind: 'warmup' | 'main' | 'bonus' | 'core' | 'cooldown';
   title: string;
   minutes: number;
   instructions: string[];
   /** Vidéo YouTube qui montre l'exercice, ou une recherche YouTube à défaut. */
   video?: string;
+  /** Détail affiché derrière le ⓘ. */
+  info?: PlanInfo;
   target?: {
     style: Style;
     grade: string;
@@ -83,6 +101,7 @@ export interface Plan {
   intensity: 'light' | 'normal';
   summary: string;
   blocks: PlanBlock[];
+  cue?: Cue;
 }
 
 export interface GeneratedPlan {
@@ -149,7 +168,7 @@ export interface AiStatus {
 }
 
 /** Matériel qu'on peut cocher dans le profil (même liste que l'API). */
-export type Equipment = 'elastic' | 'ball' | 'hangboard' | 'pullup-bar';
+export type Equipment = 'elastic' | 'hangboard' | 'pullup-bar';
 
 /** Points qu'on coche dans le profil, comme point faible ou comme plaisir (même liste que l'API). */
 export type ClimbingPoint =

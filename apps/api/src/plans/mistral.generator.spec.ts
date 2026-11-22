@@ -3,12 +3,13 @@ import {
   bracketGrades,
   classifyFailure,
   MistralError,
+  MistralCore,
   MistralGenerator,
   MistralRateLimitError,
   parseModels,
   parseModelSpecs,
 } from './mistral.generator';
-import { Plan } from './plan.schema';
+import { planFitsTime, PlanSchema } from './plan.schema';
 import { session } from './test-helpers';
 
 const now = new Date('2025-11-23T18:00:00Z');
@@ -29,17 +30,17 @@ function makeGenerator(env: Record<string, unknown> = {}) {
   >);
 }
 
-const validPlan: Plan = {
+/** Cœur de séance pour 60 min : 20 d'échauffement, 25 de cœur, 10 de gainage, 5 de calme. */
+const validCore: MistralCore = {
   focus: 'endurance',
   intensity: 'normal',
   summary: 'Endurance après une séance de force.',
   blocks: [
-    { kind: 'warmup', title: 'Échauffement', minutes: 15, instructions: ['Mobilité'] },
     {
       kind: 'main',
       title: '4x4',
-      minutes: 45,
-      instructions: ['4 blocs, 4 fois'],
+      minutes: 25,
+      instructions: ['4 blocs en [6A]', 'Série = les 4 blocs enchaînés sans pause'],
       target: { style: 'boulder', grade: '6A' },
     },
   ],
@@ -68,94 +69,122 @@ describe('bracketGrades', () => {
 describe('MistralGenerator.parse', () => {
   const gen = makeGenerator();
 
-  it('accepte un plan valide', () => {
-    expect(gen.parse(JSON.stringify(validPlan), 60)).toEqual(validPlan);
+  it('accepte un cœur de séance valide', () => {
+    expect(gen.parse(JSON.stringify(validCore), 25)).toEqual(validCore);
   });
 
-  it('accepte un plan entouré de balises Markdown ou de texte', () => {
-    const wrapped = 'Voici ta séance :\n```json\n' + JSON.stringify(validPlan) + '\n```';
-    expect(gen.parse(wrapped, 60)).toEqual(validPlan);
+  it('accepte une réponse entourée de balises Markdown ou de texte', () => {
+    const wrapped = 'Voici ta séance :\n```json\n' + JSON.stringify(validCore) + '\n```';
+    expect(gen.parse(wrapped, 25)).toEqual(validCore);
   });
 
-  it('complète un titre manquant à partir du type de bloc', () => {
-    const plan = structuredClone(validPlan) as unknown as { blocks: Record<string, unknown>[] };
-    delete plan.blocks[0].title;
-    plan.blocks[1].minutes = '45';
-    expect(gen.parse(JSON.stringify(plan), 60)).toEqual(validPlan);
+  it('complète type et minutes écrits à moitié', () => {
+    const core = structuredClone(validCore) as unknown as { blocks: Record<string, unknown>[] };
+    delete core.blocks[0].kind;
+    core.blocks[0].minutes = '25';
+    expect(gen.parse(JSON.stringify(core), 25)).toEqual(validCore);
   });
 
   it('rejette du texte non JSON', () => {
-    expect(() => gen.parse('Voici ta séance : ...', 60)).toThrow('Réponse non JSON');
+    expect(() => gen.parse('Voici ta séance : ...', 25)).toThrow('Réponse non JSON');
   });
 
-  it('rejette un plan hors schéma', () => {
-    expect(() => gen.parse(JSON.stringify({ ...validPlan, focus: 'yoga' }), 60)).toThrow(
+  it('rejette une réponse hors schéma', () => {
+    expect(() => gen.parse(JSON.stringify({ ...validCore, focus: 'yoga' }), 25)).toThrow(
       /hors schéma/,
     );
   });
 
-  it('rejette un plan trop long pour le temps dispo', () => {
-    expect(() => gen.parse(JSON.stringify(validPlan), 45)).toThrow(
-      'Séance de 60 min pour 45 min dispo',
+  it('rejette un cœur trop long ou qui gaspille le temps (5 min de marge)', () => {
+    expect(() => gen.parse(JSON.stringify(validCore), 20)).toThrow(
+      'cœur de séance de 25 min au lieu de 20',
+    );
+    expect(() => gen.parse(JSON.stringify(validCore), 31)).toThrow(/25 min au lieu de 31/);
+    expect(gen.parse(JSON.stringify(validCore), 30).blocks).toHaveLength(1);
+  });
+
+  it('exige 1 format sous 50 min, 2 au-delà', () => {
+    expect(() => gen.parse(JSON.stringify(validCore), 50)).toThrow(
+      '1 format(s) pour un cœur de 50 min : il en faut 2',
     );
   });
 
-  it('rejette un plan qui gaspille le temps dispo', () => {
-    expect(() => gen.parse(JSON.stringify(validPlan), 90)).toThrow(/60 min pour 90/);
+  it('rejette échauffement, gainage ou bonus : l’appli les ajoute', () => {
+    const core = structuredClone(validCore);
+    core.blocks[0].kind = 'core';
+    expect(() => gen.parse(JSON.stringify(core), 25)).toThrow(
+      /partie "core" : ne renvoie que le cœur de séance/,
+    );
   });
 
   it('garde la première cotation d’une fourchette', () => {
-    const plan = structuredClone(validPlan);
-    plan.blocks[1].target = { style: 'boulder', grade: '6A+/6B' };
-    expect(gen.parse(JSON.stringify(plan), 60).blocks[1].target?.grade).toBe('6A+');
+    const core = structuredClone(validCore);
+    core.blocks[0].target = { style: 'boulder', grade: '6A+/6B' };
+    expect(gen.parse(JSON.stringify(core), 25).blocks[0].target?.grade).toBe('6A+');
   });
 
-  it('rejette des exercices rangés en gainage, sans partie "main"', () => {
-    const plan = structuredClone(validPlan);
-    plan.blocks[1] = { ...plan.blocks[1], kind: 'core', title: 'Gainage', minutes: 20 };
-    plan.blocks.push({ ...plan.blocks[1], minutes: 25 });
-    expect(() => gen.parse(JSON.stringify(plan), 60)).toThrow(/2 parties "core"/);
-    plan.blocks.pop();
-    plan.blocks[1].minutes = 45;
-    expect(() => gen.parse(JSON.stringify(plan), 60)).toThrow(/aucune partie "main"/);
-  });
-
-  it('rejette une partie "main" qui n’est pas un exercice du catalogue', () => {
-    const plan = structuredClone(validPlan);
-    plan.blocks[1].title = 'Gainage';
-    expect(() => gen.parse(JSON.stringify(plan), 60)).toThrow(
-      /« Gainage » : son titre doit être le nom d'un exercice du catalogue/,
+  it('rejette une partie qui n’est pas un format du catalogue', () => {
+    const core = structuredClone(validCore);
+    core.blocks[0].title = 'Traversée continue';
+    expect(() => gen.parse(JSON.stringify(core), 25)).toThrow(
+      /« Traversée continue » : son titre doit être le nom d'un format du catalogue/,
     );
   });
 
-  it('rejette un exercice d’un autre type que la séance', () => {
-    const plan = structuredClone(validPlan);
-    plan.blocks[1].title = 'Lancés variés';
-    expect(() => gen.parse(JSON.stringify(plan), 60)).toThrow(
-      '« Lancés variés » est un exercice de force, pas d’endurance',
+  it('rejette un format d’un autre type que la séance', () => {
+    const core = structuredClone(validCore);
+    core.blocks[0].title = 'Projets';
+    expect(() => gen.parse(JSON.stringify(core), 25)).toThrow(
+      '« Projets » est un format de force, pas d’endurance',
     );
   });
 
-  it('accepte un nom d’exercice précédé du type, avec un seul gainage', () => {
-    const plan = structuredClone(validPlan);
-    plan.blocks[1] = { ...plan.blocks[1], title: 'Endurance : 4×4', minutes: 35 };
-    plan.blocks.push({ kind: 'core', title: 'Gainage', minutes: 10, instructions: ['Planche'] });
-    expect(gen.parse(JSON.stringify(plan), 60).blocks).toHaveLength(3);
+  it('rejette fond et résistance dans la même séance', () => {
+    const core = structuredClone(validCore);
+    core.blocks = [
+      { ...core.blocks[0], minutes: 30 },
+      { ...core.blocks[0], title: 'Volume', minutes: 30 },
+    ];
+    expect(() => gen.parse(JSON.stringify(core), 60)).toThrow(/une seule filière/);
+  });
+
+  it('accepte un nom de format précédé du type', () => {
+    const core = structuredClone(validCore);
+    core.blocks[0].title = 'Endurance : 4×4';
+    expect(gen.parse(JSON.stringify(core), 25).blocks).toHaveLength(1);
+  });
+
+  it('retire vidéo et ⓘ inventés par le modèle', () => {
+    const core = structuredClone(validCore);
+    core.blocks[0].video = 'https://example.com/faux';
+    core.blocks[0].info = { why: 'faux', how: [], pitfalls: [] };
+    expect(gen.parse(JSON.stringify(core), 25).blocks[0]).not.toHaveProperty('video');
+    expect(gen.parse(JSON.stringify(core), 25).blocks[0]).not.toHaveProperty('info');
   });
 
   it('rejette une cotation inventée', () => {
-    const plan = structuredClone(validPlan);
-    plan.blocks[1].target = { style: 'boulder', grade: '6Z' };
-    expect(() => gen.parse(JSON.stringify(plan), 60)).toThrow('Cotation invalide : 6Z');
+    const core = structuredClone(validCore);
+    core.blocks[0].target = { style: 'boulder', grade: '6Z' };
+    expect(() => gen.parse(JSON.stringify(core), 25)).toThrow('Cotation invalide : 6Z');
   });
 });
 
 describe('MistralGenerator.generate', () => {
   const ctx = { availableMinutes: 60, now, history: [] };
+  const okResponse = (content: unknown) =>
+    ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        choices: [
+          { message: { content: typeof content === 'string' ? content : JSON.stringify(content) } },
+        ],
+      }),
+    }) as Response;
 
   it('appelle l’API chat/completions en mode JSON', async () => {
-    const fetchMock = mockFetch({ content: JSON.stringify(validPlan) });
-    await expect(makeGenerator().generate(ctx)).resolves.toEqual(validPlan);
+    const fetchMock = mockFetch({ content: JSON.stringify(validCore) });
+    await makeGenerator().generate(ctx);
 
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe('https://api.mistral.ai/v1/chat/completions');
@@ -166,59 +195,64 @@ describe('MistralGenerator.generate', () => {
     });
   });
 
-  it('impose le format des consignes : volume, objectif, gestes, repère, repos', async () => {
-    const fetchMock = mockFetch({ content: JSON.stringify(validPlan) });
+  it('complète le cœur de Mistral avec l’échauffement, le bonus, le gainage et le calme', async () => {
+    mockFetch({ content: JSON.stringify(validCore) });
+    const plan = await makeGenerator().generate({ ...ctx, equipment: ['hangboard'] });
+    expect(PlanSchema.safeParse(plan).success).toBe(true);
+    expect(planFitsTime(plan, 60)).toBe(true);
+    expect(plan).toMatchObject({ focus: 'endurance', summary: validCore.summary });
+    expect(plan.blocks.map((b) => b.kind)).toEqual([
+      'warmup',
+      'main',
+      'bonus',
+      'bonus',
+      'core',
+      'cooldown',
+    ]);
+    expect(plan.blocks[1]).toEqual(validCore.blocks[0]);
+    expect(plan.blocks[2].title).toBe('Répétitions 7/3');
+    // L'échauffement suit le type choisi par Mistral
+    expect(plan.blocks[0].instructions.join(' ')).toContain('Puis un bloc par couleur');
+  });
+
+  it('ne demande que le cœur de séance, en consignes courtes', async () => {
+    const fetchMock = mockFetch({ content: JSON.stringify(validCore) });
     await makeGenerator().generate(ctx);
     const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string);
     const system: string = body.messages[0].content;
-    expect(system).toContain('Format des consignes');
-    expect(system).toContain('"Objectif : …"');
-    expect(system).toContain('"Repère : …"');
-    expect(system).toContain('Le repos, en dernier');
+    expect(system).toContain("L'appli ajoute elle-même l'échauffement");
+    expect(system).toContain('1 format si le cœur dure moins de 50 min');
+    expect(system).toContain('- Volume (fond) :');
+    expect(system).not.toContain('"Repère : …"');
   });
 
   it('relance une fois Mistral avec l’erreur si la réponse est invalide', async () => {
     const fetchMock = jest
       .spyOn(global, 'fetch')
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => ({ choices: [{ message: { content: 'pas du JSON' } }] }),
-      } as Response)
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => ({ choices: [{ message: { content: JSON.stringify(validPlan) } }] }),
-      } as Response);
+      .mockResolvedValueOnce(okResponse('pas du JSON'))
+      .mockResolvedValueOnce(okResponse(validCore));
 
-    await expect(makeGenerator().generate(ctx)).resolves.toEqual(validPlan);
+    const plan = await makeGenerator().generate(ctx);
+    expect(plan.blocks[1]).toEqual(validCore.blocks[0]);
     expect(fetchMock).toHaveBeenCalledTimes(2);
     const body = JSON.parse((fetchMock.mock.calls[1][1] as RequestInit).body as string);
     expect(body.messages.at(-1).content).toContain('Réponse non JSON');
   });
 
   it('type choisi par le grimpeur : refuse puis relance une séance d’un autre type', async () => {
-    const strength: Plan = {
-      ...validPlan,
+    const strength: MistralCore = {
+      ...validCore,
       focus: 'strength',
-      blocks: [validPlan.blocks[0], { ...validPlan.blocks[1], title: 'Lancés variés' }],
+      blocks: [{ ...validCore.blocks[0], title: 'Projets' }],
     };
     const fetchMock = jest
       .spyOn(global, 'fetch')
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => ({ choices: [{ message: { content: JSON.stringify(validPlan) } }] }),
-      } as Response)
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => ({ choices: [{ message: { content: JSON.stringify(strength) } }] }),
-      } as Response);
+      .mockResolvedValueOnce(okResponse(validCore))
+      .mockResolvedValueOnce(okResponse(strength));
 
-    await expect(makeGenerator().generate({ ...ctx, requestedFocus: 'strength' })).resolves.toEqual(
-      strength,
-    );
+    const plan = await makeGenerator().generate({ ...ctx, requestedFocus: 'strength' });
+    expect(plan.focus).toBe('strength');
+    expect(plan.blocks[1].title).toBe('Projets');
     const body = JSON.parse((fetchMock.mock.calls[1][1] as RequestInit).body as string);
     expect(body.messages.at(-1).content).toContain('le type choisi par le grimpeur');
   });
@@ -230,11 +264,6 @@ describe('MistralGenerator.generate', () => {
   });
 
   it('retente après un HTTP 429 en respectant Retry-After', async () => {
-    const ok = {
-      ok: true,
-      status: 200,
-      json: async () => ({ choices: [{ message: { content: JSON.stringify(validPlan) } }] }),
-    } as Response;
     const tooMany = {
       ok: false,
       status: 429,
@@ -244,8 +273,8 @@ describe('MistralGenerator.generate', () => {
     const fetchSpy = jest
       .spyOn(global, 'fetch')
       .mockResolvedValueOnce(tooMany)
-      .mockResolvedValueOnce(ok);
-    await expect(makeGenerator().generate(ctx)).resolves.toEqual(validPlan);
+      .mockResolvedValueOnce(okResponse(validCore));
+    await expect(makeGenerator().generate(ctx)).resolves.toMatchObject({ focus: 'endurance' });
     expect(fetchSpy).toHaveBeenCalledTimes(2);
   });
 
@@ -307,19 +336,29 @@ describe('MistralGenerator.generate', () => {
 });
 
 describe('MistralGenerator.buildUserPrompt', () => {
-  it('donne les points faibles, ce qu’il aime et les exercices proposés par les règles', () => {
+  it('donne les points faibles, ce qu’il aime et les formats proposés par les règles', () => {
     const prompt = makeGenerator().buildUserPrompt({
       availableMinutes: 90,
       now,
       history: [],
       weakPoints: ['footwork'],
-      likedPoints: ['coordination'],
+      likedPoints: ['reading'],
     });
     expect(prompt).toContain('Points faibles : placement des pieds.');
-    expect(prompt).toContain("Ce qu'il aime faire : coordination.");
+    expect(prompt).toContain("Ce qu'il aime faire : lecture des blocs et blocs à vue.");
     expect(prompt).toMatch(
-      /Exercices proposés par les règles, dans l'ordre : .+ \(point faible\), .+, .+ \(ce qu’il aime\)\./,
+      /Formats proposés par les règles, dans l'ordre : .+ \(25 min\) \(point faible\), .+ \(25 min\) \(ce qu’il aime\)\./,
     );
+  });
+
+  it('demande un bloc dans le type de prise à travailler', () => {
+    const prompt = makeGenerator().buildUserPrompt({
+      availableMinutes: 90,
+      now,
+      history: [],
+      weakPoints: ['slopers', 'footwork'],
+    });
+    expect(prompt).toContain('« Prends-en un en plats si la salle en a »');
   });
 
   it('donne l’objectif, et impose le type choisi pour aujourd’hui', () => {
@@ -349,26 +388,14 @@ describe('MistralGenerator.buildUserPrompt', () => {
         }),
       ],
     });
-    expect(prompt).toContain("Temps dispo aujourd'hui : 90 min");
-    expect(prompt).toContain('Meilleure réussite récente : 6C');
+    expect(prompt).toContain(
+      "Temps dispo aujourd'hui : 90 min, dont 50 min de cœur de séance : 2 formats.",
+    );
+    expect(prompt).toContain('Niveau stable : 6C');
     expect(prompt).toContain('focus endurance');
     expect(prompt).toContain('7A (échec, 1 essai)');
     expect(prompt).toContain('doigts un peu tendus');
-  });
-
-  it('liste le matériel coché, ou précise qu’il n’y en a pas', () => {
-    const gen = makeGenerator();
-    expect(
-      gen.buildUserPrompt({
-        availableMinutes: 60,
-        now,
-        history: [],
-        equipment: ['elastic', 'hangboard'],
-      }),
-    ).toContain('Matériel disponible : élastique, poutre.');
-    expect(gen.buildUserPrompt({ availableMinutes: 60, now, history: [] })).toContain(
-      'Matériel disponible : aucun',
-    );
+    expect(prompt).not.toContain('Matériel');
   });
 
   it('signale une douleur notée récemment dans la proposition', () => {

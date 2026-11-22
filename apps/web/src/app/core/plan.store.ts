@@ -1,5 +1,5 @@
 import { Injectable, signal } from '@angular/core';
-import { Focus, GeneratedPlan } from './models';
+import { Cue, Focus, GeneratedPlan } from './models';
 
 const KEY = 'climb-coach.plan';
 
@@ -48,6 +48,14 @@ export class PlanStore {
     this.plan.set(plan);
     this.startedAt.set(null);
     this.timer.set(null);
+    this.persist();
+  }
+
+  /** Consigne du jour changée : la séance garde tout le reste, minuteur compris. */
+  setCue(cue: Cue): void {
+    const current = this.plan();
+    if (!current) return;
+    this.plan.set({ ...current, plan: { ...current.plan, cue } });
     this.persist();
   }
 

@@ -1,5 +1,5 @@
 import { EXAMPLE_GYMS } from '@climb-coach/grades';
-import { schedulePlans } from '../db/schema';
+import { schedulePlans, sessions as sessionsTable, users } from '../db/schema';
 import { GymsService } from '../gyms/gyms.service';
 import { SessionsService } from '../sessions/sessions.service';
 import { MistralError, MistralGenerator } from './mistral.generator';
@@ -18,7 +18,7 @@ const mistralPlan: Plan = {
   summary: 'Plan Mistral',
   blocks: [
     { kind: 'warmup', title: 'Échauffement', minutes: 15, instructions: ['Mobilité'] },
-    { kind: 'main', title: 'Technique', minutes: 45, instructions: ['Pieds silencieux'] },
+    { kind: 'main', title: 'Flash', minutes: 45, instructions: ['5 blocs en 6A'] },
   ],
 };
 
@@ -27,14 +27,21 @@ function setup({
   mistral,
   advise,
   level = null,
+  cue = { cue: null, since: 0 },
+  sessionCount = 0,
 }: {
   enabled: boolean;
+  /** Consigne du jour enregistrée pour le compte. */
+  cue?: { cue: string | null; since: number };
+  /** Nombre de séances du compte. */
+  sessionCount?: number;
   mistral?: () => Promise<Plan>;
   advise?: () => Promise<MonthPlan>;
   /** Niveau stable déclaré par le compte dans la salle. */
   level?: string | null;
 }) {
   const inserted: unknown[] = [];
+  const cueRow = { ...cue };
   /** Plannings enregistrés (table schedule_plans), par compte. */
   const savedPlans = new Map<string, Record<string, unknown>>();
   const db = {
@@ -52,7 +59,23 @@ function setup({
       },
     }),
     // Un seul compte dans ces tests : on renvoie le plan enregistré, s'il existe
-    select: () => ({ from: () => ({ where: async () => [...savedPlans.values()] }) }),
+    select: () => ({
+      from: (table: unknown) => ({
+        where: async () =>
+          table === users
+            ? [cueRow]
+            : table === sessionsTable
+              ? [{ n: sessionCount }]
+              : [...savedPlans.values()],
+      }),
+    }),
+    update: (table: unknown) => ({
+      set: (v: { cue: string; cueSince: number }) => ({
+        where: async () => {
+          if (table === users) Object.assign(cueRow, { cue: v.cue, since: v.cueSince });
+        },
+      }),
+    }),
   };
   const sessions = {
     findRecent: jest.fn().mockResolvedValue([]),
@@ -83,7 +106,17 @@ function setup({
     gyms,
     advisor,
   );
-  return { service, inserted, mistralGen, rulesSpy, sessions, advisor, savedPlans, gyms };
+  return {
+    service,
+    inserted,
+    mistralGen,
+    rulesSpy,
+    sessions,
+    advisor,
+    savedPlans,
+    gyms,
+    cueRow,
+  };
 }
 
 describe('PlansService.generate', () => {
@@ -91,33 +124,60 @@ describe('PlansService.generate', () => {
     const { service, rulesSpy, inserted } = setup({ enabled: true });
     const result = await service.generate('u1', 60);
 
-    expect(result).toMatchObject({ source: 'mistral', plan: mistralPlan });
+    expect(result).toMatchObject({ source: 'mistral', plan: { summary: 'Plan Mistral' } });
     expect(result.fallbackReason).toBeUndefined();
     expect(rulesSpy).not.toHaveBeenCalled();
     expect(inserted).toEqual([
-      { userId: 'u1', availableMinutes: 60, source: 'mistral', plan: mistralPlan },
+      { userId: 'u1', availableMinutes: 60, source: 'mistral', plan: result.plan },
     ]);
   });
 
-  it('ajoute la vidéo de chaque exercice du cœur de séance, Mistral comme règles', async () => {
-    const named = setup({
-      enabled: true,
-      mistral: async () => ({
-        ...mistralPlan,
-        blocks: [
-          mistralPlan.blocks[0],
-          { kind: 'main', title: 'Pieds silencieux', minutes: 45, instructions: ['Sans bruit'] },
-        ],
-      }),
-    });
-    const fromMistral = await named.service.generate('u1', 60);
+  it('ajoute vidéo et ⓘ à chaque format du cœur de séance, Mistral comme règles', async () => {
+    const fromMistral = await setup({ enabled: true }).service.generate('u1', 60);
     expect(fromMistral.plan.blocks[0].video).toBeUndefined();
     expect(fromMistral.plan.blocks[1].video).toMatch(/^https:\/\/www\.youtube\.com\//);
+    expect(fromMistral.plan.blocks[1].info?.how.length).toBeGreaterThan(0);
 
     const fromRules = await setup({ enabled: false }).service.generate('u1', 90);
     const mains = fromRules.plan.blocks.filter((b) => b.kind === 'main');
     expect(mains.length).toBeGreaterThan(0);
-    for (const b of mains) expect(b.video).toMatch(/^https:\/\/www\.youtube\.com\//);
+    for (const b of mains) {
+      expect(b.video).toMatch(/^https:\/\/www\.youtube\.com\//);
+      expect(b.info).toBeDefined();
+    }
+  });
+
+  describe('consigne du jour', () => {
+    it('la première est choisie d’après les points faibles et enregistrée', async () => {
+      const { service, cueRow } = setup({ enabled: false, sessionCount: 4 });
+      const result = await service.generate('u1', 60, undefined, [], { weakPoints: ['hips'] });
+      expect(result.plan.cue).toMatchObject({
+        id: 'straight-arms',
+        text: 'Bras tendus dès que possible',
+      });
+      expect(result.plan.cue?.info?.how.length).toBeGreaterThan(0);
+      expect(cueRow).toEqual({ cue: 'straight-arms', since: 4 });
+    });
+
+    it('reste la même pendant 10 séances, puis change', async () => {
+      const kept = setup({ enabled: false, cue: { cue: 'slow', since: 2 }, sessionCount: 11 });
+      expect((await kept.service.generate('u1', 60)).plan.cue?.id).toBe('slow');
+      expect(kept.cueRow).toEqual({ cue: 'slow', since: 2 });
+
+      const changed = setup({ enabled: false, cue: { cue: 'slow', since: 2 }, sessionCount: 12 });
+      expect((await changed.service.generate('u1', 60)).plan.cue?.id).toBe('downclimb');
+      expect(changed.cueRow).toEqual({ cue: 'downclimb', since: 12 });
+    });
+
+    it('« Changer » passe à la suivante, pour 10 nouvelles séances', async () => {
+      const { service, cueRow } = setup({
+        enabled: false,
+        cue: { cue: 'slow', since: 2 },
+        sessionCount: 5,
+      });
+      await expect(service.changeCue('u1')).resolves.toMatchObject({ id: 'downclimb' });
+      expect(cueRow).toEqual({ cue: 'downclimb', since: 5 });
+    });
   });
 
   it('retombe sur les règles si Mistral échoue, en gardant la raison', async () => {
@@ -209,9 +269,9 @@ describe('PlansService.generate', () => {
 
   it('passe le matériel du profil au générateur', async () => {
     const { service, mistralGen } = setup({ enabled: true });
-    await service.generate('u1', 60, undefined, ['elastic', 'ball']);
+    await service.generate('u1', 60, undefined, ['elastic', 'hangboard']);
     expect(mistralGen.generate).toHaveBeenCalledWith(
-      expect.objectContaining({ equipment: ['elastic', 'ball'] }),
+      expect.objectContaining({ equipment: ['elastic', 'hangboard'] }),
     );
   });
 

@@ -22,7 +22,7 @@ export const users = pgTable('users', {
   username: text('username').notNull().unique(),
   /** Rythme visé, utilisé pour espacer les séances du planning. */
   sessionsPerWeek: smallint('sessions_per_week').notNull().default(3),
-  /** Matériel disponible (élastique, balle, poutre…), coché dans le profil. */
+  /** Matériel disponible à la salle ou chez soi (élastique, poutre, barre), coché dans le profil. */
   equipment: text('equipment').array().notNull().default(['elastic']),
   /** Points faibles cochés dans le profil (réglettes, dalle, peur de la chute…). */
   weakPoints: text('weak_points').array().notNull().default([]),
@@ -30,6 +30,10 @@ export const users = pgTable('users', {
   likedPoints: text('liked_points').array().notNull().default([]),
   /** Objectif d'entraînement : son type de séance revient environ une fois sur deux (null : aucun). */
   focusGoal: sessionFocus('focus_goal'),
+  /** Consigne du jour en cours (null : aucune encore), gardée 10 séances. */
+  cue: text('cue'),
+  /** Nombre de séances du compte quand la consigne a été choisie. */
+  cueSince: integer('cue_since').notNull().default(0),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 

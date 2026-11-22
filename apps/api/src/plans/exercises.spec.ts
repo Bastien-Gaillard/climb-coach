@@ -1,355 +1,224 @@
-import { ADVANCED_LEVEL, catalogForPrompt, EXERCISES, pickExercises } from './exercises';
+import { CLIMBING_POINTS } from '../auth/climbing-points';
+import { catalogForPrompt, EXERCISES, formatsFor, pickExercises } from './exercises';
 
 const grade = (v: number) => `G${v}`;
+const byId = (id: string) => EXERCISES.find((e) => e.id === id)!;
+const build = (id: string, minutes: number, extra = {}) =>
+  byId(id).build({ maxSent: 6, project: 8, light: 0, minutes, grade, ...extra });
 
-describe('catalogue d’exercices', () => {
-  it('chaque exercice se rédige pour tous les niveaux et toutes les durées utiles', () => {
+describe('catalogue des formats', () => {
+  it('14 formats : 4 de force, 6 d’endurance, 4 de technique, ids uniques', () => {
+    expect(EXERCISES).toHaveLength(14);
+    expect(new Set(EXERCISES.map((e) => e.id)).size).toBe(EXERCISES.length);
+    const count = (f: string) => EXERCISES.filter((e) => e.focus === f).length;
+    expect([count('strength'), count('endurance'), count('technique')]).toEqual([4, 6, 4]);
+  });
+
+  it('chaque format se rédige pour toutes les durées utiles, en lignes courtes', () => {
     for (const e of EXERCISES) {
-      for (const minutes of [e.minMinutes, 20, 40, 70]) {
-        const b = e.build({ maxSent: 6, project: 7, light: 0, minutes, grade });
-        expect(b.title.length).toBeGreaterThan(0);
-        expect(b.instructions.length).toBeGreaterThanOrEqual(1);
-        expect(b.instructions.every((i) => i.length > 10 && i.length <= 300)).toBe(true);
+      for (const minutes of [e.minMinutes, 30, 45, e.maxMinutes ?? 80]) {
+        const b = e.build({ maxSent: 6, project: 8, light: 0, minutes, grade });
+        expect(b.title).toBe(e.name);
+        expect(b.instructions.length).toBeGreaterThanOrEqual(2);
+        expect(b.instructions.length).toBeLessThanOrEqual(6);
+        expect(b.instructions.every((i) => i.length > 5 && i.length <= 150)).toBe(true);
+        expect(b.instructions.join(' ')).not.toMatch(/undefined|NaN/);
       }
     }
   });
 
-  it('ids uniques, les trois types couverts', () => {
-    expect(new Set(EXERCISES.map((e) => e.id)).size).toBe(EXERCISES.length);
-    for (const f of ['technique', 'endurance', 'strength'] as const) {
-      expect(EXERCISES.filter((e) => e.focus === f).length).toBeGreaterThanOrEqual(5);
+  it('chaque format a son ⓘ (pourquoi, comment, pièges) et une vidéo', () => {
+    for (const e of EXERCISES) {
+      expect(e.info.why.length).toBeGreaterThan(10);
+      expect(e.info.how.length).toBeGreaterThanOrEqual(1);
+      expect(e.info.pitfalls.length).toBeGreaterThanOrEqual(1);
+      expect(e.video).toMatch(/^https:\/\/www\.youtube\.com\//);
     }
   });
 
-  it('vrai 4×4 : 4 blocs enchaînés par série, nombre de séries selon le temps', () => {
-    const fourByFour = EXERCISES.find((e) => e.id === '4x4')!;
-    const sets = (minutes: number) =>
-      fourByFour.build({ maxSent: 6, project: 7, light: 0, minutes, grade }).title;
-    expect(sets(15)).toBe('4×4 · 2 séries');
-    expect(sets(30)).toBe('4×4 · 4 séries');
-    expect(sets(60)).toBe('4×4 · 5 séries');
-    const text = fourByFour
-      .build({ maxSent: 6, project: 7, light: 0, minutes: 30, grade })
-      .instructions.join(' ');
-    expect(text).toContain('une série = enchaîner les 4 blocs sans pause');
-    expect(text).toContain('Repos 3 min entre les séries');
+  it('chaque format dit quels points du profil il travaille', () => {
+    for (const e of EXERCISES) {
+      expect(e.points.length).toBeGreaterThan(0);
+      expect(e.points.every((p) => (CLIMBING_POINTS as readonly string[]).includes(p))).toBe(true);
+    }
   });
 
-  it('4×4 et sans les pieds : une seule fiche, deux variantes qui alternent', () => {
-    const titles = (id: string) =>
-      [0, 1].map(
-        (variant) =>
-          EXERCISES.find((e) => e.id === id)!.build({
-            maxSent: 6,
-            project: 7,
-            light: 0,
-            minutes: 30,
-            grade,
-            variant,
-          }).title,
-      );
-    expect(titles('4x4')).toEqual(['4×4 · 4 séries', '4×4 sur un même bloc · 4 séries']);
-    expect(titles('no-feet')).toEqual(['Sans les pieds', 'Sans les pieds (protocole) · 3 séries']);
-    expect(EXERCISES.map((e) => e.id)).not.toContain('4x4-same');
-    expect(EXERCISES.map((e) => e.id)).not.toContain('boulder-campus');
-  });
-
-  it('chaque exercice d’endurance dit sa filière, et seulement eux', () => {
+  it('seuls les formats d’endurance ont une filière', () => {
     for (const e of EXERCISES) expect(!!e.energy).toBe(e.focus === 'endurance');
-    expect(EXERCISES.find((e) => e.id === '4x4')!.energy).toBe('resistance');
-    expect(EXERCISES.find((e) => e.id === 'continuous-traverse')!.energy).toBe('fond');
+    expect(EXERCISES.filter((e) => e.energy === 'fond').map((e) => e.id)).toEqual([
+      'volume',
+      'emom',
+    ]);
   });
 
-  it('résumé et consigne du 30/30 donnent le même repos', () => {
-    const e = EXERCISES.find((x) => x.id === 'intervals-30-30')!;
-    expect(e.summary).toContain('5 min de repos entre les séries');
-    const lines = e.build({ maxSent: 6, project: 7, light: 0, minutes: 30, grade }).instructions;
-    expect(lines[lines.length - 1]).toBe('Repos 5 min entre les séries');
+  it('projets : la couleur au-dessus, et un bloc dans le type de prise à travailler', () => {
+    const b = build('projects', 30, { grips: 'plats' });
+    expect(b.target).toBe(8);
+    expect(b.instructions[0]).toBe('3 blocs en G8');
+    expect(b.instructions).toContain('Prends-en un en plats si la salle en a');
+    expect(build('projects', 40).instructions[0]).toBe('4 blocs en G8');
   });
 
-  it('le drapeau est expliqué clairement', () => {
-    const flag = EXERCISES.find((e) => e.id === 'flag')!;
-    const text = flag
-      .build({ maxSent: 6, project: 7, light: 0, minutes: 20, grade })
-      .instructions.join(' ');
-    expect(text).toContain('Tends l’autre jambe sur le côté');
+  it('3 essais max : la moitié à son niveau, la moitié au-dessus', () => {
+    expect(build('three-tries', 30).instructions.slice(0, 2)).toEqual([
+      '3 blocs en G6',
+      '3 blocs en G8',
+    ]);
+    const same = byId('three-tries').build({
+      maxSent: 6,
+      project: 6,
+      light: 0,
+      minutes: 30,
+      grade,
+    });
+    expect(same.instructions[0]).toBe('6 blocs en G6');
+    expect(same.instructions[1]).toBe('3 essais max par bloc : raté au 3e, tu passes au suivant');
+  });
+
+  it('un bloc par minute : mélange des deux couleurs sous le niveau, jamais plus de 25 min', () => {
+    const b = build('emom', 40);
+    expect(b.instructions.slice(0, 2)).toEqual(['4 blocs en G2', '3 blocs en G4']);
+    expect(b.instructions.join(' ')).toContain('pendant 25 min');
+    expect(byId('emom').maxMinutes).toBe(25);
+  });
+
+  it('vrai 4×4 : 4 blocs enchaînés par série, séries selon le temps', () => {
+    expect(build('4x4', 15).instructions).toEqual([
+      '4 blocs en G4',
+      'Série = les 4 blocs enchaînés sans pause',
+      '2 séries, repos 3 min entre les séries',
+    ]);
+    expect(build('4x4', 60).instructions[2]).toBe('5 séries, repos 3 min entre les séries');
+  });
+
+  it('pyramide : 2 tours seulement à partir d’une heure', () => {
+    expect(build('pyramid', 30).instructions.join(' ')).not.toContain('2 tours');
+    expect(build('pyramid', 60).instructions).toContain('2 tours, repos 12 min entre les tours');
+  });
+
+  it('la séance légère baisse les cotations d’un cran', () => {
+    const b = byId('volume').build({ maxSent: 6, project: 8, light: 1, minutes: 30, grade });
+    expect(b.instructions[0]).toBe('15 blocs en G3');
   });
 });
 
 describe('pickExercises', () => {
-  const base = { focus: 'endurance' as const, maxSent: 6, careful: false, seed: 0 };
+  const base = { careful: false, seed: 0 };
 
-  it('1 exercice si c’est court, jusqu’à 3 sinon, et le temps tombe juste', () => {
-    for (const minutes of [12, 20, 33, 45, 70, 100]) {
-      const picks = pickExercises({ ...base, minutes });
-      expect(picks.reduce((s, p) => s + p.minutes, 0)).toBe(minutes);
-      expect(new Set(picks.map((p) => p.exercise.id)).size).toBe(picks.length);
+  it('1 format sous 50 min, 2 au-delà, et le temps tombe juste', () => {
+    expect(formatsFor(49)).toBe(1);
+    expect(formatsFor(50)).toBe(2);
+    for (const focus of ['strength', 'endurance', 'technique'] as const) {
+      for (const minutes of [15, 25, 35, 50, 65, 80]) {
+        for (let seed = 0; seed < 6; seed++) {
+          const picks = pickExercises({ ...base, focus, minutes, seed });
+          expect(picks.length).toBe(formatsFor(minutes));
+          expect(picks.reduce((s, p) => s + p.minutes, 0)).toBe(minutes);
+          expect(new Set(picks.map((p) => p.exercise.id)).size).toBe(picks.length);
+          for (const p of picks) expect(p.exercise.focus).toBe(focus);
+        }
+      }
     }
-    expect(pickExercises({ ...base, minutes: 20 })).toHaveLength(1);
-    expect(pickExercises({ ...base, minutes: 33 })).toHaveLength(2);
-    expect(pickExercises({ ...base, minutes: 70 })).toHaveLength(3);
+  });
+
+  it('respecte la durée max d’un format (un bloc par minute : 25 min)', () => {
+    for (let seed = 0; seed < 12; seed++) {
+      for (const minutes of [30, 40, 60, 80]) {
+        const picks = pickExercises({ ...base, focus: 'endurance', minutes, seed });
+        for (const p of picks) {
+          if (p.exercise.maxMinutes) expect(p.minutes).toBeLessThanOrEqual(p.exercise.maxMinutes);
+        }
+      }
+    }
   });
 
   it('varie selon le jour', () => {
     const ids = new Set(
-      [0, 1, 2, 3, 4].map((seed) => pickExercises({ ...base, minutes: 20, seed })[0].exercise.id),
+      [0, 1, 2, 3].map(
+        (seed) => pickExercises({ ...base, focus: 'technique', minutes: 30, seed })[0].exercise.id,
+      ),
     );
-    expect(ids.size).toBeGreaterThan(3);
+    expect(ids.size).toBeGreaterThan(2);
   });
 
-  it('en force, commence par le bloc au max', () => {
-    for (const seed of [0, 1, 2, 3]) {
-      const picks = pickExercises({ ...base, focus: 'strength', minutes: 33, seed });
-      expect(picks[0].exercise.id).toBe('limit');
+  it('en force sans point faible, les projets passent d’abord', () => {
+    for (let seed = 0; seed < 6; seed++) {
+      const picks = pickExercises({ ...base, focus: 'strength', minutes: 60, seed });
+      expect(picks[0].exercise.id).toBe('projects');
     }
   });
 
-  it('sans les pieds et à un bras : seulement pour les confirmés, jamais avec une douleur', () => {
-    const ids = (maxSent: number, careful: boolean) =>
-      [0, 1, 2, 3, 4, 5, 6].flatMap((seed) =>
-        pickExercises({ focus: 'strength', minutes: 70, maxSent, careful, seed }).map(
-          (p) => p.exercise.id,
-        ),
-      );
-    expect(ids(ADVANCED_LEVEL - 1, false)).not.toContain('no-feet');
-    expect(ids(ADVANCED_LEVEL + 2, false)).toContain('no-feet');
-    expect(ids(ADVANCED_LEVEL + 2, true)).not.toContain('no-feet');
-    expect(ids(ADVANCED_LEVEL + 2, true)).not.toContain('power');
-  });
-});
-
-describe('filières d’endurance', () => {
-  const energies = (o: Partial<Parameters<typeof pickExercises>[0]>) =>
-    Array.from({ length: 30 }, (_, seed) =>
-      pickExercises({
-        focus: 'endurance',
-        minutes: 70,
-        maxSent: 6,
-        careful: false,
-        seed,
-        ...o,
-      }).map((p) => p.exercise.energy),
+  it('la séance de travail ne sort qu’une séance de force sur trois', () => {
+    const seeds = [0, 1, 2, 3, 4, 5].filter((seed) =>
+      pickExercises({ ...base, focus: 'strength', minutes: 80, seed }).some(
+        (p) => p.exercise.id === 'work-session',
+      ),
     );
+    expect(seeds.every((s) => s % 3 === 0)).toBe(true);
+  });
 
-  it('ne mélange jamais fond et résistance dans une séance', () => {
-    const sessions = [
-      ...energies({}),
-      ...energies({ minutes: 33 }),
-      ...energies({ weakPoints: ['volume'] }),
-      ...energies({ likedPoints: ['resistance'] }),
-      ...energies({ weakPoints: ['recovery'], likedPoints: ['volume'] }),
-    ];
-    for (const s of sessions) expect(new Set(s).size).toBe(1);
-    // Les deux filières sortent selon les jours
-    expect(new Set(energies({}).map((s) => s[0])).size).toBe(2);
+  it('mode prudent : ni circuit dur ni séance de travail', () => {
+    for (let seed = 0; seed < 12; seed++) {
+      const picks = pickExercises({ focus: 'strength', minutes: 80, careful: true, seed });
+      expect(picks.some((p) => p.exercise.stressful)).toBe(false);
+    }
+  });
+
+  it('ne mélange jamais fond et résistance', () => {
+    for (let seed = 0; seed < 12; seed++) {
+      const picks = pickExercises({ ...base, focus: 'endurance', minutes: 70, seed });
+      expect(new Set(picks.map((p) => p.exercise.energy)).size).toBe(1);
+    }
+  });
+
+  it('au plus un format sur un point faible, en premier ; un format aimé, en dernier', () => {
+    const picks = pickExercises({
+      ...base,
+      focus: 'technique',
+      minutes: 60,
+      weakPoints: ['reading'],
+      likedPoints: ['slab'],
+    });
+    expect(picks[0]).toMatchObject({ role: 'weak', points: ['reading'] });
+    expect(picks[1]).toMatchObject({ role: 'liked', points: ['slab'] });
+  });
+
+  it('un seul format : point faible et plaisir chacun leur tour', () => {
+    const roles = [0, 1].map(
+      (seed) =>
+        pickExercises({
+          ...base,
+          seed,
+          focus: 'technique',
+          minutes: 30,
+          weakPoints: ['reading'],
+          likedPoints: ['slab'],
+        })[0].role,
+    );
+    expect(new Set(roles)).toEqual(new Set(['weak', 'liked']));
   });
 
   it('la filière suit le point faible', () => {
-    for (const seed of [0, 1, 2, 3, 4]) {
+    for (let seed = 0; seed < 6; seed++) {
       const picks = pickExercises({
-        focus: 'endurance',
-        minutes: 70,
-        maxSent: 6,
-        careful: false,
+        ...base,
         seed,
-        weakPoints: ['volume'],
+        focus: 'endurance',
+        minutes: 60,
+        weakPoints: ['resistance'],
       });
-      expect(picks[0].role).toBe('weak');
-      expect(picks.every((p) => p.exercise.energy === picks[0].exercise.energy)).toBe(true);
+      expect(picks.every((p) => p.exercise.energy === 'resistance')).toBe(true);
     }
-  });
-});
-
-describe('mode prudent en force', () => {
-  it('bloc au max, blocages et intervalles de force sont marqués éprouvants', () => {
-    for (const id of ['limit', 'lock-offs', 'strength-intervals'])
-      expect(EXERCISES.find((e) => e.id === id)!.stressful).toBe(true);
-    const careful = Array.from({ length: 20 }, (_, seed) =>
-      pickExercises({ focus: 'strength', minutes: 70, maxSent: 6, careful: true, seed }),
-    ).flat();
-    expect(careful.map((p) => p.exercise.id)).not.toContain('limit');
-    expect(careful.every((p) => !p.exercise.stressful)).toBe(true);
-  });
-
-  it('le catalogue de Mistral le dit', () => {
-    const line = catalogForPrompt()
-      .split('\n')
-      .find((l) => l.startsWith('- Bloc au max :'))!;
-    expect(line).toContain('(jamais en cas de douleur)');
-    expect(catalogForPrompt()).toContain('- 4×4 (résistance) :');
-    expect(catalogForPrompt()).toContain('- Traversée continue (fond) :');
-  });
-});
-
-describe('exercices des points faibles', () => {
-  const ids = (focus: 'technique' | 'strength', careful: boolean, maxSent = 6) =>
-    Array.from({ length: 40 }, (_, seed) =>
-      pickExercises({ focus, minutes: 70, maxSent, careful, seed }).map((p) => p.exercise.id),
-    ).flat();
-
-  it('chutes, lancés et blocs au max ne sortent jamais en mode prudent', () => {
-    const careful = [...ids('technique', true), ...ids('strength', true)];
-    for (const id of [
-      'fall-practice',
-      'rapid-fire',
-      'build-the-move',
-      'grip-limit',
-      'compression',
-      'varied-dynos',
-      'fall-in-move',
-    ]) {
-      expect(careful).not.toContain(id);
-    }
-  });
-
-  it('la tension en dévers est accessible sous le 6C', () => {
-    expect(ids('strength', false, ADVANCED_LEVEL - 2)).toContain('steep-poor-feet');
-    expect(ids('strength', true, ADVANCED_LEVEL - 2)).toContain('steep-poor-feet');
-  });
-
-  it('les chutes volontaires partent bas et restent sous la mi-hauteur', () => {
-    const text = EXERCISES.find((e) => e.id === 'fall-practice')!
-      .build({ maxSent: 6, project: 7, light: 0, minutes: 15, grade })
-      .instructions.join(' ');
-    expect(text).toContain('50 cm du sol');
-    expect(text).toContain('mi-hauteur');
-    expect(text).toContain('sans regarder en bas');
-  });
-
-  it('tour des inclinaisons : un bloc par inclinaison et par tour', () => {
-    const first = (minutes: number) =>
-      EXERCISES.find((e) => e.id === 'wall-tour')!.build({
-        maxSent: 6,
-        project: 7,
-        light: 0,
-        minutes,
-        grade,
-      }).instructions[0];
-    expect(first(10)).toBe('3 blocs en G4, 1 passage par bloc');
-    expect(first(30)).toBe('9 blocs en G4, 1 passage par bloc');
   });
 });
 
 describe('catalogForPrompt', () => {
-  it('liste les exercices par type, avec les précautions', () => {
+  it('liste les formats par type, avec durées, filière et précautions', () => {
     const text = catalogForPrompt();
-    expect(text).toContain('Technique :');
-    expect(text).toContain('- Équilibre sans les mains');
-    expect(text).toContain('- Pyramide');
-    expect(text).toContain('Sans les pieds');
-    expect(text).toContain('seulement à partir de 6C');
-    expect(text).toContain('Travaille : réglettes, plats, pinces.');
-  });
-});
-
-describe('dosage de la force', () => {
-  const build = (id: string, minutes: number) =>
-    EXERCISES.find((e) => e.id === id)!.build({ maxSent: 6, project: 7, light: 0, minutes, grade })
-      .instructions[0];
-
-  it('le bloc au max tient dans le temps (environ 4 min par essai)', () => {
-    expect(build('limit', 18)).toBe('1 bloc en G7, 4 essais max par bloc');
-    expect(build('limit', 33)).toBe('2 blocs en G7, 4 essais max par bloc');
-    expect(build('limit', 60)).toBe('4 blocs en G7, 3 essais max par bloc');
-  });
-
-  it('mouvements puissants : environ 10 min par bloc', () => {
-    expect(build('power', 15)).toMatch(/^1 bloc en G6/);
-    expect(build('power', 30)).toMatch(/^3 blocs en G6/);
-  });
-});
-
-describe('pickExercises avec le profil', () => {
-  const base = { maxSent: 6, careful: false };
-
-  it('chaque exercice dit quels points il travaille', () => {
-    expect(EXERCISES.every((e) => e.points.length > 0)).toBe(true);
-  });
-
-  it('au plus un exercice sur un point faible, en premier ; un exercice aimé, en dernier', () => {
-    for (const seed of [0, 1, 2, 3, 4, 5]) {
-      const picks = pickExercises({
-        ...base,
-        focus: 'technique',
-        minutes: 70,
-        seed,
-        weakPoints: ['footwork', 'slab'],
-        likedPoints: ['coordination'],
-      });
-      expect(picks).toHaveLength(3);
-      expect(picks.filter((p) => p.role === 'weak')).toHaveLength(1);
-      expect(picks[0].role).toBe('weak');
-      expect(picks[2].role).toBe('liked');
-      expect(picks[2].points).toEqual(['coordination']);
-      // Le reste ne travaille pas un point faible
-      expect(picks[1].exercise.points.some((p) => p === 'footwork' || p === 'slab')).toBe(false);
-      expect(picks.reduce((s, p) => s + p.minutes, 0)).toBe(70);
-    }
-  });
-
-  it('un seul exercice : point faible et plaisir chacun leur tour', () => {
-    const roles = [0, 1, 2, 3].map(
-      (seed) =>
-        pickExercises({
-          ...base,
-          focus: 'technique',
-          minutes: 20,
-          seed,
-          weakPoints: ['footwork'],
-          likedPoints: ['coordination'],
-        })[0].role,
-    );
-    expect(roles).toEqual(['weak', 'liked', 'weak', 'liked']);
-  });
-
-  it('en force avec un point faible : il passe avant le bloc au max', () => {
-    const picks = pickExercises({
-      ...base,
-      focus: 'strength',
-      minutes: 33,
-      seed: 0,
-      weakPoints: ['compression'],
-    });
-    expect(picks[0].exercise.id).toBe('compression');
-    expect(picks[0].role).toBe('weak');
-  });
-
-  it('en mode prudent, un plaisir risqué est remplacé par un plaisir sans risque', () => {
-    for (const seed of [0, 1, 2, 3]) {
-      const picks = pickExercises({
-        ...base,
-        focus: 'strength',
-        minutes: 70,
-        careful: true,
-        seed,
-        likedPoints: ['power', 'tension'],
-      });
-      expect(picks.every((p) => !p.exercise.stressful && !p.exercise.advanced)).toBe(true);
-      expect(picks[picks.length - 1].exercise.id).toBe('steep-poor-feet');
-    }
-  });
-
-  it('sans profil : rien ne change', () => {
-    const picks = pickExercises({ ...base, focus: 'strength', minutes: 33, seed: 2 });
-    expect(picks[0].exercise.id).toBe('limit');
-    expect(picks.every((p) => p.role === 'other' && p.points.length === 0)).toBe(true);
-  });
-});
-
-describe('format des consignes', () => {
-  const ctxs = [20, 70].map((minutes) => ({ maxSent: 6, project: 7, light: 0, minutes, grade }));
-
-  it('chaque exercice a un objectif et un repère, des lignes courtes', () => {
-    for (const e of EXERCISES)
-      for (const ctx of ctxs) {
-        const lines = e.build(ctx).instructions;
-        expect(lines.filter((l) => l.startsWith('Objectif : '))).toHaveLength(1);
-        expect(lines.filter((l) => l.startsWith('Repère : '))).toHaveLength(1);
-        // L'objectif vient juste après le volume, le repos ferme (s'il y en a un)
-        expect(lines[1].startsWith('Objectif : ')).toBe(true);
-        const rest = lines.filter((l) => /^Repos /.test(l));
-        if (rest.length) expect(lines[lines.length - 1]).toMatch(/^Repos /);
-        for (const l of lines) expect(l.length).toBeLessThanOrEqual(150);
-      }
+    expect(text).toContain('Force :');
+    expect(text).toContain('- Un bloc par minute (fond) :');
+    expect(text).toContain('Au moins 15 min, au plus 25.');
+    expect(text).toMatch(/Circuit dur : .*jamais en cas de douleur/);
+    for (const e of EXERCISES) expect(text).toContain(`- ${e.name}`);
   });
 });

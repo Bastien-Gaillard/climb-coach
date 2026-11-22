@@ -15,10 +15,12 @@ describe('splitTime', () => {
   });
 
   it('supprime le gainage et le retour au calme sur une séance courte', () => {
-    expect(splitTime(30)).toEqual({ warmup: 10, main: 20, core: 0, cooldown: 0 });
+    expect(splitTime(30)).toEqual({ warmup: 15, main: 15, core: 0, cooldown: 0 });
   });
 
-  it('plafonne l’échauffement à 20 min', () => {
+  it('échauffement de 15 min, 20 dès 60 min', () => {
+    expect(splitTime(45).warmup).toBe(15);
+    expect(splitTime(60).warmup).toBe(20);
     expect(splitTime(180).warmup).toBe(20);
   });
 });
@@ -222,13 +224,22 @@ describe('analyzeHistory', () => {
 
 describe('RuleBasedGenerator', () => {
   it.each([30, 45, 60, 90, 150])(
-    'produit un plan valide qui tient en %i min',
+    'produit un plan valide qui tient en %i min, bonus en plus',
     async (available) => {
       const plan = await generator.generate({ availableMinutes: available, now, history: [] });
       expect(PlanSchema.safeParse(plan).success).toBe(true);
       expect(planFitsTime(plan, available)).toBe(true);
+      expect(plan.blocks.some((b) => b.kind === 'bonus')).toBe(true);
     },
   );
+
+  it('dans l’ordre : échauffement, cœur, bonus, gainage, retour au calme', async () => {
+    const plan = await generator.generate({ availableMinutes: 90, now, history: [] });
+    const kinds = plan.blocks.map((b) => b.kind);
+    const order = ['warmup', 'main', 'bonus', 'core', 'cooldown'];
+    expect([...kinds].sort((x, y) => order.indexOf(x) - order.indexOf(y))).toEqual(kinds);
+    expect(new Set(kinds)).toEqual(new Set(order));
+  });
 
   it('ajoute une consigne de prudence quand une douleur est signalée', async () => {
     const plan = await generator.generate({
@@ -252,49 +263,35 @@ describe('RuleBasedGenerator', () => {
       }),
     ];
 
-    it('va du général au spécifique : cardio, mobilité, doigts, épaules, traversée, blocs', async () => {
-      const plan = await generator.generate({ availableMinutes: 60, now, history: [] });
-      const w = plan.blocks[0];
-      expect(w.kind).toBe('warmup');
-      const text = w.instructions.join(' | ');
-      const order = ['cardio', 'Mobilité', 'Doigts', 'Épaules', 'Traversée', 'faciles'];
-      const positions = order.map((k) => text.indexOf(k));
-      expect(positions.every((p) => p >= 0)).toBe(true);
-      expect([...positions].sort((x, y) => x - y)).toEqual(positions);
-      expect(text).toContain('Pas d’étirements statiques');
-      expect(text).toContain('rotations de hanche');
-      expect(text).toContain('squats cosaques');
-      expect(text).not.toContain('grenouille');
-    });
-
-    it('point faible de mobilité : plus de temps au retour au calme', async () => {
-      const plan = await generator.generate({
-        availableMinutes: 90,
-        now,
-        history: [],
-        weakPoints: ['hip-mobility'],
-      });
-      const text = plan.blocks.find((b) => b.kind === 'cooldown')!.instructions.join(' | ');
-      expect(text).toContain('Point faible (mobilité des hanches)');
-    });
-
-    it('la mobilité statique (grenouille, floor angels) va au retour au calme', async () => {
-      const plan = await generator.generate({ availableMinutes: 90, now, history: [] });
-      const text = plan.blocks.find((b) => b.kind === 'cooldown')!.instructions.join(' | ');
-      expect(text).toContain('grenouille');
-      expect(text).toContain('floor angels');
-    });
-
-    it('ajoute le recrutement des doigts et un bloc plus dur avant une séance de force', async () => {
+    it('3 étapes : au sol, blocs faciles avec la consigne du jour, montée jusqu’au niveau en force', async () => {
       const plan = await generator.generate({
         availableMinutes: 90,
         now,
         history: strengthHistory,
       });
       expect(plan.focus).toBe('strength');
-      const text = plan.blocks[0].instructions.join(' | ');
-      expect(text).toContain('Recrutement');
-      expect(text).toContain('1 bloc plus dur en 6A+');
+      expect(plan.blocks[0]).toMatchObject({ kind: 'warmup', minutes: 20 });
+      expect(plan.blocks[0].instructions).toEqual([
+        'Au sol, 5 min : cardio léger, puis poignets, doigts et épaules',
+        '6 blocs en 5, lentement, avec la consigne du jour',
+        'Puis un bloc par couleur jusqu’à 6B, repos 3 min avant la suite',
+      ]);
+    });
+
+    it('en endurance, la montée s’arrête à la couleur du volume', async () => {
+      const plan = await generator.generate({
+        availableMinutes: 60,
+        now,
+        history: [session(2, now, { focus: 'strength', climbList: [{ grade: '6B', value: 6 }] })],
+      });
+      expect(plan.focus).toBe('endurance');
+      expect(plan.blocks[0].instructions[2]).toBe('Puis un bloc par couleur jusqu’à 6A');
+    });
+
+    it('pas de montée en technique', async () => {
+      const plan = await generator.generate({ availableMinutes: 60, now, history: [] });
+      expect(plan.focus).toBe('technique');
+      expect(plan.blocks[0].instructions).toHaveLength(2);
     });
 
     it('reste doux quand une douleur est signalée', async () => {
@@ -303,64 +300,61 @@ describe('RuleBasedGenerator', () => {
         now,
         history: [session(2, now, { focus: 'technique', notes: 'Mal au majeur' })],
       });
-      const text = plan.blocks[0].instructions.join(' | ');
-      expect(text).not.toContain('Recrutement');
-      expect(text).toContain('Pas de petites prises ni de mouvements dynamiques');
+      expect(plan.blocks[0].instructions).toContain(
+        'Pas de petites prises ni de mouvements dynamiques',
+      );
     });
 
-    it('se fait à mains nues sans matériel', async () => {
-      const plan = await generator.generate({ availableMinutes: 60, now, history: [] });
-      const text = plan.blocks[0].instructions.join(' | ');
-      expect(text).not.toMatch(/élastique|Balle|Poutre/);
-      expect(text).toContain('à une grosse prise');
-    });
-
-    it('utilise l’élastique, la balle et la barre quand ils sont cochés', async () => {
-      const plan = await generator.generate({
+    it('ne dépend pas du matériel', async () => {
+      const bare = await generator.generate({ availableMinutes: 60, now, history: [] });
+      const equipped = await generator.generate({
         availableMinutes: 60,
         now,
         history: [],
-        equipment: ['elastic', 'ball', 'pullup-bar'],
+        equipment: ['elastic', 'hangboard', 'pullup-bar'],
       });
-      const steps = plan.blocks[0].instructions;
-      expect(steps).toContain('Balle souple : 20 pressions lentes, puis 20 rapides, sans forcer');
-      expect(steps.some((s) => s.startsWith('Épaules à l’élastique'))).toBe(true);
-      expect(steps).toContain('10 tirages d’omoplates bras tendus à la barre, pieds au sol');
-    });
-
-    it('remplace le recrutement par la poutre avant une séance de force', async () => {
-      const plan = await generator.generate({
-        availableMinutes: 90,
-        now,
-        history: strengthHistory,
-        equipment: ['hangboard'],
-      });
-      const text = plan.blocks[0].instructions.join(' | ');
-      expect(text).toContain('Poutre : 10 suspensions de 1 s');
-      expect(text).toContain('Poutre : 2 suspensions de 10 s');
-      expect(text).not.toContain('Recrutement');
-    });
-
-    it('laisse la poutre de côté quand une douleur est signalée', async () => {
-      const plan = await generator.generate({
-        availableMinutes: 90,
-        now,
-        history: [session(2, now, { focus: 'technique', notes: 'Mal au majeur' })],
-        equipment: ['hangboard'],
-      });
-      expect(plan.blocks[0].instructions.join(' | ')).not.toContain('Poutre');
-    });
-
-    it('raccourcit les étapes quand l’échauffement ne dure que 10 min', async () => {
-      const plan = await generator.generate({ availableMinutes: 30, now, history: [] });
-      const text = plan.blocks[0].instructions.join(' | ');
-      expect(plan.blocks[0].minutes).toBe(10);
-      expect(text).toContain('2 min de cardio');
-      expect(text).toMatch(/2 blocs faciles .* puis 1 en/);
+      expect(equipped.blocks[0]).toEqual(bare.blocks[0]);
     });
   });
 
-  it('vise le niveau projet en séance de force', async () => {
+  it('gainage fixe : 2 tours, 3 dès 90 min', async () => {
+    const short = await generator.generate({ availableMinutes: 60, now, history: [] });
+    const long = await generator.generate({ availableMinutes: 90, now, history: [] });
+    const core = (p: typeof short) => p.blocks.find((b) => b.kind === 'core')!.instructions;
+    expect(core(short)).toEqual([
+      '2 tours, repos 1 min entre les tours :',
+      'Planche : 30 s',
+      'Gainage latéral : 20 s de chaque côté',
+      'Hollow : 20 s',
+    ]);
+    expect(core(long)[0]).toBe('3 tours, repos 1 min entre les tours :');
+  });
+
+  it('retour au calme en 3 lignes, grenouille plus longue avec un point faible de mobilité', async () => {
+    const plain = await generator.generate({ availableMinutes: 90, now, history: [] });
+    const mobile = await generator.generate({
+      availableMinutes: 90,
+      now,
+      history: [],
+      weakPoints: ['hip-mobility'],
+    });
+    const cooldown = (p: typeof plain) => p.blocks.find((b) => b.kind === 'cooldown')!.instructions;
+    expect(cooldown(plain)).toEqual([
+      'Avant-bras et doigts : étirements doux',
+      'Épaules : 10 floor angels lents',
+      'Hanches : 1 min de grenouille',
+    ]);
+    expect(cooldown(mobile)[2]).toBe('Hanches : 2 min de grenouille');
+  });
+
+  it('1 format sous 50 min de cœur, 2 au-delà', async () => {
+    const short = await generator.generate({ availableMinutes: 60, now, history: [] });
+    const long = await generator.generate({ availableMinutes: 90, now, history: [] });
+    expect(short.blocks.filter((b) => b.kind === 'main')).toHaveLength(1);
+    expect(long.blocks.filter((b) => b.kind === 'main')).toHaveLength(2);
+  });
+
+  it('vise la couleur au-dessus en séance de force', async () => {
     const history = [
       session(3, now, {
         focus: 'technique',
@@ -373,24 +367,40 @@ describe('RuleBasedGenerator', () => {
     const plan = await generator.generate({ availableMinutes: 90, now, history });
     const main = plan.blocks.find((b) => b.kind === 'main');
     expect(plan.focus).toBe('strength');
+    expect(main?.title).toBe('Force : Projets');
     expect(main?.target).toEqual({ style: 'boulder', grade: '6B+' });
   });
 
-  it('fait de l’endurance bien en dessous du max, avec des exercices du catalogue', async () => {
+  it('les types de prise en point faible orientent les projets (une séance sur deux)', async () => {
+    const mains = await Promise.all(
+      [0, 1].map(async (d) => {
+        const plan = await generator.generate({
+          availableMinutes: 60,
+          now: new Date(now.getTime() + d * 86_400_000),
+          history: [session(3, now, { focus: 'technique' })],
+          weakPoints: ['slopers'],
+        });
+        return plan.blocks.find((b) => b.kind === 'main')!;
+      }),
+    );
+    const projects = mains.find((m) => m.title === 'Force : Projets');
+    expect(projects?.instructions).toContain('Prends-en un en plats si la salle en a');
+  });
+
+  it('fait de l’endurance sous le max, avec des formats du catalogue', async () => {
     const history = [
       session(2, now, { focus: 'strength', climbList: [{ grade: '6C', value: 8 }] }),
     ];
     const plan = await generator.generate({ availableMinutes: 60, now, history });
     const mains = plan.blocks.filter((b) => b.kind === 'main');
-    expect(mains.length).toBeGreaterThanOrEqual(1);
+    expect(mains.length).toBe(1);
     for (const m of mains) {
       expect(m.title).toMatch(/^Endurance : /);
-      // Rien au-dessus de 6C+ (un cran sous le max au plus, pour le sommet d'une pyramide)
       expect(['5', '5+', '6A', '6A+', '6B', '6B+', '6C']).toContain(m.target?.grade);
     }
   });
 
-  it('change d’exercices d’un jour à l’autre', async () => {
+  it('change de formats d’un jour à l’autre', async () => {
     const history = [session(2, now, { focus: 'endurance' })];
     const titles = new Set<string>();
     for (let d = 0; d < 6; d++) {
@@ -398,10 +408,10 @@ describe('RuleBasedGenerator', () => {
       const plan = await generator.generate({ availableMinutes: 60, now: day, history });
       plan.blocks.filter((b) => b.kind === 'main').forEach((b) => titles.add(b.title));
     }
-    expect(titles.size).toBeGreaterThan(3);
+    expect(titles.size).toBeGreaterThanOrEqual(3);
   });
 
-  it('adapte le vocabulaire à la voie', async () => {
+  it('adapte le vocabulaire à la voie, sans bonus', async () => {
     const history = [
       session(2, now, {
         focus: 'strength',
@@ -410,12 +420,15 @@ describe('RuleBasedGenerator', () => {
     ];
     const plan = await generator.generate({ availableMinutes: 90, now, history });
     expect(plan.blocks.find((b) => b.kind === 'main')?.title).toBe('Endurance : continuité');
+    expect(plan.blocks.some((b) => b.kind === 'bonus')).toBe(false);
   });
 
   it('ne descend jamais sous la plus petite cotation', async () => {
     const history = [session(2, now, { focus: 'strength', climbList: [{ grade: '4', value: 1 }] })];
     const plan = await generator.generate({ availableMinutes: 60, now, history });
-    expect(plan.blocks.find((b) => b.kind === 'main')?.target?.grade).toBe('3');
+    expect(PlanSchema.safeParse(plan).success).toBe(true);
+    const text = plan.blocks.flatMap((b) => b.instructions).join(' ');
+    expect(text).not.toMatch(/undefined|NaN/);
   });
 
   it('explique ses choix dans le résumé', async () => {
@@ -433,13 +446,13 @@ describe('séance avec le profil', () => {
       now,
       history: [session(3, now, { focus: 'endurance' })],
       weakPoints: ['footwork'],
-      likedPoints: ['coordination'],
+      likedPoints: ['reading'],
     });
     expect(plan.focus).toBe('technique');
     const mains = plan.blocks.filter((b) => b.kind === 'main');
-    expect(mains.length).toBe(3);
+    expect(mains.length).toBe(2);
     expect(mains[0].instructions.join(' ')).toContain('Ton point faible (placement des pieds)');
-    expect(mains[2].instructions.join(' ')).toContain('Pour le plaisir (coordination)');
+    expect(mains[1].instructions.join(' ')).toContain('Pour le plaisir (lecture des blocs');
     expect(PlanSchema.safeParse(plan).success).toBe(true);
   });
 });

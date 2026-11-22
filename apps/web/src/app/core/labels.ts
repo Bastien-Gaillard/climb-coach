@@ -14,6 +14,7 @@ export const STYLE_LABEL: Record<Style, string> = {
 export const BLOCK_LABEL: Record<PlanBlock['kind'], string> = {
   warmup: 'Échauffement',
   main: 'Cœur',
+  bonus: 'Bonus · facultatif',
   core: 'Gainage',
   cooldown: 'Retour au calme',
 };

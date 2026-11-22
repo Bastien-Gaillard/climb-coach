@@ -1,8 +1,8 @@
-import { pointLabels } from '../auth/climbing-points';
-import { EQUIPMENT_LABEL } from '../auth/equipment';
+import { pointLabels, POINT_LABEL } from '../auth/climbing-points';
 import { gradeFromValue, gradeValue } from '@climb-coach/grades';
 import { Injectable, Logger } from '@nestjs/common';
-import { catalogForPrompt, pickExercises } from './exercises';
+import { z } from 'zod';
+import { catalogForPrompt, formatsFor, GRIP_POINTS, pickExercises } from './exercises';
 import { exerciseForTitle } from './exercise-videos';
 import { ConfigService } from '@nestjs/config';
 import { Env } from '../config/env';
@@ -10,7 +10,8 @@ import { REFERENCE_SYSTEM } from '../sessions/climb-normalizer';
 import { GeneratorContext, PlanGenerator, splitTime } from './generator';
 import { cleanGrade, describeGym } from './gym-colors';
 import { analyzeHistory, FOCUS_LABEL, ofFocus } from './history-analysis';
-import { Plan, planFitsTime, PlanSchema } from './plan.schema';
+import { FocusSchema, Plan, PlanBlockSchema } from './plan.schema';
+import { RuleBasedGenerator } from './rule-based.generator';
 
 export class MistralError extends Error {
   constructor(
@@ -121,31 +122,52 @@ const DEFAULT_TITLES: Record<string, string> = {
 };
 
 /**
- * Vérifie que la séance a un vrai cœur de séance : au moins une partie "main", chacune
- * nommée d'après un exercice du catalogue du bon type, et un seul gainage.
- * Sans ça, Mistral peut ranger ses exercices en "core" (tout s'affiche « Gainage »)
- * ou glisser des exercices d'un autre type que celui de la séance.
+ * Réponse attendue de Mistral : le type, l'intensité, le résumé et le cœur de séance seulement.
+ * L'appli ajoute elle-même l'échauffement, la consigne du jour, le bonus, le gainage et le
+ * retour au calme.
  */
-export function checkStructure(plan: Plan): void {
-  const cores = plan.blocks.filter((b) => b.kind === 'core').length;
-  if (cores > 1)
+export const MistralCoreSchema = z.object({
+  focus: FocusSchema,
+  intensity: z.enum(['light', 'normal']),
+  summary: z.string().min(1).max(500),
+  blocks: z.array(PlanBlockSchema).min(1).max(2),
+});
+export type MistralCore = z.infer<typeof MistralCoreSchema>;
+
+/**
+ * Vérifie le cœur de séance : des parties "main" seulement, 1 sous 50 min et 2 au-delà,
+ * chacune nommée d'après un format du catalogue du bon type, une seule filière en endurance,
+ * et la somme des minutes égale au temps du cœur (5 min de marge).
+ */
+export function checkStructure(core: MistralCore, mainMinutes: number): void {
+  const others = core.blocks.filter((b) => b.kind !== 'main');
+  if (others.length)
     throw new MistralError(
-      `${cores} parties "core" : le gainage tient en une seule partie, les exercices du catalogue vont chacun dans une partie "main"`,
+      `partie "${others[0].kind}" : ne renvoie que le cœur de séance, en parties "main"`,
     );
-  const mains = plan.blocks.filter((b) => b.kind === 'main');
-  if (!mains.length)
-    throw new MistralError('aucune partie "main" : le cœur de séance est obligatoire');
-  for (const block of mains) {
+  const wanted = formatsFor(mainMinutes);
+  if (core.blocks.length !== wanted)
+    throw new MistralError(
+      `${core.blocks.length} format(s) pour un cœur de ${mainMinutes} min : il en faut ${wanted}`,
+    );
+  const total = core.blocks.reduce((sum, b) => sum + b.minutes, 0);
+  if (total > mainMinutes || total < mainMinutes - 5)
+    throw new MistralError(`cœur de séance de ${total} min au lieu de ${mainMinutes}`);
+  const energies = new Set<string>();
+  for (const block of core.blocks) {
     const exercise = exerciseForTitle(block.title);
     if (!exercise)
       throw new MistralError(
-        `partie "main" « ${block.title} » : son titre doit être le nom d'un exercice du catalogue`,
+        `partie "main" « ${block.title} » : son titre doit être le nom d'un format du catalogue`,
       );
-    if (exercise.focus !== plan.focus)
+    if (exercise.focus !== core.focus)
       throw new MistralError(
-        `« ${exercise.name} » est un exercice ${ofFocus(exercise.focus)}, pas ${ofFocus(plan.focus)}`,
+        `« ${exercise.name} » est un format ${ofFocus(exercise.focus)}, pas ${ofFocus(core.focus)}`,
       );
+    if (exercise.energy) energies.add(exercise.energy);
   }
+  if (energies.size > 1)
+    throw new MistralError('fond et résistance dans la même séance : une seule filière');
 }
 
 /**
@@ -161,6 +183,8 @@ export function normalizePlan(json: unknown): unknown {
   plan.blocks = plan.blocks.map((raw: unknown) => {
     if (!raw || typeof raw !== 'object') return raw;
     const block = { ...(raw as Record<string, unknown>) };
+    // Seul le cœur de séance est demandé : une partie sans type en fait partie
+    if (block.kind === undefined) block.kind = 'main';
     if (typeof block.title !== 'string' || !block.title.trim()) {
       block.title = DEFAULT_TITLES[block.kind as string] ?? 'Bloc';
     } else if (block.title.length > 80) {
@@ -221,87 +245,49 @@ function pickGrade(
 }
 
 const SYSTEM_PROMPT = `Tu es un coach d'escalade diplômé, spécialisé dans l'entraînement de bloc en salle des grimpeurs amateurs réguliers.
-Le grimpeur ne fait que du bloc, jamais de voie : toute la séance se passe sur des blocs.
-Ton rôle : préparer LA prochaine séance de bloc du grimpeur, celle qu'il va faire aujourd'hui, pour qu'il progresse sur la durée sans se blesser.
+Le grimpeur ne fait que du bloc, dans une salle commerciale : il choisit des blocs déjà tracés, repérés par couleur. Tout ce que tu proposes doit pouvoir se faire avec ces blocs, sans mur, prise ou inclinaison particuliers.
+Ton rôle : choisir le type de la séance d'aujourd'hui et son cœur de séance, pour qu'il progresse sur la durée sans se blesser. L'appli ajoute elle-même l'échauffement, la consigne technique du jour, le bonus facultatif, le gainage et le retour au calme : ne les écris pas.
 
 Ce que tu reçois :
-- le temps dont il dispose aujourd'hui et un découpage indicatif de la séance ;
+- le temps du cœur de séance ;
 - la salle du jour et ses niveaux, si elle est connue ;
-- son niveau actuel (meilleure réussite récente) et le niveau à viser aujourd'hui ;
-- une proposition de focus et d'intensité calculée à partir de son historique, avec les raisons ;
-- ses dernières séances : focus, durée, fatigue ressentie, blocs tentés (réussis ou non) et ses notes libres.
+- son niveau stable et le niveau visé en force (la couleur au-dessus) ;
+- une proposition de type, d'intensité et de formats calculée à partir de son historique, avec les raisons ;
+- ses dernières séances : type, durée, fatigue ressentie, blocs tentés (réussis ou non) et ses notes libres.
 
 Tes principes de coach :
 - La régularité et la santé passent avant la performance du jour : en cas de doute (fatigue, douleur, longue pause), choisis la prudence.
-- Chaque partie de la séance a un but clair, que le grimpeur comprend en lisant la consigne.
-- Varie les exercices d'une séance à l'autre et appuie-toi sur ce que l'historique révèle (échecs répétés à un niveau, focus délaissé).
-- Donne des consignes qu'on peut suivre sans réfléchir une fois au pied du mur : nombre de blocs, cotation, répétitions, repos.
+- Varie les formats d'une séance à l'autre et appuie-toi sur ce que l'historique révèle (échecs répétés à un niveau, type délaissé).
+- Points faibles et plaisir : au plus UN format qui travaille un point faible, en premier, et au moins UN format qu'il aime, en dernier. Avec un seul format, alterne d'une séance à l'autre. Le catalogue dit ce que chaque format travaille.
 
-Spécificités du bloc :
-- Force : peu de blocs durs, essais courts et explosifs, 3 à 5 min de repos complet entre les essais.
-- Endurance : circuits de blocs faciles enchaînés, repos courts. Un 4×4, c'est 4 blocs enchaînés sans pause = 1 série, répétée 2 à 5 fois avec 3 min de repos entre les séries (jamais 4 fois les 4 blocs d'affilée). Une séance d'endurance travaille une seule filière : soit le fond (effort long et continu, peu intense), soit la résistance (effort court et intense, avant-bras qui gonflent), jamais les deux. Le catalogue indique la filière de chaque exercice.
-- Technique : blocs sous le niveau max, avec une consigne de mouvement précise (pieds, hanches, lecture, équilibre).
-- Varie les styles de blocs d'une séance à l'autre : dalle, vertical, dévers, réglettes, plats, compression, mouvements dynamiques.
-- Pense à la désescalade ou à la chute contrôlée : jamais de chute non préparée sur les blocs hauts.
-- Points faibles et plaisir : le grimpeur indique ses points faibles et ce qu'il aime faire (et l'historique ou les notes peuvent en révéler d'autres). Dans le cœur de séance, mets au plus UN exercice qui travaille un point faible, en premier (il est frais), et au moins UN exercice qu'il aime, en dernier (pour finir sur une bonne sensation). Avec un seul exercice, alterne d'une séance à l'autre. Un point faible de mobilité se travaille à l'échauffement et au retour au calme. Le catalogue dit ce que chaque exercice travaille.
-- Exercices de chute : toujours progressifs (on part les pieds à 50 cm du sol, jamais au-delà de la mi-hauteur), en position de grimpe sans regarder en bas, réception sur les pieds genoux fléchis, au-dessus d'un tapis épais ; jamais en cas de douleur ni de séance légère.
-
-Catalogue d'exercices (choisis dans cette liste, en variant d'une séance à l'autre) :
+Catalogue des formats (choisis uniquement dans cette liste) :
 ${catalogForPrompt()}
 
-Le cœur de séance contient 1 à 3 exercices du catalogue (1 si le temps est court, 2 ou 3 au-delà de 25 min), chacun dans sa propre partie "main", dont le titre est le nom de l'exercice. Tu peux adapter un exercice, mais garde son principe.
-Les exercices du cœur de séance sont tous du type de la séance (une séance d'endurance ne prend que des exercices d'endurance).
-Types des parties : "warmup" = échauffement, "main" = un exercice du catalogue, "core" = gainage (au sol, une seule partie, jamais un exercice du catalogue), "cooldown" = retour au calme.
-
-Structure de la séance :
-- Respecte le focus et l'intensité proposés, sauf raison évidente dans l'historique. Quand le grimpeur a choisi lui-même le type de la séance, ce focus est imposé : garde-le toujours.
-- La séance est découpée en parties (le tableau "blocks" du JSON, à ne pas confondre avec les blocs d'escalade). La somme de leurs "minutes" doit être comprise entre (temps dispo - 10) et le temps dispo.
-- Échauffement progressif : toutes ses cotations restent au moins 2 crans sous le niveau à viser. Il va du général au spécifique, du lent au rapide, des grosses prises aux petites, dans cet ordre :
-  1. 2 à 4 min de cardio léger (sautillements, montées de genoux, jumping jacks) ;
-  2. mobilité articulaire dynamique sans forcer (cercles de poignets, de bras, de chevilles ; rotations de hanche lentes genou levé, squats cosaques) ;
-  3. doigts : glissements tendineux (poing, poing tendu, crochet) et ouvertures-fermetures rapides ;
-  4. épaules : rotations externes coudes au corps, tirages d'omoplates bras tendus à une grosse prise, pieds au sol ;
-  5. traversée très facile (pieds précis et silencieux, puis plus vite) ;
-  6. quelques blocs faciles sur grosses prises (3 à 4 crans sous le max), puis 1 ou 2 un peu plus durs.
-  Avant une séance de force, ajoute un recrutement des doigts (pieds au sol, tirer fort 5 s / relâcher 1 s, 5 fois par main) et finis par un bloc proche du max ou quelques mouvements dynamiques, sans aller à l'échec. Si une douleur est signalée, pas de petites prises ni de dynamique à l'échauffement. Jamais d'étirements statiques à l'échauffement : ils vont dans le retour au calme.
-- Matériel : utilise à l'échauffement le matériel listé, et jamais un matériel absent de la liste.
-  - élastique : rotations externes des épaules à l'élastique, coudes au corps, 10 à 12 en tenant 1 s, puis écartés bras tendus ;
-  - balle souple : 20 pressions lentes puis 20 rapides, sans forcer, après les glissements tendineux ;
-  - barre de traction : les tirages d'omoplates se font à la barre ;
-  - poutre (sauf douleur) : 10 suspensions de 1 s sur grosse prise de 20-30 mm, pieds au sol au début ; avant une séance de force, elle remplace le recrutement : 2 suspensions de 10 s sur prise moyenne (15-20 mm) puis 2 sur petite prise (10-15 mm), 30 s de repos.
-- Retour au calme : étirements doux et maintenus des avant-bras, épaules et dos, hanches en grenouille (1 min sans forcer), floor angels lents pour les épaules, suspensions passives. C'est le seul endroit des étirements statiques.
+Cœur de séance :
+- 1 format si le cœur dure moins de 50 min, 2 formats à partir de 50 min, chacun dans sa propre partie "main" dont le titre est exactement le nom du format.
+- Tous du type de la séance. En endurance, une seule filière : fond ou résistance, jamais les deux.
+- Respecte la durée minimale et maximale de chaque format. La somme des "minutes" des parties est égale au temps du cœur de séance (au plus 5 min de moins).
+- La séance de travail : au plus une fois toutes les 2 à 3 semaines.
+- Respecte le type et l'intensité proposés, sauf raison évidente dans l'historique. Quand le grimpeur a choisi lui-même le type de la séance, il est imposé : garde-le toujours.
 - Le "grade" du "target" d'une partie est la cotation la plus dure demandée dans cette partie.
 
 Santé :
-- Tiens compte des notes du grimpeur : si une douleur ou une blessure est signalée, intensité "light", pas de travail en force, et aucun exercice qui sollicite la zone concernée (ex : doigts → pas de petites réglettes ni de suspensions ; épaule → pas de jetés ni de grands mouvements). Mentionne-le dans le résumé. Exception : quand le grimpeur a choisi lui-même le type de la séance, garde ce type et une intensité normale, même avec une douleur notée.
+- Tiens compte des notes du grimpeur : si une douleur ou une blessure est signalée, intensité "light", pas de force, et aucun format marqué « jamais en cas de douleur ». Mentionne-le dans le résumé. Exception : quand le grimpeur a choisi lui-même le type de la séance, garde ce type et une intensité normale.
 
 Cotations :
 - Toujours en cotation Fontainebleau (ex : 5+, 6A, 6A+, 6B).
 - Une seule cotation par "grade", jamais de fourchette (pas de "6A+/6B"), jamais de signe "-" (pas de "6B-").
-- Dans les consignes, écris TOUJOURS chaque cotation entre crochets, ex : "4 blocs en [6A]", "2 blocs en [6A+]".
+- Dans les consignes, écris TOUJOURS chaque cotation entre crochets, ex : "4 blocs en [6A]".
 - N'écris jamais de nom de couleur : l'appli ajoute elle-même les couleurs de la salle.
+- Repères : « sous son niveau » = environ 2 crans sous le niveau stable, « deux couleurs sous » = environ 4 crans, « au-dessus » = le niveau visé en force.
 
-Vocabulaire des consignes (obligatoire, pour qu'aucune consigne ne soit ambiguë) :
-- Un "passage" = une montée sur un bloc, réussie ou non. N'utilise pas "répétition" ni "essai" seul.
-- Deux façons, et deux seulement, de dire combien de fois grimper un bloc, jamais les deux dans la même consigne :
-  - Bloc dur, on s'arrête dès qu'il est réussi : "N essais max", ex : "3 blocs en [6B], 3 essais max par bloc".
-  - Bloc qu'on enchaîne pour le volume ou la technique : "N passages par bloc", ex : "6 blocs en [6A], 2 passages par bloc".
-- Un total compte des passages, pas des blocs : "6 blocs en [6A], 2 passages par bloc (12 passages au total)".
-- Le repos dit toujours précisément entre quoi et quoi, avec une de ces formules :
-  - "repos X min entre chaque passage" (y compris entre deux passages d'un même bloc) ;
-  - "repos X min entre chaque essai" (pour les "essais max") ;
-  - "repos X min avant de changer de bloc" ;
-  - "repos X min entre les séries", seulement si la consigne définit la série, ex : "série = enchaîner les 4 blocs sans pause".
-- Consignes courtes, concrètes, en français : une idée par ligne, jamais plus de 150 caractères.
-
-Format des consignes d'un exercice du cœur de séance (obligatoire, dans cet ordre, une entrée du tableau "instructions" par ligne) :
-1. Le volume : nombre de blocs, cotation entre crochets, et s'il y a lieu "N essais max par bloc" ou "N passages par bloc", ex : "6 blocs en [6A], 2 passages par bloc".
-2. "Objectif : …" : une phrase, pourquoi on fait cet exercice.
-3. Les gestes : 1 à 3 lignes, une par geste, à l'impératif, sans le pourquoi, ex : "Pose le pied sur la carre externe, pointe vers l'extérieur".
-4. "Repère : …" : à quoi le grimpeur voit que c'est réussi, ex : "Repère : tu atteins la prise bras tendu, sans à-coup".
-5. Le repos, en dernier, ex : "Repos 2 min avant de changer de bloc".
-Exemple complet : ["3 blocs en [6A], 2 passages par bloc", "Objectif : gagner de l'allonge en dévers sans tirer sur les bras", "Pose le pied sur la carre externe, pointe vers l'extérieur", "Tourne le genou vers le bas et vers le mur", "Colle la hanche au mur, puis allonge le bras", "Repère : tu atteins la prise bras tendu, sans à-coup", "Repos 2 min avant de changer de bloc"].
-L'échauffement, le gainage et le retour au calme gardent des consignes simples, une par étape, sans "Objectif" ni "Repère".
+Consignes d'un format (le détail, le pourquoi et les pièges sont déjà dans l'appli : reste court) :
+- D'abord le volume, une ligne par cotation : "N blocs en [6A]" (ou "N à M blocs en [6A]").
+- Puis 1 à 3 lignes : la règle du format (essais, passages, séries, durée) et le repos.
+- Un "passage" = une montée, réussie ou non. Bloc dur qu'on arrête dès qu'il est réussi : "N essais max par bloc". Bloc qu'on enchaîne : "N passages par bloc". Jamais les deux dans la même consigne.
+- Le repos dit entre quoi et quoi : "repos X min entre chaque essai", "repos X min avant de changer de bloc", ou "repos X min entre les séries" si la série est définie.
+- Une idée par ligne, jamais plus de 150 caractères, en français.
+Exemple : ["3 blocs en [6B]", "Choisis-les très différents : inclinaison, prises, style", "Repos 5 min entre chaque essai"].
 
 Réponds UNIQUEMENT avec un objet JSON de la forme :
 {
@@ -310,15 +296,15 @@ Réponds UNIQUEMENT avec un objet JSON de la forme :
   "summary": "2 phrases max qui expliquent les choix",
   "blocks": [
     {
-      "kind": "warmup" | "main" | "core" | "cooldown",
-      "title": "titre court",
+      "kind": "main",
+      "title": "nom exact du format",
       "minutes": entier,
       "instructions": ["consigne 1", "consigne 2"],
       "target": { "style": "boulder", "grade": "cotation Fontainebleau" }
     }
   ]
 }
-Le champ "target" est optionnel. Pas de texte autour, pas de balises Markdown, pas de commentaires.`;
+Pas de texte autour, pas de balises Markdown, pas de commentaires.`;
 
 @Injectable()
 export class MistralGenerator implements PlanGenerator {
@@ -345,6 +331,9 @@ export class MistralGenerator implements PlanGenerator {
     return { enabled: this.enabled, ...this.state, lastModel: this.lastModel };
   }
 
+  /** Échauffement, bonus, gainage et retour au calme : toujours ceux des règles. */
+  private readonly rules = new RuleBasedGenerator();
+
   constructor(private readonly config: ConfigService<Env, true>) {}
 
   get enabled(): boolean {
@@ -359,15 +348,17 @@ export class MistralGenerator implements PlanGenerator {
       { role: 'user', content: this.buildUserPrompt(ctx) },
     ];
     const content = await this.chat(messages);
+    const analysis = analyzeHistory(ctx);
     // Type choisi par le grimpeur : une séance d'un autre type est refusée (puis relancée)
-    const wanted = ctx.requestedFocus ? analyzeHistory(ctx).focus : undefined;
+    const wanted = ctx.requestedFocus ? analysis.focus : undefined;
     const parse = (raw: string) => {
-      const plan = this.parse(raw, ctx.availableMinutes);
-      if (wanted && plan.focus !== wanted)
+      const core = this.parse(raw, splitTime(ctx.availableMinutes).main);
+      if (wanted && core.focus !== wanted)
         throw new MistralError(
-          `focus "${plan.focus}" au lieu de "${wanted}", le type choisi par le grimpeur`,
+          `focus "${core.focus}" au lieu de "${wanted}", le type choisi par le grimpeur`,
         );
-      return plan;
+      const { blocks, ...head } = core;
+      return this.rules.assemble(ctx, analysis, blocks, head);
     };
     try {
       return parse(content);
@@ -407,7 +398,6 @@ export class MistralGenerator implements PlanGenerator {
     const picks = pickExercises({
       focus: a.focus,
       minutes: split.main,
-      maxSent: a.maxSent,
       careful: !!a.pain || a.intensity === 'light',
       seed: Math.floor(ctx.now.getTime() / 86_400_000) + ctx.history.length,
       weakPoints: weak,
@@ -416,26 +406,31 @@ export class MistralGenerator implements PlanGenerator {
     const roleLabel = { weak: ' (point faible)', liked: ' (ce qu’il aime)', other: '' };
 
     return [
-      `Temps dispo aujourd'hui : ${ctx.availableMinutes} min.`,
-      `Découpage indicatif : échauffement ${split.warmup}, cœur ${split.main}, gainage ${split.core}, retour au calme ${split.cooldown}.`,
-      `Style principal : ${a.style === 'boulder' ? 'bloc' : 'voie'}.`,
-      `Matériel disponible : ${ctx.equipment?.length ? ctx.equipment.map((e) => EQUIPMENT_LABEL[e]).join(', ') : 'aucun (échauffement à mains nues)'}.`,
+      `Temps dispo aujourd'hui : ${ctx.availableMinutes} min, dont ${split.main} min de cœur de séance : ${formatsFor(split.main)} format${formatsFor(split.main) > 1 ? 's' : ''}.`,
       ...(ctx.gym
         ? [
             `Salle du jour : ${ctx.gym.name}, ${ctx.gym.discipline === 'boulder' ? 'bloc' : 'voie'} uniquement : tous les "target" ont le style "${ctx.gym.discipline}".`,
             `Niveaux de la salle : ${describeGym(ctx.gym)}.`,
           ]
         : []),
-      `Meilleure réussite récente : ${gradeFromValue(a.maxSent, system)}. Niveau à viser : ${gradeFromValue(a.project, system)}.`,
+      `Niveau stable : ${gradeFromValue(a.maxSent, system)}. Niveau visé en force : ${gradeFromValue(a.project, system)}.`,
       ...(ctx.focusGoal ? [`Objectif d'entraînement : ${FOCUS_LABEL[ctx.focusGoal]}.`] : []),
       `Points faibles : ${weak.length ? pointLabels(weak) : 'aucun indiqué'}.`,
+      ...(weak.some((p) => GRIP_POINTS.includes(p))
+        ? [
+            `Types de prise à travailler : dans un format de projets, ajoute « Prends-en un en ${weak
+              .filter((p) => GRIP_POINTS.includes(p))
+              .map((p) => POINT_LABEL[p])
+              .join(', ')} si la salle en a ».`,
+          ]
+        : []),
       `Ce qu'il aime faire : ${liked.length ? pointLabels(liked) : 'rien d’indiqué'}.`,
       ctx.requestedFocus
         ? `Type choisi par le grimpeur pour aujourd'hui, à la place du planning : focus ${a.focus} (imposé), intensité ${a.intensity}.`
         : `Proposition : focus ${a.focus}, intensité ${a.intensity}.`,
       ...(picks.length
         ? [
-            `Exercices proposés par les règles, dans l'ordre : ${picks.map((p) => `${p.exercise.name}${roleLabel[p.role]}`).join(', ')}.`,
+            `Formats proposés par les règles, dans l'ordre : ${picks.map((p) => `${p.exercise.name} (${p.minutes} min)${roleLabel[p.role]}`).join(', ')}.`,
           ]
         : []),
       `Raisons : ${a.reasons.join(' ; ')}.`,
@@ -445,8 +440,8 @@ export class MistralGenerator implements PlanGenerator {
     ].join('\n');
   }
 
-  /** Valide la réponse : JSON, schéma zod, temps et cotations cohérents. */
-  parse(content: string, availableMinutes: number): Plan {
+  /** Valide la réponse : JSON, schéma zod, formats, temps et cotations cohérents. */
+  parse(content: string, mainMinutes: number): MistralCore {
     let json: unknown;
     try {
       json = JSON.parse(extractJson(content));
@@ -454,28 +449,25 @@ export class MistralGenerator implements PlanGenerator {
       throw new MistralError('Réponse non JSON');
     }
 
-    const result = PlanSchema.safeParse(normalizePlan(json));
+    const result = MistralCoreSchema.safeParse(normalizePlan(json));
     if (!result.success) {
       const first = result.error.issues[0];
       throw new MistralError(`Réponse hors schéma (${first.path.join('.')}: ${first.message})`);
     }
 
-    const plan = result.data;
-    if (!planFitsTime(plan, availableMinutes)) {
-      const total = plan.blocks.reduce((s, b) => s + b.minutes, 0);
-      throw new MistralError(`Séance de ${total} min pour ${availableMinutes} min dispo`);
-    }
+    const core = result.data;
+    checkStructure(core, mainMinutes);
 
-    checkStructure(plan);
-
-    for (const block of plan.blocks) {
+    for (const block of core.blocks) {
       block.instructions = block.instructions.map(bracketGrades);
+      delete block.video;
+      delete block.info;
       if (!block.target) continue;
       const grade = pickGrade(block.target.grade, REFERENCE_SYSTEM[block.target.style]);
       if (!grade) throw new MistralError(`Cotation invalide : ${block.target.grade}`);
       block.target.grade = grade;
     }
-    return plan;
+    return core;
   }
 
   /** Modèles à essayer, par ordre de préférence (MISTRAL_MODEL, séparés par des virgules). */

@@ -1,10 +1,9 @@
-/** Matériel qu'un grimpeur peut avoir sous la main, coché dans son profil. */
-export const EQUIPMENT = ['elastic', 'ball', 'hangboard', 'pullup-bar'] as const;
+/** Matériel qu'un grimpeur a sous la main, à la salle ou chez lui, coché dans son profil. */
+export const EQUIPMENT = ['elastic', 'hangboard', 'pullup-bar'] as const;
 export type Equipment = (typeof EQUIPMENT)[number];
 
 export const EQUIPMENT_LABEL: Record<Equipment, string> = {
   elastic: 'élastique',
-  ball: 'balle souple',
   hangboard: 'poutre',
   'pullup-bar': 'barre de traction',
 };

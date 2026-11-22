@@ -1,4 +1,4 @@
-import { exerciseForTitle, withVideos } from './exercise-videos';
+import { exerciseForTitle, withCatalog } from './exercise-videos';
 import { EXERCISES } from './exercises';
 import { Plan } from './plan.schema';
 
@@ -9,8 +9,8 @@ const plan = (blocks: Plan['blocks']): Plan => ({
   blocks,
 });
 
-describe('vidéos des exercices', () => {
-  it('donne à chaque exercice un lien YouTube : une vidéo ou, à défaut, une recherche', () => {
+describe('vidéos et ⓘ des formats', () => {
+  it('donne à chaque format un lien YouTube : une vidéo ou, à défaut, une recherche', () => {
     for (const e of EXERCISES) {
       expect(e.video).toMatch(
         /^https:\/\/www\.youtube\.com\/(watch\?v=[\w-]{11}|shorts\/[\w-]{11}|results\?search_query=.+)$/,
@@ -18,42 +18,42 @@ describe('vidéos des exercices', () => {
     }
   });
 
-  it('montre une vraie vidéo pour la grande majorité des exercices', () => {
-    const searches = EXERCISES.filter((e) => e.video.includes('/results?'));
-    expect(searches.length).toBeLessThanOrEqual(10);
-  });
-
-  it('retrouve chaque exercice depuis le titre des règles et depuis son nom seul', () => {
+  it('retrouve chaque format depuis le titre des règles et depuis son nom seul', () => {
     for (const e of EXERCISES) {
-      expect(exerciseForTitle(`Technique : ${e.name}`)?.id).toBe(e.id);
+      expect(exerciseForTitle(`Force : ${e.name}`)?.id).toBe(e.id);
       expect(exerciseForTitle(e.name)?.id).toBe(e.id);
     }
   });
 
   it('préfère le nom le plus long et ignore accents et apostrophes', () => {
-    expect(exerciseForTitle('Force : Bloc au max sur un type de prise')?.id).toBe('grip-limit');
-    expect(exerciseForTitle('Force : Bloc au max')?.id).toBe('limit');
-    expect(exerciseForTitle("Endurance : tour d'une cotation")?.id).toBe('grade-tour');
-    expect(exerciseForTitle('equilibre sans les mains')?.id).toBe('no-hands');
+    expect(exerciseForTitle('Technique : Volume technique')?.id).toBe('tech-volume');
+    expect(exerciseForTitle('Endurance : Volume')?.id).toBe('volume');
     expect(exerciseForTitle('Endurance : 4x4')?.id).toBe('4x4');
+    expect(exerciseForTitle('densite')?.id).toBe('density');
   });
 
   it('ne reconnaît un nom qu’en mot entier', () => {
     expect(exerciseForTitle('Endurance : continuité')).toBeUndefined();
-    expect(exerciseForTitle('Drapeaux')?.id).toBe('flag');
-    expect(exerciseForTitle('Petits drapeauxxx')).toBeUndefined();
+    expect(exerciseForTitle('Flashs')).toBeUndefined();
   });
 
-  it('ajoute la vidéo au cœur de séance seulement, et retire celle inventée par le modèle', () => {
-    const lolottes = EXERCISES.find((e) => e.id === 'drop-knee')!;
-    const out = withVideos(
+  it('ajoute vidéo et ⓘ au cœur de séance, retire ceux du modèle, garde ceux du bonus', () => {
+    const flash = EXERCISES.find((e) => e.id === 'flash')!;
+    const bonusInfo = { why: 'Doigts', how: ['10 s'], pitfalls: ['Échec'] };
+    const out = withCatalog(
       plan([
-        { kind: 'warmup', title: 'Échauffement', minutes: 15, instructions: ['Cardio'] },
+        {
+          kind: 'warmup',
+          title: 'Échauffement',
+          minutes: 15,
+          instructions: ['Cardio'],
+          info: { why: 'faux', how: [], pitfalls: [] },
+        },
         {
           kind: 'main',
-          title: 'Technique : Lolottes',
+          title: 'Technique : Flash',
           minutes: 30,
-          instructions: ['Genou vers le bas'],
+          instructions: ['Un essai'],
           video: 'https://example.com/faux',
         },
         {
@@ -63,10 +63,19 @@ describe('vidéos des exercices', () => {
           instructions: ['Grimpe'],
           video: 'https://example.com/faux',
         },
+        {
+          kind: 'bonus',
+          title: 'Suspensions max',
+          minutes: 10,
+          instructions: ['10 s'],
+          video: 'https://www.youtube.com/shorts/aDeEkQ0g5cA',
+          info: bonusInfo,
+        },
       ]),
     );
-    expect(out.blocks[0].video).toBeUndefined();
-    expect(out.blocks[1].video).toBe(lolottes.video);
+    expect(out.blocks[0]).not.toHaveProperty('info');
+    expect(out.blocks[1]).toMatchObject({ video: flash.video, info: flash.info });
     expect(out.blocks[2]).not.toHaveProperty('video');
+    expect(out.blocks[3]).toMatchObject({ info: bonusInfo });
   });
 });

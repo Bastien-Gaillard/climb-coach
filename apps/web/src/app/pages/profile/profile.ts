@@ -17,22 +17,17 @@ export const EQUIPMENT_OPTIONS: EquipmentOption[] = [
   {
     id: 'elastic',
     label: 'Élastique',
-    hint: 'Rotations des épaules à l’élastique',
-  },
-  {
-    id: 'ball',
-    label: 'Balle souple',
-    hint: 'Pressions pour réveiller les doigts',
+    hint: 'Exercices d’équilibre pour les épaules',
   },
   {
     id: 'hangboard',
     label: 'Poutre',
-    hint: 'Suspensions progressives, et avant la force',
+    hint: 'Suspensions max ou répétitions 7/3 en bonus',
   },
   {
     id: 'pullup-bar',
     label: 'Barre de traction',
-    hint: 'Tirages d’omoplates à la barre',
+    hint: 'Tractions et blocages en bonus',
   },
 ];
 

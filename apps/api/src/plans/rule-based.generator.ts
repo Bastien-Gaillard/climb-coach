@@ -1,10 +1,11 @@
 import { FONT, gradeFromValue } from '@climb-coach/grades';
 import { Injectable } from '@nestjs/common';
 import { MOBILITY_POINTS, pointLabels } from '../auth/climbing-points';
-import { Equipment } from '../auth/equipment';
 import { REFERENCE_SYSTEM } from '../sessions/climb-normalizer';
 import { GeneratorContext, PlanGenerator, splitTime } from './generator';
-import { pickExercises } from './exercises';
+import { pickBonus } from './bonus';
+import { exerciseForTitle } from './exercise-videos';
+import { GRIP_POINTS, pickExercises } from './exercises';
 import { gradeLabel } from './gym-colors';
 import { analyzeHistory, FOCUS_LABEL, HistoryAnalysis, Style } from './history-analysis';
 import { Plan, PlanBlock } from './plan.schema';
@@ -27,8 +28,6 @@ export class RuleBasedGenerator implements PlanGenerator {
     const a = analyzeHistory(ctx);
     const time = splitTime(ctx.availableMinutes);
     const light = a.intensity === 'light' ? 1 : 0;
-
-    const blocks: PlanBlock[] = [this.warmup(ctx, a, time.warmup, light)];
     const mains =
       a.style === 'boulder'
         ? this.boulderMain(ctx, a, time.main, light)
@@ -38,22 +37,47 @@ export class RuleBasedGenerator implements PlanGenerator {
         'Douleur signalée récemment : éviter les prises et mouvements qui sollicitent la zone, arrêter au moindre signal',
       );
     }
-    blocks.push(...mains);
-    if (time.core > 0) blocks.push(this.core(time.core, light));
-    if (time.cooldown > 0) blocks.push(this.cooldown(time.cooldown, ctx));
-
     const intensityLabel = a.intensity === 'light' ? ' (légère)' : '';
-    return {
+    return this.assemble(ctx, a, mains, {
       focus: a.focus,
       intensity: a.intensity,
       summary: `Séance ${FOCUS_LABEL[a.focus]}${intensityLabel} de ${ctx.availableMinutes} min. ${a.reasons.join('. ')}.`,
-      blocks,
-    };
+    });
   }
 
   /**
-   * Cœur de séance en bloc : 1 à 3 exercices du catalogue, qui changent d'une séance à l'autre.
-   * Chaque exercice est une partie de la séance, avec son propre minuteur.
+   * Séance complète autour d'un cœur de séance (des règles ou de Mistral) : échauffement, cœur,
+   * bonus facultatif, gainage, retour au calme. Tout sauf le cœur est standard.
+   */
+  assemble(
+    ctx: GeneratorContext,
+    analysis: HistoryAnalysis,
+    mains: PlanBlock[],
+    head: Pick<Plan, 'focus' | 'intensity' | 'summary'>,
+  ): Plan {
+    const a = { ...analysis, focus: head.focus };
+    const time = splitTime(ctx.availableMinutes);
+    const light = head.intensity === 'light' ? 1 : 0;
+    const blocks: PlanBlock[] = [this.warmup(ctx, a, time.warmup, light), ...mains];
+    if (a.style === 'boulder') {
+      blocks.push(
+        ...pickBonus({
+          focus: a.focus,
+          equipment: ctx.equipment ?? [],
+          pain: !!a.pain,
+          heavyMain: mains.some((m) => exerciseForTitle(m.title)?.id === 'work-session'),
+          seed: this.seed(ctx),
+        }),
+      );
+    }
+    if (time.core > 0) blocks.push(this.core(time.core, ctx.availableMinutes));
+    if (time.cooldown > 0) blocks.push(this.cooldown(time.cooldown, ctx));
+    return { ...head, blocks };
+  }
+
+  /**
+   * Cœur de séance en bloc : 1 ou 2 formats du catalogue, qui changent d'une séance à l'autre.
+   * Chaque format est une partie de la séance, avec son propre minuteur.
    */
   private boulderMain(
     ctx: GeneratorContext,
@@ -63,12 +87,11 @@ export class RuleBasedGenerator implements PlanGenerator {
   ): PlanBlock[] {
     const max = FONT.grades.length - 1;
     const clamp = (v: number) => Math.min(max, Math.max(0, Math.round(v)));
-    // Un jour, une sélection : la séance du lendemain ne propose pas les mêmes exercices
-    const seed = Math.floor(ctx.now.getTime() / 86_400_000) + ctx.history.length;
+    const seed = this.seed(ctx);
+    const grips = (ctx.weakPoints ?? []).filter((p) => GRIP_POINTS.includes(p));
     const picks = pickExercises({
       focus: a.focus,
       minutes,
-      maxSent: a.maxSent,
       careful: !!a.pain || light === 1,
       seed,
       weakPoints: ctx.weakPoints,
@@ -80,8 +103,7 @@ export class RuleBasedGenerator implements PlanGenerator {
         project: a.project,
         light,
         minutes: m,
-        // Les variantes (4×4 sur un même bloc, sans les pieds en protocole) changent d'une séance à l'autre
-        variant: seed,
+        ...(grips.length && { grips: pointLabels(grips) }),
         grade: (v) => this.label(ctx, 'boulder', this.grade('boulder', clamp(v))),
       });
       return {
@@ -102,6 +124,11 @@ export class RuleBasedGenerator implements PlanGenerator {
     });
   }
 
+  /** Un jour, une sélection : la séance du lendemain ne propose pas les mêmes formats. */
+  private seed(ctx: GeneratorContext): number {
+    return Math.floor(ctx.now.getTime() / 86_400_000) + ctx.history.length;
+  }
+
   private grade(style: Style, value: number): string {
     return gradeFromValue(Math.max(0, value), REFERENCE_SYSTEM[style]);
   }
@@ -116,6 +143,10 @@ export class RuleBasedGenerator implements PlanGenerator {
     return plural ? 'voies' : 'voie';
   }
 
+  /**
+   * Échauffement en 3 étapes : au sol, blocs faciles avec la consigne du jour, puis montée en
+   * couleur jusqu'à ce que demande la séance (sautée en technique).
+   */
   private warmup(
     ctx: GeneratorContext,
     a: HistoryAnalysis,
@@ -123,52 +154,23 @@ export class RuleBasedGenerator implements PlanGenerator {
     light: number,
   ): PlanBlock {
     const u = this.unit(a.style);
-    const easy = this.label(ctx, a.style, this.grade(a.style, a.maxSent - 4 - light));
-    const medium = this.label(ctx, a.style, this.grade(a.style, a.maxSent - 2 - light));
+    const label = (v: number) => this.label(ctx, a.style, this.grade(a.style, v));
     const careful = !!a.pain || light === 1;
-    const long = minutes >= 15;
-    const cardio = long ? 3 : 2;
-    const traverse = (long ? 3 : 2) + (a.focus === 'endurance' ? 1 : 0);
-    const easyCount = long ? 3 : 2;
-    const mediumCount = minutes >= 18 ? 2 : 1;
-    const has = (e: Equipment) => ctx.equipment?.includes(e) ?? false;
-    const hangboard = has('hangboard') && !careful;
-    const scapHold = has('pullup-bar') ? 'à la barre' : 'à une grosse prise';
-
-    // Du général au spécifique, du lent au rapide, des grosses prises aux petites.
+    const easyCount = minutes >= 18 ? 6 : minutes >= 15 ? 5 : 4;
     const instructions = [
-      `${cardio} min de cardio léger : sautillements, montées de genoux, jumping jacks`,
-      'Mobilité sans forcer : cercles de poignets, de bras (10 dans chaque sens) et de chevilles, 5 rotations de hanche lentes par jambe, genou levé, puis 5 squats cosaques par côté',
-      'Doigts : 10 glissements tendineux par main (poing, poing tendu, crochet), puis 20 ouvertures-fermetures rapides',
-      ...(has('ball') ? ['Balle souple : 20 pressions lentes, puis 20 rapides, sans forcer'] : []),
-      ...(has('elastic')
-        ? [
-            'Épaules à l’élastique : 10 rotations externes coudes au corps en tenant 1 s, puis 10 écartés bras tendus',
-            `10 tirages d’omoplates bras tendus ${scapHold}, pieds au sol`,
-          ]
-        : [
-            `Épaules : 10 rotations externes coudes au corps, puis 10 tirages d’omoplates bras tendus ${scapHold}, pieds au sol`,
-          ]),
-      ...(hangboard
-        ? ['Poutre : 10 suspensions de 1 s sur grosse prise (20-30 mm), pieds au sol au début']
-        : []),
-      a.focus === 'technique'
-        ? `Traversée très facile ${traverse} min : pieds précis et silencieux, puis on varie les positions du corps`
-        : `Traversée très facile ${traverse} min : pieds précis et silencieux, puis on accélère peu à peu`,
-      `${easyCount} ${u} faciles en ${easy} sur grosses prises, puis ${mediumCount} en ${medium}`,
+      'Au sol, 5 min : cardio léger, puis poignets, doigts et épaules',
+      `${easyCount} ${u} en ${label(a.maxSent - 4 - light)}, lentement, avec la consigne du jour`,
     ];
-    if (a.focus === 'strength' && !careful) {
+    if (a.focus === 'strength') {
       instructions.push(
-        hangboard
-          ? 'Poutre : 2 suspensions de 10 s sur prise moyenne (15-20 mm), puis 2 sur petite prise (10-15 mm), 30 s de repos'
-          : 'Recrutement : sur une bonne prise de départ, pieds au sol, tirer fort 5 s puis relâcher 1 s, 5 fois par main',
-        `Finir par 1 ${this.unit(a.style, false)} plus dur en ${this.label(ctx, a.style, this.grade(a.style, a.maxSent - 1))} ou quelques mouvements dynamiques sur grosses prises, sans aller à l’échec`,
+        `Puis un ${this.unit(a.style, false)} par couleur jusqu’à ${label(a.maxSent)}, repos 3 min avant la suite`,
+      );
+    } else if (a.focus === 'endurance') {
+      instructions.push(
+        `Puis un ${this.unit(a.style, false)} par couleur jusqu’à ${label(a.maxSent - 2 - light)}`,
       );
     }
-    if (careful) {
-      instructions.push('Pas de petites prises ni de mouvements dynamiques pendant l’échauffement');
-    }
-    instructions.push('Pas d’étirements statiques maintenant : ils sont pour le retour au calme');
+    if (careful) instructions.push('Pas de petites prises ni de mouvements dynamiques');
     return { kind: 'warmup', title: 'Échauffement', minutes, instructions };
   }
 
@@ -255,18 +257,18 @@ export class RuleBasedGenerator implements PlanGenerator {
     }
   }
 
-  private core(minutes: number, light: number): PlanBlock {
-    const rounds = Math.max(1, Math.floor(minutes / 5) - light);
+  /** Gainage fixe : 2 tours, 3 au-delà de 90 min. */
+  private core(minutes: number, available: number): PlanBlock {
+    const rounds = available >= 90 ? 3 : 2;
     return {
       kind: 'core',
       title: 'Gainage',
       minutes,
       instructions: [
-        `${rounds} tour${rounds > 1 ? 's' : ''} :`,
-        '40 s de planche',
-        '30 s de gainage latéral de chaque côté',
-        '10 relevés de jambes suspendu (ou au sol)',
-        '30 s de superman',
+        `${rounds} tours, repos 1 min entre les tours :`,
+        'Planche : 30 s',
+        'Gainage latéral : 20 s de chaque côté',
+        'Hollow : 20 s',
       ],
     };
   }
@@ -278,15 +280,9 @@ export class RuleBasedGenerator implements PlanGenerator {
       title: 'Retour au calme',
       minutes,
       instructions: [
-        ...(mobility.length
-          ? [
-              `Point faible (${pointLabels(mobility)}) : double le temps de la grenouille et des floor angels`,
-            ]
-          : []),
-        'Étirements doux des avant-bras, épaules et dos',
-        'Hanches : 1 min en grenouille (à genoux, genoux écartés, bassin vers l’arrière), sans forcer',
-        'Épaules : 10 floor angels lents, allongé sur le dos, bras qui glissent au sol de la position W à la position Y',
-        'Suspensions passives de 20 s',
+        'Avant-bras et doigts : étirements doux',
+        'Épaules : 10 floor angels lents',
+        `Hanches : ${mobility.length ? '2 min' : '1 min'} de grenouille`,
       ],
     };
   }

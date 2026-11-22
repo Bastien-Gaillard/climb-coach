@@ -178,6 +178,21 @@
   }
 }
 
+.cue {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: var(--r-m);
+  background: var(--surface);
+}
+
+.skip {
+  align-self: flex-start;
+  min-height: 44px;
+  padding: 0 14px;
+  font-size: 15px;
+}
+
 .video {
   align-self: flex-start;
   min-height: 44px;
