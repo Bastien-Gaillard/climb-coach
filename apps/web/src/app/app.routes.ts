@@ -29,6 +29,11 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/live/live').then((m) => m.LivePage),
       },
       {
+        path: 'souplesse',
+        title: 'Souplesse',
+        loadComponent: () => import('./pages/mobility/mobility').then((m) => m.MobilityPage),
+      },
+      {
         path: 'seance',
         title: 'Nouvelle séance',
         loadComponent: () =>

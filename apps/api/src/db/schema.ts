@@ -11,6 +11,7 @@ import {
   smallint,
   text,
   timestamp,
+  unique,
   uuid,
 } from 'drizzle-orm/pg-core';
 
@@ -181,7 +182,63 @@ export const pushSubscriptions = pgTable(
   (t) => [index('push_subscriptions_next_at_idx').on(t.nextAt)],
 );
 
+/** Encart ⓘ d'un exercice : pourquoi, comment, pièges. */
+export interface StoredInfo {
+  why: string;
+  how: string[];
+  pitfalls: string[];
+}
+
+/**
+ * Routines hors séance, à faire chez soi (ex. « souplesse » des jours de pause).
+ * Contenu partagé entre les comptes, rempli par les migrations.
+ */
+export const mobilityRoutines = pgTable('mobility_routines', {
+  /** Identifiant lisible (ex. « souplesse »). */
+  id: text('id').primaryKey(),
+  title: text('title').notNull(),
+  /** Durée annoncée, transitions comprises. */
+  minutes: smallint('minutes').notNull(),
+  intro: text('intro').notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Exercices d'une routine, dans l'ordre de `position`. */
+export const mobilitySteps = pgTable(
+  'mobility_steps',
+  {
+    routineId: text('routine_id')
+      .notNull()
+      .references(() => mobilityRoutines.id, { onDelete: 'cascade' }),
+    id: text('id').notNull(),
+    position: smallint('position').notNull(),
+    title: text('title').notNull(),
+    /** Dose affichée (« 1 min », « 2 × 5 par côté »…). */
+    dose: text('dose').notNull(),
+    /** Durée du minuteur, en secondes. */
+    seconds: smallint('seconds').notNull(),
+    instruction: text('instruction').notNull(),
+    /** Fait d'un côté puis de l'autre : le minuteur prévient à mi-temps. */
+    sides: boolean('sides').notNull().default(false),
+    video: text('video').notNull(),
+    info: jsonb('info').$type<StoredInfo>().notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.routineId, t.id] }),
+    unique('mobility_steps_routine_position_uq').on(t.routineId, t.position),
+  ],
+);
+
 export const sessionsRelations = relations(sessions, ({ many }) => ({ climbs: many(climbs) }));
 export const climbsRelations = relations(climbs, ({ one }) => ({
   session: one(sessions, { fields: [climbs.sessionId], references: [sessions.id] }),
+}));
+export const mobilityRoutinesRelations = relations(mobilityRoutines, ({ many }) => ({
+  steps: many(mobilitySteps),
+}));
+export const mobilityStepsRelations = relations(mobilitySteps, ({ one }) => ({
+  routine: one(mobilityRoutines, {
+    fields: [mobilitySteps.routineId],
+    references: [mobilityRoutines.id],
+  }),
 }));

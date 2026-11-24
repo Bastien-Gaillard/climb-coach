@@ -11,6 +11,7 @@ import {
   GeneratedPlan,
   Gym,
   GymInput,
+  MobilityRoutine,
   Profile,
   ProgressionPoint,
   Schedule,
@@ -85,6 +86,11 @@ export class ApiService {
   /** État de Mistral (quota atteint, saturé, en panne). */
   aiStatus(): Observable<AiStatus> {
     return this.http.get<AiStatus>(`${this.base}/plans/ai-status`);
+  }
+
+  /** Routine souplesse des jours de pause. */
+  mobility(): Observable<MobilityRoutine> {
+    return this.http.get<MobilityRoutine>(`${this.base}/plans/mobility`);
   }
 
   /** Version déployée de l'appli (dernier commit), « dev » en local. */

@@ -66,6 +66,30 @@ export interface PlanInfo {
   pitfalls: string[];
 }
 
+/** Un exercice de la souplesse des jours de pause (catalogue de l'API). */
+export interface MobilityStep {
+  id: string;
+  title: string;
+  /** Dose affichée (« 1 min », « 2 × 5 par côté »…). */
+  dose: string;
+  /** Durée du minuteur, en secondes. */
+  seconds: number;
+  instruction: string;
+  /** Fait d'un côté puis de l'autre : le minuteur prévient à mi-temps. */
+  sides: boolean;
+  video: string;
+  info: PlanInfo;
+}
+
+/** Jour de pause : routine souplesse facultative, chez soi, sans matériel. */
+export interface MobilityRoutine {
+  id: string;
+  title: string;
+  minutes: number;
+  intro: string;
+  steps: MobilityStep[];
+}
+
 /** Consigne du jour : une ligne de technique, la même 10 séances. */
 export interface Cue {
   id: string;

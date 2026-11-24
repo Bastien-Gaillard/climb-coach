@@ -5,6 +5,7 @@ import { normalizePreferences } from '../auth/climbing-points';
 import { normalizeEquipment } from '../auth/equipment';
 import type { User } from '../auth/users.service';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
+import { MobilityService } from './mobility.service';
 import { FocusSchema } from './plan.schema';
 import { PlansService } from './plans.service';
 
@@ -27,7 +28,10 @@ const profilePoints = (user: User) => ({
 
 @Controller('plans')
 export class PlansController {
-  constructor(private readonly plans: PlansService) {}
+  constructor(
+    private readonly plans: PlansService,
+    private readonly mobilityRoutines: MobilityService,
+  ) {}
 
   @Post('generate')
   generate(
@@ -71,6 +75,12 @@ export class PlansController {
       user.sessionsPerWeek,
       profilePoints(user),
     );
+  }
+
+  /** Jour de pause : la routine souplesse facultative (15 min, chez soi, sans matériel). */
+  @Get('mobility')
+  mobility() {
+    return this.mobilityRoutines.routine();
   }
 
   /** État de Mistral : l'appli affiche une bannière quand le quota est atteint. */

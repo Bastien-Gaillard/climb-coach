@@ -1,10 +1,11 @@
-import { DatePipe } from '@angular/common';
+import { DatePipe, LowerCasePipe } from '@angular/common';
 import { Component, computed, DestroyRef, inject, OnInit, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { ApiService } from '../../core/api.service';
 import { dayDate, durationLabel, errorMessage, FOCUS_LABEL, relativeDay } from '../../core/labels';
+import { MobilityStore } from '../../core/mobility.store';
 import { Focus, PlannedSession, Schedule, Session } from '../../core/models';
 import { Icon } from '../../shared/icon';
 
@@ -30,7 +31,7 @@ function dayKey(d: Date): string {
 /** Planning sur un mois : calendrier semaine par semaine, puis le détail des séances à venir. */
 @Component({
   selector: 'app-planning',
-  imports: [DatePipe, RouterLink, Icon],
+  imports: [DatePipe, LowerCasePipe, RouterLink, Icon],
   templateUrl: './planning.html',
   styleUrl: './planning.scss',
 })
@@ -97,6 +98,25 @@ export class PlanningPage implements OnInit {
     );
   });
 
+  /** Routine souplesse des jours vides (servie par l'API). */
+  private readonly mobilityStore = inject(MobilityStore);
+  protected readonly mobility = this.mobilityStore.routine;
+  /** Jour de pause choisi dans le calendrier (clé AAAA-MM-JJ). */
+  private readonly picked = signal<string | null>(null);
+
+  /** Jour de pause affiché : celui cliqué, sinon le premier à partir d'aujourd'hui. */
+  protected readonly restDay = computed<CalendarDay | null>(() => {
+    const days = this.calendar()
+      .flat()
+      .filter((d) => this.isRest(d));
+    return days.find((d) => d.key === this.picked()) ?? days[0] ?? null;
+  });
+
+  /** Jour vide à venir : pas de séance faite ni prévue, souplesse facultative. */
+  protected isRest(d: CalendarDay): boolean {
+    return d.inDays >= 0 && !d.done && !d.planned;
+  }
+
   /** Séances prévues pendant la période affichée (au moins la prochaine). */
   protected readonly upcoming = computed(() => {
     const s = this.schedule();
@@ -113,6 +133,7 @@ export class PlanningPage implements OnInit {
 
   ngOnInit(): void {
     this.load();
+    this.mobilityStore.load();
     this.api
       .listSessions(40)
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -148,6 +169,13 @@ export class PlanningPage implements OnInit {
 
   /** Clic sur un jour prévu du calendrier : on descend jusqu'à son détail. */
   protected show(day: CalendarDay): void {
+    if (this.isRest(day)) {
+      this.picked.set(day.key);
+      document
+        .getElementById('rest-day')
+        ?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+      return;
+    }
     if (!day.planned) return;
     document
       .getElementById(`plan-${day.key}`)

@@ -3,6 +3,7 @@ import { GymsModule } from '../gyms/gyms.module';
 import { SessionsModule } from '../sessions/sessions.module';
 import { MistralGenerator } from './mistral.generator';
 import { MistralScheduleAdvisor } from './mistral.schedule';
+import { MobilityService } from './mobility.service';
 import { PlansController } from './plans.controller';
 import { CLOCK, PlansService } from './plans.service';
 import { RuleBasedGenerator } from './rule-based.generator';
@@ -14,6 +15,7 @@ import { RuleBasedGenerator } from './rule-based.generator';
     PlansService,
     MistralGenerator,
     MistralScheduleAdvisor,
+    MobilityService,
     RuleBasedGenerator,
     { provide: CLOCK, useValue: () => new Date() },
   ],

@@ -415,6 +415,38 @@ describe('API (e2e)', () => {
       http().post('/api/plans/generate').send({ availableMinutes: 10 }).expect(400));
   });
 
+  describe('souplesse des jours de pause', () => {
+    it('sert la routine depuis la base, exercices dans l’ordre avec ⓘ et vidéo', async () => {
+      const res = await http().get('/api/plans/mobility').expect(200);
+      expect(res.body).toMatchObject({ id: 'souplesse', title: 'Souplesse', minutes: 15 });
+      expect(res.body.steps.map((s: { title: string }) => s.title)).toEqual([
+        'Chat-vache',
+        '90/90',
+        'Fente basse',
+        'Squat cosaque',
+        'Grenouille',
+        'Pied haut',
+        'Haut du dos',
+      ]);
+      for (const s of res.body.steps) {
+        expect(s.info.why).not.toBe('');
+        expect(s.info.how.length).toBeGreaterThan(0);
+        expect(s.info.pitfalls.length).toBeGreaterThan(0);
+        expect(s.video).toMatch(/^https:\/\/www\.youtube\.com\//);
+      }
+      expect(
+        res.body.steps.filter((s: { sides: boolean }) => s.sides).map((s: { id: string }) => s.id),
+      ).toEqual(['low-lunge', 'high-step']);
+      const seconds = res.body.steps.reduce(
+        (t: number, s: { seconds: number }) => t + s.seconds,
+        0,
+      );
+      expect(seconds).toBeLessThanOrEqual(15 * 60);
+    });
+
+    it('réservée aux comptes connectés', () => anonymous().get('/api/plans/mobility').expect(401));
+  });
+
   describe('cotations et salles', () => {
     it('convertit une cotation', () =>
       http()

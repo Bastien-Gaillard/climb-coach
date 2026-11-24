@@ -2,7 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, fakeAsync, TestBed, tick } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { PlannedSession, Schedule, Session } from '../../core/models';
+import { MobilityRoutine, PlannedSession, Schedule, Session } from '../../core/models';
 import { PlanningPage } from './planning';
 
 /** AAAA-MM-JJ local, décalé de `n` jours par rapport à aujourd'hui. */
@@ -33,6 +33,14 @@ const schedule = (perWeek: number, sessions: PlannedSession[], extra: Partial<Sc
     ...extra,
   }) as Schedule;
 
+const routine: MobilityRoutine = {
+  id: 'souplesse',
+  title: 'Souplesse',
+  minutes: 15,
+  intro: '',
+  steps: [],
+};
+
 const done: Session = {
   id: 's1',
   date: new Date().toISOString(),
@@ -54,6 +62,7 @@ describe('PlanningPage', () => {
     fixture.detectChanges();
     http.expectOne((r) => r.url === '/api/plans/schedule').flush(s);
     http.expectOne((r) => r.url === '/api/sessions').flush([done]);
+    http.match('/api/plans/mobility').forEach((r) => r.flush(routine));
     fixture.detectChanges();
   };
   const items = () => el.querySelectorAll('[data-testid=planning] > li');
@@ -173,5 +182,22 @@ describe('PlanningPage', () => {
 
     expect(checked()).toBe('5');
     expect(items().length).toBe(4);
+  });
+
+  it('jour vide à venir : pause, souplesse facultative avec minuteur', () => {
+    open(schedule(3, [planned(2)]));
+    const card = () => el.querySelector('[data-testid=rest-day]')!;
+    // Aujourd'hui est fait : le premier jour vide est demain
+    expect(card().textContent).toContain('Pause · souplesse 15 min');
+    expect(card().querySelector('[data-testid=rest-start]')?.getAttribute('href')).toBe(
+      '/souplesse',
+    );
+    expect(el.querySelector('.cal-day.today')!.classList).not.toContain('rest');
+
+    const later = el.querySelectorAll<HTMLButtonElement>('.cal-day.rest')[3];
+    expect(later.disabled).toBe(false);
+    later.click();
+    fixture.detectChanges();
+    expect(later.classList).toContain('picked');
   });
 });

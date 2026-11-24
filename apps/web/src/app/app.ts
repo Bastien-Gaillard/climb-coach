@@ -7,7 +7,7 @@ import { AiBanner } from './shared/ai-banner';
 import { Icon } from './shared/icon';
 
 /** Écrans plein écran sur mobile : ils ont leur propre barre d'actions en bas. */
-const IMMERSIVE = ['/seance', '/seance-en-cours'];
+const IMMERSIVE = ['/seance', '/seance-en-cours', '/souplesse'];
 
 @Component({
   selector: 'app-root',

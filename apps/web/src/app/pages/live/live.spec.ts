@@ -155,6 +155,8 @@ describe('LivePage · minuteur', () => {
   it('rattrape le temps passé en veille, même sur plusieurs blocs', () => {
     // Téléphone en veille : aucun tick pendant 20 min, puis la page revient
     jasmine.clock().mockDate(new Date(t0.getTime() + 20 * 60_000));
+    // La fenêtre de test peut être en arrière-plan : on simule une page revenue à l'écran
+    spyOnProperty(document, 'visibilityState').and.returnValue('visible');
     document.dispatchEvent(new Event('visibilitychange'));
     fixture.detectChanges();
 
@@ -205,6 +207,8 @@ describe('LivePage · minuteur', () => {
 
   it('ne vibre pas au retour de veille pour une fin de bloc déjà ancienne', () => {
     jasmine.clock().mockDate(new Date(t0.getTime() + 20 * 60_000));
+    // La fenêtre de test peut être en arrière-plan : on simule une page revenue à l'écran
+    spyOnProperty(document, 'visibilityState').and.returnValue('visible');
     document.dispatchEvent(new Event('visibilitychange'));
     fixture.detectChanges();
     expect(title()).toBe('Technique');

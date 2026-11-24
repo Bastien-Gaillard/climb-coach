@@ -1,0 +1,109 @@
+@if (!started()) {
+<header class="bar">
+  <a routerLink="/planning" class="btn icon close" aria-label="Retour au planning">
+    <app-icon name="back" [size]="22" [stroke]="2.4" />
+  </a>
+  <span class="overline">Jour de pause · facultatif</span>
+</header>
+
+@if (routine(); as r) {
+<section class="intro">
+  <h1>{{ r.title }} <span class="num mins">{{ r.minutes }} min</span></h1>
+  <p class="muted">{{ r.intro }}</p>
+</section>
+
+<ol class="list" data-testid="mobility-steps">
+  @for (st of r.steps; track st.id; let n = $index) {
+  <li class="card">
+    <div class="head">
+      <span class="num idx">{{ n + 1 }}</span>
+      <strong>{{ st.title }}</strong>
+      <span class="dose">{{ st.dose }}</span>
+    </div>
+    <p>{{ st.instruction }}</p>
+    <app-info [info]="st.info" [video]="st.video" label="Pourquoi, comment" />
+  </li>
+  }
+</ol>
+
+<div class="controls single">
+  <button type="button" class="primary" (click)="start()" data-testid="mobility-start">
+    <app-icon name="play" [size]="24" />Lancer le minuteur
+  </button>
+</div>
+} @else if (loadError()) {
+<p class="error">Impossible de charger la routine. Vérifie ta connexion et réessaie.</p>
+} @else {
+<p class="muted">Chargement…</p>
+} } @else {
+<header class="top">
+  <div class="bar">
+    <button type="button" class="btn icon close" aria-label="Arrêter" (click)="close()">
+      <app-icon name="close" [size]="22" [stroke]="2.4" />
+    </button>
+    <span class="overline">{{ index() + 1 }} / {{ steps().length }} · Souplesse</span>
+  </div>
+  <div class="segs" aria-hidden="true">
+    @for (x of steps(); track x.id; let k = $index) {
+    <span
+      [style.flex-grow]="x.seconds"
+      [class.done]="k < index()"
+      [class.cur]="k === index()"
+    ></span>
+    }
+  </div>
+</header>
+
+<section class="body">
+  <div class="title">
+    <span class="overline kind">{{ step().dose }}</span>
+    <h1 data-testid="mobility-title">{{ step().title }}</h1>
+  </div>
+
+  <div class="timer" role="timer" aria-live="off">
+    <span class="num clock">{{ clock() }}</span>
+    <div class="progress"><span [style.width.%]="progress()"></span></div>
+    <span class="muted">
+      @if (done()) { Terminé, bravo } @else if (!running()) { En pause } @else if (side(); as s) {
+      <b class="side">{{ s }}</b> } @else { restant }
+    </span>
+  </div>
+
+  <p class="instruction">{{ step().instruction }}</p>
+  <app-info [info]="step().info" [video]="step().video" label="Pourquoi, comment" />
+
+  <div class="then">
+    <span class="overline">Ensuite</span>
+    <span class="grow"> @if (next(); as nx) { {{ nx.title }} · {{ nx.dose }} } @else { Fin } </span>
+  </div>
+</section>
+
+<div class="controls">
+  <button
+    type="button"
+    (click)="go(index() - 1)"
+    [disabled]="index() === 0"
+    aria-label="Exercice précédent"
+  >
+    <app-icon name="prev" [size]="28" />
+  </button>
+  @if (done()) {
+  <a routerLink="/planning" class="btn primary">
+    <app-icon name="check" [size]="24" [stroke]="3" />Terminer
+  </a>
+  } @else {
+  <button type="button" class="primary" (click)="toggle()">
+    <app-icon [name]="running() ? 'pause' : 'play'" [size]="26" />
+    {{ running() ? 'Pause' : 'Reprendre' }}
+  </button>
+  }
+  <button
+    type="button"
+    (click)="go(index() + 1)"
+    [disabled]="isLast()"
+    aria-label="Exercice suivant"
+  >
+    <app-icon name="next" [size]="28" />
+  </button>
+</div>
+}

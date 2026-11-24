@@ -80,13 +80,16 @@
       [class.past]="d.inDays < 0"
       [class.done]="d.done"
       [class.planned]="d.planned"
+      [class.rest]="isRest(d)"
+      [class.picked]="restDay()?.key === d.key"
       [attr.data-focus]="d.planned?.focus ?? d.done?.focus"
-      [disabled]="!d.planned"
+      [disabled]="!d.planned && !isRest(d)"
       (click)="show(d)"
       [attr.aria-label]="
         (d.date | date: 'EEEE d MMMM') +
         (d.done ? ' : séance faite, ' + focusLabel[d.done.focus] : '') +
-        (d.planned ? ' : ' + focusLabel[d.planned.focus] + ', ' + duration(d.planned.durationMinutes) : '')
+        (d.planned ? ' : ' + focusLabel[d.planned.focus] + ', ' + duration(d.planned.durationMinutes) : '') +
+        (isRest(d) ? ' : pause, souplesse facultative' : '')
       "
     >
       <span class="n">{{ d.date | date: 'd' }}</span>
@@ -111,6 +114,21 @@
     <span class="chip done">✓</span> Faite <span class="ai-dot"></span> IA
   </p>
 </section>
+
+@if (restDay(); as r) { @if (mobility(); as m) {
+<section class="rest-card card" id="rest-day" data-testid="rest-day">
+  <div class="rest-text">
+    <span class="overline">
+      @if (r.inDays === 0) { Aujourd'hui } @else { {{ r.date | date: 'EEEE d MMMM' }} }
+    </span>
+    <strong>Pause · {{ m.title | lowercase }} {{ m.minutes }} min</strong>
+    <span class="muted small">Facultatif, chez toi, sans matériel</span>
+  </div>
+  <a routerLink="/souplesse" class="btn primary go" data-testid="rest-start">
+    <app-icon name="play" [size]="18" />Lancer le minuteur
+  </a>
+</section>
+} }
 
 <h2 class="overline">Prochaines séances</h2>
 <ol class="list" data-testid="planning">

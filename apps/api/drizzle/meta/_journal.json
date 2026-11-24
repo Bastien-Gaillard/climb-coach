@@ -78,6 +78,13 @@
       "when": 1795374902129,
       "tag": "0010_daily_cue",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1795519716972,
+      "tag": "0011_mobility",
+      "breakpoints": true
     }
   ]
 }

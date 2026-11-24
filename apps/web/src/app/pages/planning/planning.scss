@@ -233,6 +233,42 @@
   }
 }
 
+// ---------- Jour de pause
+
+.cal-day.rest {
+  cursor: pointer;
+}
+
+.cal-day.picked:not(.today) {
+  box-shadow: inset 0 0 0 2px var(--line-strong);
+}
+
+.rest-card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  scroll-margin: 80px;
+
+  .rest-text {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 180px;
+  }
+
+  strong {
+    font-size: 18px;
+  }
+
+  .go {
+    margin-top: 0;
+    gap: 6px;
+  }
+}
+
 // ---------- Liste détaillée
 
 h2.overline {
