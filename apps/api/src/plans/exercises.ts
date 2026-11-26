@@ -181,7 +181,7 @@ export const EXERCISES: Exercise[] = [
     points: ['power', 'lock-off', 'pushing'],
     name: 'Circuit dur',
     summary:
-      '5 blocs durs à réussir en 30 min ; quand ils passent tous, on remplace le plus facile.',
+      '5 blocs durs à réussir en 30 min, du haut de son niveau à la couleur au-dessus ; quand ils passent tous, on remplace le plus facile.',
     minMinutes: 30,
     stressful: true,
     source: 'https://www.lasportivausa.com/blogs/blog/gym-series-bouldering-power-hour',
@@ -189,6 +189,7 @@ export const EXERCISES: Exercise[] = [
     info: {
       why: 'Un même circuit d’une séance à l’autre montre tes progrès, et la règle de remplacement fait monter le niveau tout seul.',
       how: [
+        '3 blocs dans le haut de ta couleur et 2 dans la couleur au-dessus : un circuit dur mais faisable',
         'Garde les mêmes 5 blocs tant qu’ils ne passent pas tous en 30 min',
         'Commence par les blocs à grosses prises (plats, pinces), finis par les réglettes',
         'Tous réussis en 30 min : la prochaine fois, remplace le plus facile par un plus dur',
@@ -200,8 +201,12 @@ export const EXERCISES: Exercise[] = [
     build: (c) => ({
       title: 'Circuit dur',
       target: c.project,
+      // 5 blocs dans la couleur au-dessus, c'est hors de portée tant qu'on n'en a réussi qu'un ou
+      // deux : 3 dans le haut de sa couleur, 2 au-dessus, et la règle de remplacement fait monter
       instructions: [
-        `5 blocs en ${c.grade(c.project)}`,
+        ...(c.project > c.level + 1
+          ? [`3 blocs en ${c.grade(c.level + 1)}`, `2 blocs en ${c.grade(c.project)}`]
+          : [`5 blocs en ${c.grade(c.project)}`]),
         'À réussir en 30 min, des grosses prises vers les réglettes',
         'Repos 3 min minimum entre deux efforts',
         ...(c.minutes > 35 ? ['Temps restant : reprends les blocs ratés'] : []),

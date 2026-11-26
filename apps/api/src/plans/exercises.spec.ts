@@ -103,6 +103,14 @@ describe('catalogue des formats', () => {
     }
   });
 
+  it('circuit dur : 3 blocs dans le haut de sa couleur, 2 dans la couleur au-dessus', () => {
+    expect(build('hard-circuit', 30).instructions.slice(0, 2)).toEqual([
+      '3 blocs en G7',
+      '2 blocs en G8',
+    ]);
+    expect(build('hard-circuit', 30, { project: 7 }).instructions[0]).toBe('5 blocs en G7');
+  });
+
   it('tes 5 plus durs : un cran au-dessus du niveau, jamais plus que ce qui a été réussi', () => {
     expect(build('top-five', 25, { best: 9 }).target).toBe(7);
     expect(build('top-five', 25, { best: 6 }).target).toBe(6);
