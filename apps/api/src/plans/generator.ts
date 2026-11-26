@@ -51,11 +51,12 @@ export interface TimeSplit {
 }
 
 /**
- * Échauffement (15 min, 20 dès 60 min) et retour au calme quasi fixes, le cœur de séance prend
- * le reste. Le bonus facultatif vient en plus.
+ * Échauffement (15 min en force, où les doigts doivent être chauds avant les blocs durs, 10 min
+ * sinon) et retour au calme quasi fixes, le cœur de séance prend le reste. Le bonus facultatif
+ * vient en plus.
  */
-export function splitTime(available: number): TimeSplit {
-  const warmup = available >= 60 ? 20 : 15;
+export function splitTime(available: number, focus?: Focus): TimeSplit {
+  const warmup = focus === 'strength' || focus === undefined ? 15 : 10;
   const core = available >= 90 ? 15 : available >= 45 ? 10 : 0;
   const cooldown = available >= 60 ? 5 : 0;
   return { warmup, core, cooldown, main: available - warmup - core - cooldown };

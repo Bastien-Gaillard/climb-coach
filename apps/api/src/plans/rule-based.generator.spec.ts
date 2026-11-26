@@ -16,14 +16,28 @@ describe('splitTime', () => {
     expect(t.main).toBeGreaterThan(0);
   });
 
+  it.each(['strength', 'endurance', 'technique'] as const)(
+    'répartit exactement le temps en %s',
+    (focus) => {
+      for (const available of [30, 45, 60, 90, 120, 180]) {
+        const t = splitTime(available, focus);
+        expect(t.warmup + t.main + t.core + t.cooldown).toBe(available);
+        expect(t.main).toBeGreaterThan(0);
+      }
+    },
+  );
+
   it('supprime le gainage et le retour au calme sur une séance courte', () => {
-    expect(splitTime(30)).toEqual({ warmup: 15, main: 15, core: 0, cooldown: 0 });
+    expect(splitTime(30, 'strength')).toEqual({ warmup: 15, main: 15, core: 0, cooldown: 0 });
+    expect(splitTime(30, 'technique')).toEqual({ warmup: 10, main: 20, core: 0, cooldown: 0 });
   });
 
-  it('échauffement de 15 min, 20 dès 60 min', () => {
-    expect(splitTime(45).warmup).toBe(15);
-    expect(splitTime(60).warmup).toBe(20);
-    expect(splitTime(180).warmup).toBe(20);
+  it('échauffement de 15 min en force, 10 min en endurance et en technique, quelle que soit la durée', () => {
+    for (const available of [45, 60, 180]) {
+      expect(splitTime(available, 'strength').warmup).toBe(15);
+      expect(splitTime(available, 'endurance').warmup).toBe(10);
+      expect(splitTime(available, 'technique').warmup).toBe(10);
+    }
   });
 });
 
@@ -272,10 +286,10 @@ describe('RuleBasedGenerator', () => {
         history: strengthHistory,
       });
       expect(plan.focus).toBe('strength');
-      expect(plan.blocks[0]).toMatchObject({ kind: 'warmup', minutes: 20 });
+      expect(plan.blocks[0]).toMatchObject({ kind: 'warmup', minutes: 15 });
       expect(plan.blocks[0].instructions).toEqual([
         'Au sol, 5 min : cardio léger, puis poignets, doigts et épaules',
-        '6 blocs en 5, lentement, avec la consigne du jour',
+        '5 blocs en 5, lentement, avec la consigne du jour',
         'Puis un bloc par couleur jusqu’à 6B, repos 3 min avant la suite',
       ]);
     });
@@ -287,13 +301,20 @@ describe('RuleBasedGenerator', () => {
         history: [session(2, now, { focus: 'strength', climbList: [{ grade: '6B', value: 6 }] })],
       });
       expect(plan.focus).toBe('endurance');
+      expect(plan.blocks[0]).toMatchObject({ kind: 'warmup', minutes: 10 });
+      expect(plan.blocks[0].instructions[0]).toBe(
+        'Au sol, 2 min : cardio léger, puis poignets, doigts et épaules',
+      );
+      expect(plan.blocks[0].instructions[1]).toMatch(/^3 blocs en /);
       expect(plan.blocks[0].instructions[2]).toBe('Puis un bloc par couleur jusqu’à 6A');
     });
 
-    it('pas de montée en technique', async () => {
+    it('pas de montée en technique, 10 min avec 4 blocs faciles', async () => {
       const plan = await generator.generate({ availableMinutes: 60, now, history: [] });
       expect(plan.focus).toBe('technique');
+      expect(plan.blocks[0]).toMatchObject({ kind: 'warmup', minutes: 10 });
       expect(plan.blocks[0].instructions).toHaveLength(2);
+      expect(plan.blocks[0].instructions[1]).toMatch(/^4 blocs en /);
     });
 
     it('reste doux quand une douleur est signalée', async () => {
@@ -483,6 +504,23 @@ describe('format principal et format secondaire', () => {
       expect(value(second)).toBeGreaterThanOrEqual(6);
     }
   });
+
+  it.each(['strength', 'endurance'] as const)(
+    '%s en 90 min (cœur de 50 min) : le principal n’a jamais moins de temps que le secondaire',
+    async (focus) => {
+      for (let d = 0; d < 12; d++) {
+        const plan = await generator.generate({
+          availableMinutes: 90,
+          now: day(d),
+          history: [session(3, now, { focus: 'technique' })],
+          requestedFocus: focus,
+        });
+        const mains = plan.blocks.filter((b) => b.kind === 'main');
+        expect(mains).toHaveLength(2);
+        expect(mains[0].minutes).toBeGreaterThan(mains[1].minutes);
+      }
+    },
+  );
 
   it('technique : pas de format secondaire allégé', async () => {
     for (let d = 0; d < 4; d++) {

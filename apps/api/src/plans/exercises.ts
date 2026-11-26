@@ -138,7 +138,7 @@ export const EXERCISES: Exercise[] = [
     name: '3 essais max',
     summary:
       'Des blocs à son niveau et au-dessus (2 à 8 selon le temps), 3 essais par bloc pour le réussir, pas un de plus.',
-    minMinutes: 25,
+    minMinutes: 20,
     source:
       'https://gripped.com/sections/training/develop-your-try-hard-mindset-with-this-workout/',
     video: ytSearch('3 attempts bouldering session try hard'),

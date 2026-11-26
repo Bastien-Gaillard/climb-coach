@@ -33,7 +33,7 @@ export class RuleBasedGenerator implements PlanGenerator {
 
   async generate(ctx: GeneratorContext): Promise<Plan> {
     const a = analyzeHistory(ctx);
-    const time = splitTime(ctx.availableMinutes);
+    const time = splitTime(ctx.availableMinutes, a.focus);
     const light = a.intensity === 'light' ? 1 : 0;
     const mains =
       a.style === 'boulder'
@@ -65,7 +65,7 @@ export class RuleBasedGenerator implements PlanGenerator {
     head: Pick<Plan, 'focus' | 'intensity' | 'summary'>,
   ): Plan {
     const a = { ...analysis, focus: head.focus };
-    const time = splitTime(ctx.availableMinutes);
+    const time = splitTime(ctx.availableMinutes, a.focus);
     const light = head.intensity === 'light' ? 1 : 0;
     const blocks: PlanBlock[] = [this.warmup(ctx, a, time.warmup, light), ...mains];
     if (a.style === 'boulder') {
@@ -136,13 +136,18 @@ export class RuleBasedGenerator implements PlanGenerator {
     };
     // Le format le plus exigeant d'abord, quand on est frais : des blocs durs après 25 min de
     // volume se grimpent en force, pas proprement
-    // Le principal prend aussi la plus grosse part du temps
-    const ordered = favorMain(
-      picks
-        .map((pick, i) => ({ pick, i, rank: gradeRank(build(pick, 0)) }))
-        .sort((x, y) => y.rank - x.rank || x.i - y.i)
-        .map((x) => x.pick),
-    );
+    const sorted = picks
+      .map((pick, i) => ({ pick, i, rank: gradeRank(build(pick, 0)) }))
+      .sort((x, y) => y.rank - x.rank || x.i - y.i);
+    // Le principal prend aussi la plus grosse part du temps. À couleur égale, si le principal reste
+    // sans la plus grosse part (circuit dur demande 30 min sur un cœur de 50), on les inverse
+    let ordered = favorMain(sorted.map((x) => x.pick));
+    if (ordered.length === 2 && sorted[0].rank === sorted[1].rank) {
+      const swapped = favorMain([ordered[1], ordered[0]]);
+      if (ordered[0].minutes <= ordered[1].minutes && swapped[0].minutes > ordered[0].minutes) {
+        ordered = swapped;
+      }
+    }
     // En force et en endurance, le second format est secondaire : un cran plus facile, pour garder
     // de la qualité au lieu d'empiler deux efforts durs. La technique est déjà peu intense.
     const secondaryEasier = a.focus === 'technique' ? 0 : 1;
@@ -184,9 +189,12 @@ export class RuleBasedGenerator implements PlanGenerator {
     const u = this.unit(a.style);
     const label = (v: number) => this.label(ctx, a.style, this.grade(a.style, v));
     const careful = !!a.pain || light === 1;
-    const easyCount = minutes >= 18 ? 6 : minutes >= 15 ? 5 : 4;
+    // 15 min en force : 5 min au sol, 5 blocs faciles, la montée. 10 min sinon : 2 min au sol,
+    // 3 ou 4 blocs faciles (4 en technique, sans montée)
+    const short = minutes < 15;
+    const easyCount = !short ? 5 : a.focus === 'technique' ? 4 : 3;
     const instructions = [
-      'Au sol, 5 min : cardio léger, puis poignets, doigts et épaules',
+      `Au sol, ${short ? 2 : 5} min : cardio léger, puis poignets, doigts et épaules`,
       `${easyCount} ${u} en ${label(a.level - 4 - light)}, lentement, avec la consigne du jour`,
     ];
     if (a.focus === 'strength') {
