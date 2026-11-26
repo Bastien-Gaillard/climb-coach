@@ -15,6 +15,13 @@ export const PlanInfoSchema = z.object({
  */
 export const BlockKindSchema = z.enum(['warmup', 'main', 'bonus', 'core', 'cooldown']);
 
+/** Couleur de la salle dans un badge, avec ce qu'on affiche (« bleu facile »). */
+const TargetColorSchema = z.object({
+  color: z.string().min(1),
+  hex: z.string().optional(),
+  label: z.string().optional(),
+});
+
 export const PlanBlockSchema = z.object({
   kind: BlockKindSchema,
   title: z.string().min(1).max(80),
@@ -32,9 +39,7 @@ export const PlanBlockSchema = z.object({
       /** Cotations demandées dans les consignes, de la plus facile à la plus dure (ajoutées par l'API). */
       range: z.object({ min: z.string().min(1), max: z.string().min(1) }).optional(),
       /** Couleurs de la salle choisie qui couvrent la cotation (ajoutées par l'API). */
-      colors: z
-        .array(z.object({ color: z.string().min(1), hex: z.string().optional() }))
-        .optional(),
+      colors: z.array(TargetColorSchema).optional(),
       /**
        * Volume par cotation (« 3 blocs » en 5+), sorti des consignes pour être affiché
        * dans le badge, chacun avec ses propres couleurs (ajouté par l'API).
@@ -44,9 +49,7 @@ export const PlanBlockSchema = z.object({
           z.object({
             count: z.string().min(1),
             grade: z.string().min(1),
-            colors: z
-              .array(z.object({ color: z.string().min(1), hex: z.string().optional() }))
-              .optional(),
+            colors: z.array(TargetColorSchema).optional(),
           }),
         )
         .optional(),

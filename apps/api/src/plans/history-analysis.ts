@@ -99,7 +99,7 @@ function analyzeSessions(ctx: GeneratorContext): Omit<HistoryAnalysis, 'level'> 
       style,
       maxSent: DEFAULT_LEVEL[style],
       project: DEFAULT_LEVEL[style],
-      focus: ctx.requestedFocus ?? 'technique',
+      focus: ctx.requestedFocus ?? ctx.planned?.focus ?? 'technique',
       intensity: 'normal',
       pain: null,
       reasons: [
@@ -130,8 +130,10 @@ function analyzeSessions(ctx: GeneratorContext): Omit<HistoryAnalysis, 'level'> 
   const daysSinceLast = Math.floor((ctx.now.getTime() - last.date.getTime()) / DAY_MS);
   const favored = favoredFocus(ctx.focusGoal, ctx.weakPoints);
   const requested = ctx.requestedFocus;
+  const planned = requested ? undefined : ctx.planned;
   let focus =
     requested ??
+    planned?.focus ??
     nextFocus(
       ctx.history.map((s) => s.focus),
       focusWeights(favored?.focus),
@@ -141,18 +143,23 @@ function analyzeSessions(ctx: GeneratorContext): Omit<HistoryAnalysis, 'level'> 
     focus === 'strength' &&
     !!lastStrength &&
     ctx.now.getTime() - lastStrength.date.getTime() < STRENGTH_SPACING_MS;
-  // Type choisi à la main : on le garde, et on prévient seulement
-  if (strengthTooSoon && !requested) focus = last.focus === 'technique' ? 'endurance' : 'technique';
-  let intensity: HistoryAnalysis['intensity'] = 'normal';
+  // Type choisi à la main ou prévu au planning (qui tient déjà compte des 48 h) : on le garde
+  const kept = !!requested || !!planned;
+  if (strengthTooSoon && !kept) focus = last.focus === 'technique' ? 'endurance' : 'technique';
+  let intensity: HistoryAnalysis['intensity'] = planned?.intensity ?? 'normal';
 
   if (requested) reasons.push(`Séance ${ofFocus(requested)} choisie à la place du planning`);
+  if (planned) {
+    const when = planned.inDays === 0 ? 'aujourd’hui' : 'pour la prochaine séance';
+    reasons.push(`Séance ${ofFocus(planned.focus)} prévue au planning ${when}`);
+  }
   if (daysSinceLast >= 14) {
-    if (!requested) focus = 'technique';
+    if (!kept) focus = 'technique';
     intensity = 'light';
     reasons.push(`${daysSinceLast} jours sans grimper : reprise en douceur`);
   } else if (daysSinceLast < 1 || (last.fatigue >= 4 && daysSinceLast < 2)) {
     intensity = 'light';
-    if (focus === 'strength' && !requested) focus = 'technique';
+    if (focus === 'strength' && !kept) focus = 'technique';
     reasons.push(
       daysSinceLast < 1
         ? 'Dernière séance il y a moins de 24 h : séance légère'
@@ -160,12 +167,12 @@ function analyzeSessions(ctx: GeneratorContext): Omit<HistoryAnalysis, 'level'> 
     );
   } else if (strengthTooSoon) {
     reasons.push(
-      requested
+      kept
         ? 'Force il y a moins de 48 h : les doigts n’ont pas fini de récupérer, écoute-les'
         : `Force il y a moins de 48 h : on attend avant la suivante, séance ${ofFocus(focus)}`,
     );
-  } else if (requested) {
-    // Rien à ajouter : la raison est le choix lui-même
+  } else if (kept) {
+    // Rien à ajouter : la raison est le choix lui-même, ou le planning
   } else if (favored?.focus === focus && favored.source === 'goal') {
     reasons.push(`Objectif ${FOCUS_LABEL[focus]} : séance ${ofFocus(focus)}, environ une sur deux`);
   } else if (favored?.focus === focus) {
@@ -179,8 +186,11 @@ function analyzeSessions(ctx: GeneratorContext): Omit<HistoryAnalysis, 'level'> 
     );
   }
 
-  // Type choisi à la main : les douleurs notées ne changent rien, le grimpeur décide
-  const pain = requested ? null : findRecentPain(ctx, recent);
+  // Séance du planning : son intensité est gardée telle quelle, fatigue comprise
+  if (planned) intensity = planned.intensity;
+
+  // Type choisi à la main ou prévu au planning : les douleurs notées ne changent rien
+  const pain = kept ? null : findRecentPain(ctx, recent);
   if (pain) {
     intensity = 'light';
     if (focus === 'strength') focus = 'technique';

@@ -114,9 +114,14 @@ export interface PlanBlock {
     /** Cotations demandées dans les consignes, de la plus facile à la plus dure. */
     range?: { min: string; max: string };
     /** Couleurs de la salle choisie qui couvrent la cotation. */
-    colors?: { color: string; hex?: string }[];
+    /** `label` : « bleu facile », « rose difficile » (pas de cotation Font). */
+    colors?: { color: string; hex?: string; label?: string }[];
     /** Volume par cotation (« 3 blocs » en 5+), chacun avec ses couleurs de salle. */
-    volumes?: { count: string; grade: string; colors?: { color: string; hex?: string }[] }[];
+    volumes?: {
+      count: string;
+      grade: string;
+      colors?: { color: string; hex?: string; label?: string }[];
+    }[];
   };
 }
 

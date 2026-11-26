@@ -83,7 +83,8 @@ describe('LivePage · minuteur', () => {
     const rows = Array.from(el.querySelectorAll('[data-testid=target-volume]'));
     expect(rows.map((r) => r.querySelectorAll('.hold-chip').length)).toEqual([2, 1]);
     expect(rows[0].textContent).toContain('3 blocs');
-    expect(rows[1].textContent).toContain('rouge');
+    expect(rows[1].textContent).toContain('Rouge');
+    expect(rows[1].textContent).not.toContain('6A');
   });
 
   it('ouvre la vidéo de l’exercice dans un nouvel onglet, seulement quand il y en a une', () => {

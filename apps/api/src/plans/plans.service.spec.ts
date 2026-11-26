@@ -153,15 +153,57 @@ describe('PlansService.generate', () => {
     const { service, rulesSpy, sessions } = setup({ enabled: true });
     await service.generate('u1', 90);
     expect(sessions.findRecent).toHaveBeenCalledWith('u1', 10);
-    expect(rulesSpy).toHaveBeenCalledWith({
-      availableMinutes: 90,
-      now,
-      history: [],
-      equipment: [],
-      weakPoints: [],
-      likedPoints: [],
-      focusGoal: null,
+    expect(rulesSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        availableMinutes: 90,
+        now,
+        history: [],
+        equipment: [],
+        weakPoints: [],
+        likedPoints: [],
+        focusGoal: null,
+      }),
+    );
+  });
+
+  it('sans type choisi, suit la séance conseillée par le planning', async () => {
+    const { service, rulesSpy, sessions, advisor } = setup({ enabled: true });
+    (sessions.findRecent as jest.Mock).mockResolvedValue([session(3, now, { focus: 'technique' })]);
+    // Planning du mois déjà fait : force aujourd'hui
+    jest.spyOn(service, 'schedule').mockResolvedValue({
+      today: '2025-11-23',
+      source: 'mistral',
+      sessionsPerWeek: 4,
+      basedOn: null,
+      sessions: [
+        {
+          date: '2025-11-23',
+          inDays: 0,
+          focus: 'strength',
+          durationMinutes: 90,
+          intensity: 'normal',
+          reason: 'Force',
+          source: 'mistral',
+        },
+      ],
+    } as never);
+    const result = await service.generate('u1', 90, undefined, [], {}, undefined, 4);
+    expect(service.schedule).toHaveBeenCalledWith('u1', 7, 4, {});
+    expect(rulesSpy.mock.calls[0][0].planned).toEqual({
+      focus: 'strength',
+      intensity: 'normal',
+      inDays: 0,
     });
+    expect(result.plan.focus).toBe('strength');
+    expect(advisor.advisePlan).not.toHaveBeenCalled();
+  });
+
+  it('un type choisi à la main ne regarde pas le planning', async () => {
+    const { service, rulesSpy } = setup({ enabled: true });
+    const spy = jest.spyOn(service, 'schedule');
+    await service.generate('u1', 60, undefined, [], {}, 'endurance', 4);
+    expect(spy).not.toHaveBeenCalled();
+    expect(rulesSpy.mock.calls[0][0].planned).toBeUndefined();
   });
 
   it('passe le niveau déclaré dans la salle du jour', async () => {

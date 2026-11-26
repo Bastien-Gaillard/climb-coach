@@ -308,12 +308,12 @@ describe('GeneratePage', () => {
     req.flush(withColors);
     fixture.detectChanges();
 
-    expect(el.querySelector('[data-testid=target-colors]')?.textContent).toContain('bleu');
+    expect(el.querySelector('[data-testid=target-colors]')?.textContent).toContain('Bleu');
     expect(el.querySelector('h1')?.textContent).toContain('Salle Alpha');
     expect(localStorage.getItem('climb-coach.gym')).toBe('alpha-bloc');
   });
 
-  it('affiche le volume de chaque cotation avec ses propres couleurs, même à cheval', () => {
+  it('affiche le volume avec ses couleurs et leur nuance, sans cotation Font', () => {
     click('Générer');
     const withVolumes = structuredClone(response);
     withVolumes.plan.blocks[1].instructions = ['Pose la pointe du chausson'];
@@ -326,7 +326,7 @@ describe('GeneratePage', () => {
           grade: '5+',
           colors: [
             { color: 'orange', hex: '#f97316' },
-            { color: 'bleu', hex: '#3b82f6' },
+            { color: 'Difficile', hex: '#3b82f6', label: 'bleu facile' },
           ],
         },
         { count: '2 blocs', grade: '6A', colors: [{ color: 'rouge', hex: '#ef4444' }] },
@@ -338,14 +338,16 @@ describe('GeneratePage', () => {
     const rows = Array.from(el.querySelectorAll('[data-testid=target-volume]'));
     expect(rows.length).toBe(2);
     expect(Array.from(rows[0].querySelectorAll('.hold-chip')).map((c) => c.textContent)).toEqual([
-      'orange',
-      'bleu',
+      'Orange',
+      'Bleu facile',
     ]);
-    expect(rows[0].textContent).toContain('3 blocs · Bloc · 5+');
+    expect(rows[0].textContent).toContain('3 blocs');
+    expect(rows[0].textContent).not.toContain('5+');
     expect(Array.from(rows[1].querySelectorAll('.hold-chip')).map((c) => c.textContent)).toEqual([
-      'rouge',
+      'Rouge',
     ]);
-    expect(rows[1].textContent).toContain('2 blocs · Bloc · 6A');
+    expect(rows[1].textContent).toContain('2 blocs');
+    expect(rows[1].textContent).not.toContain('6A');
     expect(el.querySelector('[data-testid=target-colors]')).toBeNull();
     expect(el.querySelector('.blocks ul')?.textContent).not.toContain('3 blocs');
   });

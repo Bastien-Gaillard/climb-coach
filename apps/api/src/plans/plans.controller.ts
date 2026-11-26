@@ -45,6 +45,7 @@ export class PlansController {
       normalizeEquipment(user.equipment),
       profilePoints(user),
       body.focus,
+      user.sessionsPerWeek,
     );
   }
 

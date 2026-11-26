@@ -21,6 +21,12 @@ export interface GeneratorContext {
    * douleurs notées n'allègent pas la séance.
    */
   requestedFocus?: Focus;
+  /**
+   * Séance que le planning conseille (celle affichée sur Générer et dans le Planning), quand
+   * aucun type n'est choisi à la main : son type et son intensité sont gardés tels quels (le
+   * planning a déjà lu les notes).
+   */
+  planned?: { focus: Focus; intensity: 'light' | 'normal'; inDays: number };
   /** Points faibles du profil : un exercice par séance, et le type favorisé sans objectif. */
   weakPoints?: ClimbingPoint[];
   /**

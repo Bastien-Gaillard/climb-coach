@@ -73,11 +73,9 @@
       } @if (b.target?.volumes?.length) { @for (v of b.target!.volumes!; track $index) {
       <div class="target-colors" data-testid="target-volume">
         @for (c of v.colors ?? []; track c.color) {
-        <span class="hold-chip" [style]="holdVars(c.hex)">{{ c.color }}</span>
+        <span class="hold-chip" [style]="holdVars(c.hex)">{{ chipLabel(c) }}</span>
         } @if (v.colors?.length) {
-        <span class="muted small"
-          >{{ v.count }} · {{ styleLabel[b.target!.style] }} · {{ v.grade }}</span
-        >
+        <span class="muted small">{{ v.count }}</span>
         } @else {
         <span class="badge line target"
           >{{ v.count }} · {{ styleLabel[b.target!.style] }} · {{ v.grade }}</span
@@ -87,12 +85,8 @@
       } } @else if (b.target) { @if (b.target.colors?.length) {
       <div class="target-colors" data-testid="target-colors">
         @for (c of b.target.colors; track c.color) {
-        <span class="hold-chip" [style]="holdVars(c.hex)">{{ c.color }}</span>
+        <span class="hold-chip" [style]="holdVars(c.hex)">{{ chipLabel(c) }}</span>
         }
-        <span class="muted small">
-          {{ styleLabel[b.target.style] }} · @if (b.target.range; as r) { {{ r.min }} → {{ r.max }}
-          } @else { {{ b.target.grade }} }
-        </span>
       </div>
       } @else {
       <span class="badge line target"

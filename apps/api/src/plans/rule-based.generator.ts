@@ -5,8 +5,8 @@ import { REFERENCE_SYSTEM } from '../sessions/climb-normalizer';
 import { GeneratorContext, PlanGenerator, splitTime } from './generator';
 import { pickBonus } from './bonus';
 import { exerciseForTitle } from './exercise-videos';
+import { withGymColors } from './gym-colors';
 import { GRIP_POINTS, pickExercises } from './exercises';
-import { gradeLabel } from './gym-colors';
 import { analyzeHistory, FOCUS_LABEL, HistoryAnalysis, Style } from './history-analysis';
 import { Plan, PlanBlock } from './plan.schema';
 
@@ -42,11 +42,13 @@ export class RuleBasedGenerator implements PlanGenerator {
       );
     }
     const intensityLabel = a.intensity === 'light' ? ' (légère)' : '';
-    return this.assemble(ctx, a, mains, {
+    const plan = this.assemble(ctx, a, mains, {
       focus: a.focus,
       intensity: a.intensity,
       summary: `Séance ${FOCUS_LABEL[a.focus]}${intensityLabel} de ${ctx.availableMinutes} min. ${a.reasons.join('. ')}.`,
     });
+    // Cotations en couleurs de la salle, lignes de volume dans le badge
+    return withGymColors(plan, ctx.gym);
   }
 
   /**
@@ -105,6 +107,7 @@ export class RuleBasedGenerator implements PlanGenerator {
     const blocks = picks.map(({ exercise, minutes: m, role, points }) => {
       const built = exercise.build({
         level: a.level,
+        best: a.maxSent,
         project: a.project,
         light,
         minutes: m,
@@ -140,9 +143,12 @@ export class RuleBasedGenerator implements PlanGenerator {
     return gradeFromValue(Math.max(0, value), REFERENCE_SYSTEM[style]);
   }
 
-  /** Cotation à afficher dans une consigne : avec la couleur de la salle si on la connaît. */
-  private label(ctx: GeneratorContext, style: Style, grade: string): string {
-    return gradeLabel(ctx.gym, style, grade);
+  /**
+   * Cotation dans une consigne, entre crochets : `withGymColors` la remplace par la couleur de la
+   * salle (« bleu facile ») et sort les lignes de volume dans le badge.
+   */
+  private label(_ctx: GeneratorContext, _style: Style, grade: string): string {
+    return `[${grade}]`;
   }
 
   private unit(style: Style, plural = true): string {

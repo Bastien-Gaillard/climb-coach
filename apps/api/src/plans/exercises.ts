@@ -20,6 +20,8 @@ export interface ExerciseContext {
    * celle du niveau stable déclaré. Jamais la meilleure réussite d'un jour.
    */
   level: number;
+  /** Meilleure réussite récente (au moins le niveau) : borne « Tes 5 plus durs ». */
+  best?: number;
   /** Niveau visé en force : la couleur au-dessus. */
   project: number;
   /** 1 pour une séance légère, 0 sinon : on baisse les cotations d'un cran. */
@@ -520,11 +522,13 @@ export const EXERCISES: Exercise[] = [
     build: (c) => {
       // 2 essais en moyenne sur des blocs déjà réussis, 3 min de repos : 8 min par bloc
       const n = count(c.minutes, minutesPerBlock(2, 3), 2, 5);
+      // Un cran au-dessus du niveau (le haut de la couleur), sans dépasser ce qui a été réussi
+      const v = Math.max(c.level, Math.min(c.best ?? c.level, c.level + 1));
       return {
         title: 'Tes 5 plus durs',
-        target: c.level,
+        target: v,
         instructions: [
-          `${plural(n, 'bloc')} en ${c.grade(c.level)}, 3 essais max par bloc`,
+          `${plural(n, 'bloc')} en ${c.grade(v)}, 3 essais max par bloc`,
           'Les plus durs que tu as déjà réussis ici',
           'Repos 3 min entre chaque essai',
           `Arrête au bout de ${c.minutes} min, même s’il reste des blocs`,

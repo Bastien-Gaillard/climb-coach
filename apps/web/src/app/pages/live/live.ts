@@ -3,7 +3,7 @@ import { Router, RouterLink } from '@angular/router';
 import { BLOCK_LABEL, FOCUS_LABEL, STYLE_LABEL, videoLabel } from '../../core/labels';
 import { PlanStore } from '../../core/plan.store';
 import { PushAlerts, vibrate } from '../../core/push-alerts';
-import { holdVars } from '../../shared/hold';
+import { chipLabel, holdVars } from '../../shared/hold';
 import { Icon } from '../../shared/icon';
 import { InfoPanel } from '../../shared/info';
 import { ScreenWakeLock } from '../../shared/wake-lock';
@@ -24,6 +24,7 @@ export class LivePage implements OnInit {
 
   protected readonly styleLabel = STYLE_LABEL;
   protected readonly holdVars = holdVars;
+  protected readonly chipLabel = chipLabel;
   protected readonly videoLabel = videoLabel;
   protected readonly generated = this.store.plan;
   protected readonly blocks = computed(() => this.generated()?.plan.blocks ?? []);

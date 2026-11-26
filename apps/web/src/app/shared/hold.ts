@@ -33,3 +33,9 @@ export function holdVars(hex: string | null | undefined): Record<string, string 
     ? { '--hold': hex, '--on-hold': onHold(hex), '--hold-line': holdLine(hex) }
     : { '--hold': null, '--on-hold': null, '--hold-line': null };
 }
+
+/** Texte d'une pastille de couleur du badge : « Bleu facile » (ancien plan : le nom du niveau). */
+export function chipLabel(c: { color: string; label?: string }): string {
+  const text = c.label ?? c.color;
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}

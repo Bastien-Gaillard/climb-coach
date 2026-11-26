@@ -6,6 +6,25 @@ import { Plan } from './plan.schema';
 export interface TargetColor {
   color: string;
   hex?: string;
+  /** Ce qu'on affiche : la couleur et, si elle couvre plusieurs cotations, « facile » ou « difficile ». */
+  label?: string;
+}
+
+/** Où tombe une cotation dans sa couleur : en bas (« facile »), en haut (« difficile »), au milieu. */
+export type Shade = 'facile' | 'difficile';
+
+function shadeOf(gym: Gym, color: string, grade: string, style: Style): Shade | undefined {
+  const ref = REFERENCE_SYSTEM[style];
+  const value = gradeValue(
+    gym.system === ref ? grade : convertGrade(grade, ref, gym.system),
+    gym.system,
+  );
+  const r = colorRange(gym, color);
+  if (r.to <= r.from || value < r.from || value > r.to) return undefined;
+  const at = (value - r.from) / (r.to - r.from);
+  if (at < 1 / 3) return 'facile';
+  if (at > 2 / 3) return 'difficile';
+  return undefined;
 }
 
 /** Écart max (en crans de cotation) pour rattacher une cotation à la couleur la plus proche. */
@@ -44,7 +63,10 @@ export function gymColorsFor(gym: Gym | undefined, style: Style, grade: string):
     const names = covering.length > 0 ? covering : nearestColors(gym, grade, style);
     return names.map((name) => {
       const hex = gym.colors.find((c) => c.color === name)?.hex;
-      return hex ? { color: name, hex } : { color: name };
+      // Une seule couleur qui couvre la cotation : on précise le bas ou le haut de sa plage
+      const shade = covering.length === 1 ? shadeOf(gym, name, grade, style) : undefined;
+      const label = [describeColor(name, hex).word, shade].filter(Boolean).join(' ');
+      return hex ? { color: name, hex, label } : { color: name, label };
     });
   } catch {
     return [];
@@ -106,22 +128,21 @@ function describeColor(name: string, hex: string | undefined): { word: string; e
 }
 
 /**
- * « vert (Assez difficile, 6B+) », « rouge (6A+) », ou juste la cotation
- * si la salle n'a pas de niveau pour elle.
+ * « bleu facile », « rose difficile », « vert » : la couleur de la salle et où la cotation tombe
+ * dedans, sans chiffre (les cotations Font ne parlent pas en salle). Juste la cotation si la
+ * salle n'a pas de niveau pour elle.
  */
 export function gradeLabel(gym: Gym | undefined, style: Style, grade: string): string {
   grade = cleanGrade(grade);
-  const colors = gymColorsFor(gym, style, grade).map((c) => describeColor(c.color, c.hex));
+  const colors = gymColorsFor(gym, style, grade);
   if (colors.length === 0) return grade;
-  const words = colors.map((c) => c.word).join(' ou ');
-  const extras = colors.flatMap((c) => (c.extra ? [c.extra] : []));
-  return `${words} (${[...extras, grade].join(', ')})`;
+  return colors.map((c) => c.label ?? c.color).join(' ou ');
 }
 
 /** Cotations écrites « [6B+] » par le modèle : remplacées par le niveau de la salle. */
 const BRACKETED_GRADE = /\[([^[\]]{1,6})\]/g;
 
-/** « 4 blocs en [6A] » → « 4 blocs en bleu (6A) », ou « 4 blocs en 6A » sans salle. */
+/** « 4 blocs en [6A] » → « 4 blocs en bleu facile », ou « 4 blocs en 6A » sans salle. */
 export function labelGrades(text: string, gym: Gym | undefined): string {
   return text.replace(BRACKETED_GRADE, (_, grade: string) =>
     gym ? gradeLabel(gym, gym.discipline, grade) : cleanGrade(grade),
@@ -202,15 +223,20 @@ export function withGymColors(plan: Plan, gym: Gym | undefined): Plan {
 
       // Le badge reflète ce que les consignes demandent vraiment, pas seulement
       // la cotation « cible » choisie à part par le modèle.
-      const grades = sortedGrades(raw.instructions, target.style);
+      // Avec des lignes de volume, le badge montre exactement ces lignes ; les autres cotations
+      // des consignes (« 2 échecs de suite : continue en … ») restent dans le texte
+      const { volumes, rest } = splitVolumes(raw.instructions, gym, target.style);
+      const useVolumes = volumes.length > 0;
+      const grades = useVolumes
+        ? sortGrades(
+            volumes.map((v) => v.grade),
+            target.style,
+          )
+        : sortedGrades(raw.instructions, target.style);
       const shown = grades.length > 0 ? grades : [cleanGrade(target.grade)];
       const colors = uniqueColors(shown.flatMap((g) => gymColorsFor(gym, target.style, g)));
       const range =
         grades.length > 1 ? { min: grades[0], max: grades[grades.length - 1] } : undefined;
-
-      const { volumes, rest } = splitVolumes(raw.instructions, gym, target.style);
-      const covered = new Set(volumes.map((v) => v.grade));
-      const useVolumes = volumes.length > 0 && shown.every((g) => covered.has(g));
 
       return {
         ...raw,
@@ -228,17 +254,23 @@ export function withGymColors(plan: Plan, gym: Gym | undefined): Plan {
 
 /** Cotations « [6A] » d'une liste de consignes, sans doublon, de la plus facile à la plus dure. */
 export function sortedGrades(instructions: string[], style: Style): string[] {
+  return sortGrades(
+    instructions.flatMap((text) => [...text.matchAll(BRACKETED_GRADE)].map(([, raw]) => raw)),
+    style,
+  );
+}
+
+/** Cotations sans doublon, de la plus facile à la plus dure ; les inconnues sont ignorées. */
+function sortGrades(list: string[], style: Style): string[] {
   const system = REFERENCE_SYSTEM[style];
   const seen = new Map<string, number>();
-  for (const text of instructions) {
-    for (const [, raw] of text.matchAll(BRACKETED_GRADE)) {
-      const grade = cleanGrade(raw);
-      if (seen.has(grade)) continue;
-      try {
-        seen.set(grade, gradeValue(grade, system));
-      } catch {
-        // cotation inconnue ou d'une autre discipline : ignorée
-      }
+  for (const raw of list) {
+    const grade = cleanGrade(raw);
+    if (seen.has(grade)) continue;
+    try {
+      seen.set(grade, gradeValue(grade, system));
+    } catch {
+      // cotation inconnue ou d'une autre discipline : ignorée
     }
   }
   return [...seen.entries()].sort((a, b) => a[1] - b[1]).map(([g]) => g);

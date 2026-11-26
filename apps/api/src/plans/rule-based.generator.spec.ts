@@ -370,7 +370,7 @@ describe('RuleBasedGenerator', () => {
     const main = plan.blocks.find((b) => b.kind === 'main');
     expect(plan.focus).toBe('strength');
     expect(main?.title).toBe('Force : Projets');
-    expect(main?.target).toEqual({ style: 'boulder', grade: '6B+' });
+    expect(main?.target).toMatchObject({ style: 'boulder', grade: '6B+' });
   });
 
   it('les types de prise en point faible orientent les projets (une séance sur deux)', async () => {
@@ -462,6 +462,60 @@ describe('séance avec le profil', () => {
   });
 });
 
+describe('séance prévue au planning', () => {
+  const lastStrength = [session(1, now, { focus: 'strength' })];
+
+  it('garde le type prévu, même là où la rotation proposerait autre chose', () => {
+    const free = analyzeHistory({ availableMinutes: 60, now, history: lastStrength });
+    expect(free.focus).not.toBe('strength');
+    const a = analyzeHistory({
+      availableMinutes: 60,
+      now,
+      history: lastStrength,
+      planned: { focus: 'strength', intensity: 'normal', inDays: 0 },
+    });
+    expect(a.focus).toBe('strength');
+    expect(a.reasons.join(' ')).toContain('Séance de force prévue au planning aujourd’hui');
+  });
+
+  it('reprend l’intensité prévue, et garde le type même avec une douleur notée', () => {
+    const light = analyzeHistory({
+      availableMinutes: 60,
+      now,
+      history: [session(3, now, { focus: 'endurance' })],
+      planned: { focus: 'technique', intensity: 'light', inDays: 0 },
+    });
+    expect(light.intensity).toBe('light');
+    const pain = analyzeHistory({
+      availableMinutes: 60,
+      now,
+      history: [session(3, now, { focus: 'endurance', notes: 'douleur au doigt' })],
+      planned: { focus: 'strength', intensity: 'normal', inDays: 0 },
+    });
+    expect(pain.focus).toBe('strength');
+    expect(pain.pain).toBeNull();
+    // Même fatigué la veille : l'intensité du planning reste
+    const tired = analyzeHistory({
+      availableMinutes: 60,
+      now,
+      history: [session(1, now, { focus: 'endurance', fatigue: 5 })],
+      planned: { focus: 'strength', intensity: 'normal', inDays: 0 },
+    });
+    expect(tired).toMatchObject({ focus: 'strength', intensity: 'normal' });
+  });
+
+  it('un type choisi à la main passe avant le planning', () => {
+    const a = analyzeHistory({
+      availableMinutes: 60,
+      now,
+      history: lastStrength,
+      requestedFocus: 'endurance',
+      planned: { focus: 'strength', intensity: 'normal', inDays: 0 },
+    });
+    expect(a.focus).toBe('endurance');
+  });
+});
+
 describe('séance technique', () => {
   const gym = defineGym({
     id: 'digne',
@@ -494,7 +548,8 @@ describe('séance technique', () => {
         requestedFocus: 'technique',
       });
       for (const b of plan.blocks.filter((x) => x.kind === 'main')) {
-        expect(gradeValue(b.target!.grade, 'font')).toBeLessThanOrEqual(gradeValue('6A+', 'font'));
+        // Reste dans le bleu (6A+ à 6B), jamais dans le rose réussi une fois
+        expect(gradeValue(b.target!.grade, 'font')).toBeLessThanOrEqual(gradeValue('6B', 'font'));
       }
     }
   });

@@ -103,6 +103,12 @@ describe('catalogue des formats', () => {
     }
   });
 
+  it('tes 5 plus durs : un cran au-dessus du niveau, jamais plus que ce qui a été réussi', () => {
+    expect(build('top-five', 25, { best: 9 }).target).toBe(7);
+    expect(build('top-five', 25, { best: 6 }).target).toBe(6);
+    expect(build('top-five', 25).target).toBe(6);
+  });
+
   it('flash : à son niveau maîtrisé, jamais au-dessus, avec la règle de repli', () => {
     const b = build('flash', 25);
     expect(b.target).toBe(6);

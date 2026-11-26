@@ -17,7 +17,6 @@ import { Cue, currentCue, nextCue } from './cues';
 import { DeclaredLevel, declaredLevel } from './declared-level';
 import { GeneratorContext } from './generator';
 import { withCatalog } from './exercise-videos';
-import { withGymColors } from './gym-colors';
 import { MistralClient } from './mistral.client';
 import { ADVICE_HORIZON_DAYS, MistralScheduleAdvisor } from './mistral.schedule';
 import { Focus, Plan } from './plan.schema';
@@ -100,6 +99,8 @@ export class PlansService {
     points: ProfilePoints = {},
     /** Type choisi à la place du planning. */
     requestedFocus?: Focus,
+    /** Rythme du compte : sans type choisi, la séance suit le planning fait pour ce rythme. */
+    sessionsPerWeek?: number,
   ): Promise<GeneratedPlanResult> {
     const [history, gym] = await Promise.all([
       this.sessions.findRecent(userId, 10),
@@ -118,10 +119,14 @@ export class PlansService {
     if (gym) ctx.gym = gym;
     if (level) ctx.level = level;
     if (requestedFocus) ctx.requestedFocus = requestedFocus;
+    else {
+      // « Planning » : la séance conseillée sur Générer et dans le Planning, pas une rotation à part
+      const next = (await this.schedule(userId, 7, sessionsPerWeek, points)).sessions[0];
+      if (next) ctx.planned = { focus: next.focus, intensity: next.intensity, inDays: next.inDays };
+    }
 
     const source = 'rules' as const;
-    let plan = await this.rules.generate(ctx);
-    plan = withCatalog(withGymColors(plan, gym));
+    let plan = withCatalog(await this.rules.generate(ctx));
     plan = { ...plan, cue: cueView(await this.dailyCue(userId, points.weakPoints ?? [])) };
 
     const [saved] = await this.db

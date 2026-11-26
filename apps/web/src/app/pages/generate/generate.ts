@@ -15,7 +15,7 @@ import {
 } from '../../core/labels';
 import { Focus, Gym, PlannedSession, Schedule, Session } from '../../core/models';
 import { PlanStore } from '../../core/plan.store';
-import { holdVars } from '../../shared/hold';
+import { chipLabel, holdVars } from '../../shared/hold';
 import { Icon } from '../../shared/icon';
 import { InfoPanel } from '../../shared/info';
 
@@ -41,6 +41,7 @@ export class GeneratePage implements OnInit {
   protected readonly blockLabel = BLOCK_LABEL;
   protected readonly today = new Date();
   protected readonly holdVars = holdVars;
+  protected readonly chipLabel = chipLabel;
   protected readonly videoLabel = videoLabel;
 
   protected readonly gyms = signal<Gym[]>([]);
