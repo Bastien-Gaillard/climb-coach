@@ -6,7 +6,7 @@ import { GeneratorContext, PlanGenerator, splitTime } from './generator';
 import { pickBonus } from './bonus';
 import { exerciseForTitle } from './exercise-videos';
 import { withGymColors } from './gym-colors';
-import { GRIP_POINTS, pickExercises } from './exercises';
+import { favorMain, GRIP_POINTS, pickExercises } from './exercises';
 import { analyzeHistory, FOCUS_LABEL, HistoryAnalysis, Style } from './history-analysis';
 import { Plan, PlanBlock } from './plan.schema';
 
@@ -20,6 +20,9 @@ const TECHNIQUE_DRILLS = [
 ];
 
 /** Difficulté d'un format du cœur : la cotation la plus dure qu'il demande. */
+/** Ligne ajoutée au second format en force et en endurance. */
+export const SECONDARY_LINE = 'Format secondaire, un cran plus facile : grimpe propre, sans forcer';
+
 const gradeRank = (b: PlanBlock) =>
   b.target ? gradeValue(b.target.grade, REFERENCE_SYSTEM[b.target.style]) : -1;
 
@@ -84,7 +87,7 @@ export class RuleBasedGenerator implements PlanGenerator {
   /**
    * Cœur de séance en bloc : 1 ou 2 formats du catalogue, qui changent d'une séance à l'autre.
    * Chaque format est une partie de la séance, avec son propre minuteur. Le plus exigeant passe
-   * en premier.
+   * en premier et prend la plus grosse part du temps.
    */
   private boulderMain(
     ctx: GeneratorContext,
@@ -104,12 +107,16 @@ export class RuleBasedGenerator implements PlanGenerator {
       weakPoints: ctx.weakPoints,
       likedPoints: ctx.likedPoints,
     });
-    const blocks = picks.map(({ exercise, minutes: m, role, points }) => {
+    const build = (
+      { exercise, minutes: m, role, points }: (typeof picks)[number],
+      easier: number,
+    ) => {
       const built = exercise.build({
         level: a.level,
         best: a.maxSent,
-        project: a.project,
-        light,
+        // Les formats de force visent `project` : le secondaire descend d'un cran, jamais sous le niveau
+        project: Math.max(a.level, a.project - easier),
+        light: light + easier,
         minutes: m,
         ...(grips.length && { grips: pointLabels(grips) }),
         grade: (v) => this.label(ctx, 'boulder', this.grade('boulder', clamp(v))),
@@ -121,17 +128,25 @@ export class RuleBasedGenerator implements PlanGenerator {
         target: { style: 'boulder' as const, grade: this.grade('boulder', clamp(built.target)) },
         instructions: [
           ...built.instructions,
+          ...(easier ? [SECONDARY_LINE] : []),
           ...(role === 'weak' ? [`Travaille ton point faible : ${pointLabels(points)}`] : []),
           ...(role === 'liked' ? [`Pour le plaisir : ${pointLabels(points)}`] : []),
         ],
       };
-    });
+    };
     // Le format le plus exigeant d'abord, quand on est frais : des blocs durs après 25 min de
     // volume se grimpent en force, pas proprement
-    return blocks
-      .map((block, i) => ({ block, i }))
-      .sort((x, y) => gradeRank(y.block) - gradeRank(x.block) || x.i - y.i)
-      .map((x) => x.block);
+    // Le principal prend aussi la plus grosse part du temps
+    const ordered = favorMain(
+      picks
+        .map((pick, i) => ({ pick, i, rank: gradeRank(build(pick, 0)) }))
+        .sort((x, y) => y.rank - x.rank || x.i - y.i)
+        .map((x) => x.pick),
+    );
+    // En force et en endurance, le second format est secondaire : un cran plus facile, pour garder
+    // de la qualité au lieu d'empiler deux efforts durs. La technique est déjà peu intense.
+    const secondaryEasier = a.focus === 'technique' ? 0 : 1;
+    return ordered.map((pick, i) => build(pick, i > 0 ? secondaryEasier : 0));
   }
 
   /** Un jour, une sélection : la séance du lendemain ne propose pas les mêmes formats. */

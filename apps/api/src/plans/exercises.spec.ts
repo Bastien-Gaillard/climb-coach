@@ -2,6 +2,7 @@ import { CLIMBING_POINTS } from '../auth/climbing-points';
 import {
   catalogForPrompt,
   EXERCISES,
+  favorMain,
   formatsFor,
   minutesPerBlock,
   pickExercises,
@@ -214,6 +215,15 @@ describe('pickExercises', () => {
     }
   });
 
+  it('jamais deux formats éprouvants dans la même séance', () => {
+    for (let seed = 0; seed < 12; seed++) {
+      for (const minutes of [60, 80, 120]) {
+        const picks = pickExercises({ ...base, focus: 'strength', minutes, seed });
+        expect(picks.filter((p) => p.exercise.stressful).length).toBeLessThanOrEqual(1);
+      }
+    }
+  });
+
   it('ne mélange jamais fond et résistance', () => {
     for (let seed = 0; seed < 12; seed++) {
       const picks = pickExercises({ ...base, focus: 'endurance', minutes: 70, seed });
@@ -258,6 +268,50 @@ describe('pickExercises', () => {
         weakPoints: ['resistance'],
       });
       expect(picks.every((p) => p.exercise.energy === 'resistance')).toBe(true);
+    }
+  });
+});
+
+describe('favorMain', () => {
+  const pair = (a: string, am: number, b: string, bm: number) => [
+    { exercise: byId(a), minutes: am },
+    { exercise: byId(b), minutes: bm },
+  ];
+
+  it('environ 60 % du temps au format principal', () => {
+    const [main, second] = favorMain(pair('projects', 35, 'three-tries', 30));
+    expect(main.minutes).toBe(40);
+    expect(second.minutes).toBe(25);
+  });
+
+  it('le secondaire garde son minimum', () => {
+    const [main, second] = favorMain(pair('projects', 35, 'hard-circuit', 30));
+    expect(second.minutes).toBe(30);
+    expect(main.minutes).toBe(35);
+  });
+
+  it('le principal ne dépasse pas son plafond, le secondaire non plus', () => {
+    const [main, second] = favorMain(pair('doubles', 45, 'volume', 45));
+    expect(main.minutes).toBeLessThanOrEqual(45);
+    expect(main.minutes + second.minutes).toBe(90);
+  });
+
+  it('le principal a toujours au moins autant de temps, et le total ne change pas', () => {
+    for (const focus of ['strength', 'endurance', 'technique'] as const) {
+      for (const minutes of [50, 65, 80, 100]) {
+        for (let seed = 0; seed < 6; seed++) {
+          const picks = pickExercises({ focus, minutes, careful: false, seed });
+          const out = favorMain(picks);
+          expect(out.reduce((s, p) => s + p.minutes, 0)).toBe(minutes);
+          for (const p of out) {
+            expect(p.minutes).toBeGreaterThanOrEqual(Math.min(p.minutes, p.exercise.minMinutes));
+            if (p.exercise.maxMinutes) expect(p.minutes).toBeLessThanOrEqual(p.exercise.maxMinutes);
+          }
+          if (out.length === 2 && out[0].minutes !== picks[0].minutes) {
+            expect(out[0].minutes).toBeGreaterThan(out[1].minutes);
+          }
+        }
+      }
     }
   });
 });

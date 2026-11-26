@@ -662,6 +662,7 @@ const fitsIn = (e: Exercise, minutes: number) =>
  * Avec un profil : au plus un format sur un point faible et au moins un format qu'on aime.
  * Avec un seul format, on alterne d'une séance à l'autre.
  * En endurance, les deux formats travaillent la même filière (fond ou résistance).
+ * Au plus un format éprouvant (circuit dur, séance de travail) : l'autre reste plus léger.
  */
 export function pickExercises(o: PickOptions): Pick[] {
   const pool = EXERCISES.filter(
@@ -728,6 +729,8 @@ export function pickExercises(o: PickOptions): Pick[] {
     for (const e of others) {
       if (chosen.length >= slots) break;
       if (chosen.includes(e)) continue;
+      // Jamais deux formats éprouvants dans la même séance : un principal, un secondaire plus léger
+      if (e.stressful && [...chosen, likedPick].some((x) => x?.stressful)) continue;
       const needed =
         chosen.reduce((sum, x) => sum + x.minMinutes, 0) +
         e.minMinutes +
@@ -774,6 +777,36 @@ export function pickExercises(o: PickOptions): Pick[] {
     split[0];
   taker.minutes += rest;
   return split;
+}
+
+/** Part du cœur de séance donnée au format principal (le plus exigeant) quand il y en a deux. */
+export const MAIN_SHARE = 0.6;
+
+/**
+ * Redonne la majorité du temps au format principal (le premier de `ordered`) : environ 60 % du
+ * cœur, arrondi à 5 min, sans sortir des durées min et max de chaque format. Si les durées ne le
+ * permettent pas, le partage d'origine est gardé.
+ */
+export function favorMain<T extends { exercise: Exercise; minutes: number }>(ordered: T[]): T[] {
+  if (ordered.length !== 2) return ordered;
+  const [main, second] = ordered;
+  const total = main.minutes + second.minutes;
+  const least = (e: Exercise) => Math.ceil(e.minMinutes / 5) * 5;
+  const most = (e: Exercise) => e.maxMinutes ?? total;
+  let m = Math.round((total * MAIN_SHARE) / 5) * 5;
+  m = Math.min(m, most(main.exercise), total - least(second.exercise));
+  // Le secondaire ne dépasse pas son plafond : le surplus revient au principal
+  m = Math.max(m, total - most(second.exercise));
+  const fits =
+    m >= least(main.exercise) &&
+    m <= most(main.exercise) &&
+    total - m >= least(second.exercise) &&
+    total - m <= most(second.exercise);
+  if (!fits || m <= main.minutes) return ordered;
+  return [
+    { ...main, minutes: m },
+    { ...second, minutes: total - m },
+  ];
 }
 
 /** Le catalogue en texte, par type de séance, pour le prompt de Mistral. */

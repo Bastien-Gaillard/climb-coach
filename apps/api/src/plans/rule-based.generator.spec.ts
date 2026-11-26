@@ -3,7 +3,7 @@ import { declaredLevel } from './declared-level';
 import { splitTime } from './generator';
 import { analyzeHistory } from './history-analysis';
 import { planFitsTime, PlanSchema } from './plan.schema';
-import { RuleBasedGenerator } from './rule-based.generator';
+import { RuleBasedGenerator, SECONDARY_LINE } from './rule-based.generator';
 import { session } from './test-helpers';
 
 const now = new Date('2025-11-16T18:00:00Z');
@@ -438,6 +438,57 @@ describe('RuleBasedGenerator', () => {
     const plan = await generator.generate({ availableMinutes: 60, now, history });
     expect(plan.summary).toContain('légère');
     expect(plan.summary).toContain('Fatigue 5/5');
+  });
+});
+
+describe('format principal et format secondaire', () => {
+  const day = (d: number) => new Date(now.getTime() + d * 86_400_000);
+  const mainsOf = async (focus: 'strength' | 'endurance' | 'technique', d: number) => {
+    const plan = await generator.generate({
+      availableMinutes: 105,
+      now: day(d),
+      history: [
+        session(3, now, {
+          focus: 'technique',
+          climbList: [
+            { grade: '6B', value: 6 },
+            { grade: '6B', value: 6 },
+          ],
+        }),
+      ],
+      requestedFocus: focus,
+    });
+    return plan.blocks.filter((b) => b.kind === 'main');
+  };
+  const value = (b: { target?: { grade: string } }) => gradeValue(b.target!.grade, 'font');
+
+  it.each(['strength', 'endurance'] as const)(
+    '%s : le second format est marqué secondaire et ne vise pas plus dur que le premier',
+    async (focus) => {
+      for (let d = 0; d < 6; d++) {
+        const mains = await mainsOf(focus, d);
+        expect(mains).toHaveLength(2);
+        expect(mains[0].instructions).not.toContain(SECONDARY_LINE);
+        expect(mains[1].instructions).toContain(SECONDARY_LINE);
+        expect(value(mains[1])).toBeLessThanOrEqual(value(mains[0]));
+        expect(mains[0].minutes).toBeGreaterThan(mains[1].minutes);
+      }
+    },
+  );
+
+  it('force : le secondaire descend d’un cran sous le projet, jamais sous le niveau', async () => {
+    for (let d = 0; d < 6; d++) {
+      const [first, second] = await mainsOf('strength', d);
+      expect(value(second)).toBeLessThan(value(first));
+      expect(value(second)).toBeGreaterThanOrEqual(6);
+    }
+  });
+
+  it('technique : pas de format secondaire allégé', async () => {
+    for (let d = 0; d < 4; d++) {
+      const mains = await mainsOf('technique', d);
+      for (const m of mains) expect(m.instructions).not.toContain(SECONDARY_LINE);
+    }
   });
 });
 
