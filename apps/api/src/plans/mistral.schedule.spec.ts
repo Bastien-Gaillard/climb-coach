@@ -1,4 +1,4 @@
-import { MistralError, MistralGenerator } from './mistral.generator';
+import { MistralClient, MistralError } from './mistral.client';
 import {
   buildScheduleUserPrompt,
   completeMonthPlan,
@@ -201,13 +201,13 @@ describe('MistralScheduleAdvisor', () => {
     const advisor = new MistralScheduleAdvisor({
       enabled: true,
       chat,
-    } as unknown as MistralGenerator);
+    } as unknown as MistralClient);
     return { advisor, chat };
   };
   const history = [session(0, now, { focus: 'endurance' })];
   const base = buildSchedule(history, now, { horizonDays: 28 });
 
-  it('redemande une fois si la réponse est invalide, en priorité basse', async () => {
+  it('redemande une fois si la réponse est invalide', async () => {
     const { advisor, chat } = advisorWith(
       'oups',
       JSON.stringify({ reducedForHealth: true, sessions: [s(2), s(5)] }),
@@ -216,7 +216,6 @@ describe('MistralScheduleAdvisor', () => {
     expect(plan.reducedForHealth).toBe(true);
     expect(plan.sessions).toHaveLength(2);
     expect(chat).toHaveBeenCalledTimes(2);
-    expect(chat.mock.calls[0][1]).toBe('low');
   });
 
   it('jamais une deuxième séance le jour même', async () => {

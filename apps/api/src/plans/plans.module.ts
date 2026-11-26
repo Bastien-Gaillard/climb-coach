@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { GymsModule } from '../gyms/gyms.module';
 import { SessionsModule } from '../sessions/sessions.module';
-import { MistralGenerator } from './mistral.generator';
+import { MistralClient } from './mistral.client';
 import { MistralScheduleAdvisor } from './mistral.schedule';
 import { MobilityService } from './mobility.service';
 import { PlansController } from './plans.controller';
@@ -13,7 +13,7 @@ import { RuleBasedGenerator } from './rule-based.generator';
   controllers: [PlansController],
   providers: [
     PlansService,
-    MistralGenerator,
+    MistralClient,
     MistralScheduleAdvisor,
     MobilityService,
     RuleBasedGenerator,

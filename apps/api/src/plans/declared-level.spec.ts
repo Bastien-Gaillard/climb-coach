@@ -50,6 +50,7 @@ describe('analyzeHistory avec le niveau déclaré', () => {
   it('sert de plancher : un historique de verts ne fait plus descendre sous le bleu', () => {
     const a = analyzeHistory({ availableMinutes: 90, now, history: [greens], level });
     expect(grade(a.maxSent)).toBe('6A+');
+    expect(grade(a.level)).toBe('6A+');
     expect(grade(a.project)).toBe('6B+');
     expect(a.reasons.join(' ')).toContain(
       'Niveau stable déclaré à Digne @ Bloc : Bleu, on vise le Rose au max en force',
@@ -61,13 +62,20 @@ describe('analyzeHistory avec le niveau déclaré', () => {
     expect(grade(a.project)).toBe('6B+');
   });
 
-  it('ne fait pas baisser un historique plus fort', () => {
+  it('reste le niveau maîtrisé même avec un rose réussi, qui compte en force seulement', () => {
     const roses = session(3, now, {
       focus: 'technique',
       climbList: [{ grade: '6C', value: v('6C') }],
     });
     const a = analyzeHistory({ availableMinutes: 90, now, history: [roses], level });
     expect(grade(a.maxSent)).toBe('6C');
-    expect(a.reasons.join(' ')).not.toContain('Niveau stable déclaré');
+    expect(grade(a.level)).toBe('6A+');
+    expect(grade(a.project)).toBe('6C');
+    expect(a.reasons.join(' ')).toContain('Niveau stable déclaré à Digne @ Bloc : Bleu');
+  });
+
+  it('sans niveau déclaré, le niveau maîtrisé est la meilleure réussite', () => {
+    const a = analyzeHistory({ availableMinutes: 90, now, history: [greens] });
+    expect(a.level).toBe(a.maxSent);
   });
 });

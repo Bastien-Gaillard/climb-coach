@@ -8,7 +8,6 @@ import { GeneratePage } from './generate';
 const response: GeneratedPlan = {
   id: 'p1',
   source: 'rules',
-  fallbackReason: 'Timeout',
   availableMinutes: 60,
   createdAt: '2025-12-21T10:00:00Z',
   plan: {
@@ -185,13 +184,28 @@ describe('GeneratePage', () => {
     req.flush(response);
   });
 
-  it('signale quand les règles ont pris le relais de Mistral', () => {
+  it('met la règle du format avant les couleurs, et l’objectif du jour en technique', () => {
     click('Générer');
-    http.expectOne('/api/plans/generate').flush(response);
+    http.expectOne('/api/plans/generate').flush({
+      ...response,
+      plan: {
+        ...response.plan,
+        focus: 'technique',
+        cue: { id: 'slow', text: 'Au ralenti' },
+        blocks: [
+          response.plan.blocks[0],
+          { ...response.plan.blocks[1], title: 'Technique : Flash' },
+        ],
+      },
+    });
     fixture.detectChanges();
 
-    expect(el.querySelector('.badge.line')?.textContent?.trim()).toBe('Règles');
-    expect(el.textContent).toContain("Mistral n'a pas pu répondre (Timeout)");
+    const main = el.querySelectorAll('.blocks > li')[1];
+    expect(main.querySelector('[data-testid=block-focus]')?.textContent).toContain('Au ralenti');
+    const html = main.innerHTML;
+    expect(html.indexOf('4 blocs, 4 fois')).toBeLessThan(html.indexOf('Bloc · 6A'));
+    // Plus de badge « Règles » ni « IA · Mistral » : toutes les séances viennent des règles
+    expect(el.querySelector('[data-testid=plan] header .badge')).toBeNull();
   });
 
   it('rappelle la dernière séance prise en compte', () => {

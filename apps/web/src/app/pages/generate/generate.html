@@ -10,15 +10,6 @@
         >{{ r.gym.name }}</small
       >}
     </h1>
-    @if (r.source === 'mistral') {
-    <span class="badge accent" title="Générée par Mistral, validée par l'API">
-      <app-icon name="generate" [size]="14" [stroke]="2.6" />IA · Mistral
-    </span>
-    } @else {
-    <span class="badge line" [title]="r.fallbackReason ?? 'Générée par les règles'">
-      <app-icon name="rules" [size]="14" [stroke]="2.6" />Règles
-    </span>
-    }
   </header>
 
   <p class="summary">
@@ -26,11 +17,7 @@
     <span class="badge">Séance légère</span>
     } {{ r.plan.summary }}
   </p>
-  @if (r.fallbackReason) {
-  <p class="muted small">
-    Mistral n'a pas pu répondre ({{ r.fallbackReason }}), les règles ont pris le relais.
-  </p>
-  } @if (r.plan.cue; as cue) {
+  @if (r.plan.cue; as cue) {
   <section class="card cue" data-testid="cue">
     <div class="cue-head">
       <div>
@@ -73,7 +60,17 @@
         </div>
         <span class="num mins">{{ b.minutes }}<small> min</small></span>
       </div>
-      @if (b.target?.volumes?.length) { @for (v of b.target!.volumes!; track $index) {
+      @if (b.kind === 'main' && r.plan.focus === 'technique' && r.plan.cue; as cue) {
+      <p class="block-focus" data-testid="block-focus">
+        Objectif : <strong>{{ cue.text }}</strong>
+      </p>
+      } @if (b.instructions.length) {
+      <ul>
+        @for (step of b.instructions; track $index; let k = $index) {
+        <li>{{ step }}</li>
+        }
+      </ul>
+      } @if (b.target?.volumes?.length) { @for (v of b.target!.volumes!; track $index) {
       <div class="target-colors" data-testid="target-volume">
         @for (c of v.colors ?? []; track c.color) {
         <span class="hold-chip" [style]="holdVars(c.hex)">{{ c.color }}</span>
@@ -101,13 +98,7 @@
       <span class="badge line target"
         >Niveau visé · {{ styleLabel[b.target.style] }} · {{ b.target.grade }}</span
       >
-      } } @if (b.instructions.length) {
-      <ul>
-        @for (step of b.instructions; track $index; let k = $index) {
-        <li>{{ step }}</li>
-        }
-      </ul>
-      } @if (b.info) {
+      } } @if (b.info) {
       <app-info [info]="b.info" [video]="b.video" />
       } @else if (b.video) {
       <a

@@ -15,8 +15,11 @@ import { Focus, PlanInfo } from './plan.schema';
 
 /** De quoi rédiger un format : niveau du grimpeur et temps alloué. */
 export interface ExerciseContext {
-  /** Niveau stable (valeur sur l'échelle Fontainebleau) : la couleur passée presque à coup sûr. */
-  maxSent: number;
+  /**
+   * Niveau maîtrisé (valeur sur l'échelle Fontainebleau) : la couleur passée presque à coup sûr,
+   * celle du niveau stable déclaré. Jamais la meilleure réussite d'un jour.
+   */
+  level: number;
   /** Niveau visé en force : la couleur au-dessus. */
   project: number;
   /** 1 pour une séance légère, 0 sinon : on baisse les cotations d'un cran. */
@@ -74,6 +77,13 @@ export interface Exercise {
 const count = (minutes: number, perItem: number, min: number, max = 25) =>
   Math.min(max, Math.max(min, Math.floor(minutes / perItem)));
 
+/**
+ * Minutes par bloc d'un format à essais limités : chaque essai prend environ 1 min sur le mur,
+ * suivie du repos. Sert à déduire le nombre de blocs du temps accordé, pour que la durée affichée
+ * corresponde à ce qu'on fait vraiment.
+ */
+export const minutesPerBlock = (attempts: number, rest: number) => attempts * (1 + rest);
+
 const plural = (n: number, word: string) => `${n} ${word}${n > 1 ? 's' : ''}`;
 
 /** Recherche YouTube, pour les formats sans vidéo qui les montre bien. */
@@ -125,7 +135,7 @@ export const EXERCISES: Exercise[] = [
     points: ['commitment', 'power', 'reading'],
     name: '3 essais max',
     summary:
-      '6 à 8 blocs à son niveau et au-dessus, 3 essais par bloc pour le réussir, pas un de plus.',
+      'Des blocs à son niveau et au-dessus (2 à 8 selon le temps), 3 essais par bloc pour le réussir, pas un de plus.',
     minMinutes: 25,
     source:
       'https://gripped.com/sections/training/develop-your-try-hard-mindset-with-this-workout/',
@@ -140,16 +150,17 @@ export const EXERCISES: Exercise[] = [
       pitfalls: ['Commencer par les blocs à petites réglettes : garde-les pour quand tu es chaud'],
     },
     build: (c) => {
-      const n = count(c.minutes, 5, 6, 8);
+      // 2,5 essais en moyenne sur des blocs durs, 3 min de repos : environ 10 min par bloc
+      const n = count(c.minutes, minutesPerBlock(2.5, 3), 2, 8);
       const above = Math.floor(n / 2);
       // Sans couleur au-dessus connue, tous à son niveau
       const volume =
-        c.project > c.maxSent
+        c.project > c.level
           ? [
-              `${n - above} blocs en ${c.grade(c.maxSent)}`,
-              `${above} blocs en ${c.grade(c.project)}`,
+              `${plural(n - above, 'bloc')} en ${c.grade(c.level)}`,
+              `${plural(above, 'bloc')} en ${c.grade(c.project)}`,
             ]
-          : [`${n} blocs en ${c.grade(c.maxSent)}`];
+          : [`${n} blocs en ${c.grade(c.level)}`];
       return {
         title: '3 essais max',
         target: c.project,
@@ -255,7 +266,7 @@ export const EXERCISES: Exercise[] = [
       pitfalls: ['Monter en couleur en cours de route : ça devient une séance de force ratée'],
     },
     build: (c) => {
-      const v = c.maxSent - 2 - c.light;
+      const v = c.level - 2 - c.light;
       return {
         title: 'Volume',
         target: v,
@@ -289,8 +300,8 @@ export const EXERCISES: Exercise[] = [
     },
     build: (c) => {
       const minutes = Math.min(25, c.minutes);
-      const easy = c.maxSent - 4 - c.light;
-      const medium = c.maxSent - 2 - c.light;
+      const easy = c.level - 4 - c.light;
+      const medium = c.level - 2 - c.light;
       return {
         title: 'Un bloc par minute',
         target: medium,
@@ -326,7 +337,7 @@ export const EXERCISES: Exercise[] = [
       pitfalls: ['Raccourcir le repos entre les séries : tu ne finiras pas les dernières'],
     },
     build: (c) => {
-      const v = c.maxSent - 2 - c.light;
+      const v = c.level - 2 - c.light;
       const sets = count(c.minutes, 8, 2, 5);
       return {
         title: '4×4',
@@ -361,16 +372,17 @@ export const EXERCISES: Exercise[] = [
     },
     build: (c) => {
       const rounds = c.minutes >= 60 ? 2 : 1;
-      const n = count((c.minutes - (rounds - 1) * 12) / rounds, 2.5, 6, 10);
+      // 1 min de grimpe et 2 min de repos par bloc
+      const n = count((c.minutes - (rounds - 1) * 12) / rounds, 3, 6, 10);
       const hard = Math.round(n / 3);
       const mid = Math.round(n / 3);
       return {
         title: 'Pyramide',
-        target: c.maxSent - c.light,
+        target: c.level - c.light,
         instructions: [
-          `${hard} blocs en ${c.grade(c.maxSent - c.light)}`,
-          `${mid} blocs en ${c.grade(c.maxSent - 2 - c.light)}`,
-          `${n - hard - mid} blocs en ${c.grade(c.maxSent - 4 - c.light)}`,
+          `${hard} blocs en ${c.grade(c.level - c.light)}`,
+          `${mid} blocs en ${c.grade(c.level - 2 - c.light)}`,
+          `${n - hard - mid} blocs en ${c.grade(c.level - 4 - c.light)}`,
           'Des blocs déjà réussis, du plus dur au plus facile',
           'Repos 2 min avant de changer de bloc',
           ...(rounds > 1 ? ['2 tours, repos 12 min entre les tours'] : []),
@@ -399,7 +411,7 @@ export const EXERCISES: Exercise[] = [
       pitfalls: ['Changer de blocs à chaque fois : on ne peut plus comparer'],
     },
     build: (c) => {
-      const v = c.maxSent - 1 - c.light;
+      const v = c.level - 1 - c.light;
       const bouts = c.minutes >= 55 ? 2 : 1;
       const bout = bouts === 2 ? 20 : Math.min(25, c.minutes);
       return {
@@ -437,12 +449,12 @@ export const EXERCISES: Exercise[] = [
     },
     build: (c) => {
       const minutes = Math.min(45, c.minutes);
-      const v = c.maxSent - 1 - c.light;
+      const v = c.level - 1 - c.light;
       return {
         title: 'Course aux points en doublé',
         target: v,
         instructions: [
-          `Blocs en ${c.grade(c.maxSent - 3 - c.light)} à ${c.grade(v)}, au choix`,
+          `Blocs en ${c.grade(c.level - 3 - c.light)} à ${c.grade(v)}, au choix`,
           'Un bloc compte s’il est grimpé 2 fois de suite, sans repos entre les deux',
           `Le plus de points en ${minutes} min : les plus durs rapportent plus`,
         ],
@@ -457,7 +469,7 @@ export const EXERCISES: Exercise[] = [
     points: ['footwork', 'hips', 'wall-styles', 'slab', 'hooks', 'coordination'],
     name: 'Répétitions parfaites',
     summary:
-      '2 blocs à son niveau, dans un style à améliorer, refaits 3 à 5 fois en 15 min chacun.',
+      '1 à 4 blocs à son niveau, dans un style à améliorer, refaits 3 à 5 fois en 10 à 15 min chacun.',
     minMinutes: 15,
     source: 'https://www.lasportivausa.com/blogs/blog/gym-series-bouldering-power-hour',
     video: ytSearch('bouldering perfect repeats technique drill'),
@@ -471,13 +483,15 @@ export const EXERCISES: Exercise[] = [
       pitfalls: ['Prendre des blocs trop durs : on lutte au lieu de soigner le mouvement'],
     },
     build: (c) => {
-      const n = count(c.minutes, 15, 1, 4);
+      // Le temps se partage entre les blocs : 10 à 15 min chacun, sans minutes perdues
+      const n = count(c.minutes, 10, 1, 4);
+      const each = Math.floor(c.minutes / n);
       return {
         title: 'Répétitions parfaites',
-        target: c.maxSent - c.light,
+        target: c.level - c.light,
         instructions: [
-          `${plural(n, 'bloc')} en ${c.grade(c.maxSent - c.light)}, 3 à 5 passages par bloc`,
-          '15 min par bloc, repos complet entre chaque passage',
+          `${plural(n, 'bloc')} en ${c.grade(c.level - c.light)}, 3 à 5 passages par bloc`,
+          `${each} min par bloc, repos complet entre chaque passage`,
           'Chaque passage plus fluide que le précédent',
         ],
       };
@@ -488,7 +502,8 @@ export const EXERCISES: Exercise[] = [
     focus: 'technique',
     points: ['commitment', 'coordination', 'balance'],
     name: 'Tes 5 plus durs',
-    summary: 'Refaire les 5 blocs les plus durs déjà réussis dans la salle, 3 essais max chacun.',
+    summary:
+      'Refaire ses blocs les plus durs déjà réussis dans la salle (2 à 5 selon le temps), 3 essais max chacun.',
     minMinutes: 20,
     maxMinutes: 40,
     source: 'https://www.lasportivausa.com/blogs/blog/gym-series-climbing-technique',
@@ -502,22 +517,28 @@ export const EXERCISES: Exercise[] = [
       ],
       pitfalls: ['S’entêter au-delà de 3 essais'],
     },
-    build: (c) => ({
-      title: 'Tes 5 plus durs',
-      target: c.maxSent,
-      instructions: [
-        `5 blocs en ${c.grade(c.maxSent)}, 3 essais max par bloc`,
-        'Les plus durs que tu as déjà réussis ici',
-        'Repos 3 min entre chaque essai',
-      ],
-    }),
+    build: (c) => {
+      // 2 essais en moyenne sur des blocs déjà réussis, 3 min de repos : 8 min par bloc
+      const n = count(c.minutes, minutesPerBlock(2, 3), 2, 5);
+      return {
+        title: 'Tes 5 plus durs',
+        target: c.level,
+        instructions: [
+          `${plural(n, 'bloc')} en ${c.grade(c.level)}, 3 essais max par bloc`,
+          'Les plus durs que tu as déjà réussis ici',
+          'Repos 3 min entre chaque essai',
+          `Arrête au bout de ${c.minutes} min, même s’il reste des blocs`,
+        ],
+      };
+    },
   },
   {
     id: 'flash',
     focus: 'technique',
     points: ['reading', 'commitment'],
     name: 'Flash',
-    summary: 'Les nouveautés de la salle à son niveau : une lecture au sol, un seul essai à fond.',
+    summary:
+      'Les nouveautés de la salle à son niveau maîtrisé, jamais au-dessus : une lecture au sol, un seul essai à fond.',
     minMinutes: 15,
     maxMinutes: 40,
     source:
@@ -526,21 +547,31 @@ export const EXERCISES: Exercise[] = [
     info: {
       why: 'Lire un bloc et le réussir du premier coup, c’est une compétence qui se travaille.',
       how: [
-        'Seulement des blocs jamais essayés',
+        'Seulement des blocs jamais essayés, dans ta couleur maîtrisée : tu dois en réussir environ un sur deux',
         'Au sol : repère les prises de pieds, les mains, l’endroit dur',
         'Un seul essai, à fond, et on passe au suivant',
+        'Départ pas passé : l’essai compte quand même. Deux échecs de suite : une couleur en dessous',
       ],
-      pitfalls: ['Regarder quelqu’un d’autre le faire avant : ce n’est plus un flash'],
+      pitfalls: [
+        'Regarder quelqu’un d’autre le faire avant : ce n’est plus un flash',
+        'Viser trop haut : au-dessus de ton niveau, on reste au sol et on ne travaille ni la lecture ni l’engagement',
+      ],
     },
-    build: (c) => ({
-      title: 'Flash',
-      target: c.maxSent,
-      instructions: [
-        `${count(c.minutes, 5, 3, 8)} blocs en ${c.grade(c.maxSent)}, jamais essayés`,
-        'Lis le bloc au sol, puis un seul essai, à fond',
-        'Repos 3 min avant de changer de bloc',
-      ],
-    }),
+    build: (c) => {
+      const v = c.level - c.light;
+      return {
+        title: 'Flash',
+        target: v,
+        instructions: [
+          // 1 min de lecture, 1 min d'essai, 3 min de repos
+          `${count(c.minutes, 5, 3, 8)} blocs en ${c.grade(v)}, jamais essayés`,
+          'Lis le bloc au sol, puis un seul essai, à fond',
+          'Départ pas passé : l’essai compte quand même',
+          `2 échecs de suite : continue en ${c.grade(v - 2)}`,
+          'Repos 3 min avant de changer de bloc',
+        ],
+      };
+    },
   },
   {
     id: 'tech-volume',
@@ -548,7 +579,8 @@ export const EXERCISES: Exercise[] = [
     points: ['footwork', 'balance', 'slab', 'hips'],
     name: 'Volume technique',
     summary: 'Beaucoup de blocs faciles, avec la consigne du jour comme seul objectif.',
-    minMinutes: 20,
+    minMinutes: 30,
+    maxMinutes: 45,
     source: 'https://www.lasportivausa.com/blogs/blog/gym-series-bouldering-power-hour',
     video: 'https://www.youtube.com/watch?v=WbscmZDybdQ',
     info: {
@@ -560,7 +592,7 @@ export const EXERCISES: Exercise[] = [
       pitfalls: ['Aller vite : le but n’est pas le nombre de blocs'],
     },
     build: (c) => {
-      const v = c.maxSent - 4 - c.light;
+      const v = c.level - 4 - c.light;
       return {
         title: 'Volume technique',
         target: v,
@@ -614,10 +646,12 @@ const fitsIn = (e: Exercise, minutes: number) =>
 
 /**
  * Choisit les formats du cœur de séance : 1 sous 50 min, 2 au-delà, différents, en tournant dans
- * le catalogue selon `seed`, avec leurs minutes (la somme fait `minutes`).
+ * le catalogue selon `seed`, avec leurs minutes (la somme fait `minutes`). Chaque format reçoit
+ * au moins son temps minimal quand l'autre peut en céder. L'ordre de passage est fixé ensuite
+ * par le générateur : le format le plus exigeant en premier.
  *
- * Avec un profil : au plus un format sur un point faible, en premier, et au moins un format qu'on
- * aime, en dernier. Avec un seul format, on alterne d'une séance à l'autre.
+ * Avec un profil : au plus un format sur un point faible et au moins un format qu'on aime.
+ * Avec un seul format, on alterne d'une séance à l'autre.
  * En endurance, les deux formats travaillent la même filière (fond ou résistance).
  */
 export function pickExercises(o: PickOptions): Pick[] {
@@ -631,19 +665,21 @@ export function pickExercises(o: PickOptions): Pick[] {
 
   const howMany = Math.min(formatsFor(o.minutes), pool.length);
   const share = Math.floor(o.minutes / howMany);
+  // Un format peut prendre plus que sa part si l'autre se contente de son minimum
+  const shortest = Math.min(...pool.map((e) => e.minMinutes));
+  const room = o.minutes - (howMany - 1) * shortest;
+  const fitsHere = (e: Exercise) =>
+    room >= e.minMinutes && (e.maxMinutes === undefined || share <= e.maxMinutes);
   const start = ((o.seed % pool.length) + pool.length) % pool.length;
   let ordered = [...pool.slice(start), ...pool.slice(0, start)];
   // Ce qui tient dans le temps d'abord ; le reste ne sert qu'en dernier recours
-  ordered = [
-    ...ordered.filter((e) => fitsIn(e, share)),
-    ...ordered.filter((e) => !fitsIn(e, share)),
-  ];
+  ordered = [...ordered.filter(fitsHere), ...ordered.filter((e) => !fitsHere(e))];
 
   const weak = new Set(o.weakPoints ?? []);
   const liked = new Set(o.likedPoints ?? []);
   const isWeak = (e: Exercise) => e.points.some((p) => weak.has(p));
   const isLiked = (e: Exercise) => !isWeak(e) && e.points.some((p) => liked.has(p));
-  const fits = (e: Exercise) => fitsIn(e, share);
+  const fits = fitsHere;
 
   if (howMany > 1 && o.focus === 'endurance') {
     // Fond et résistance ne se mélangent pas dans une même séance
@@ -676,9 +712,21 @@ export function pickExercises(o: PickOptions): Pick[] {
     const projects = others.findIndex((e) => e.id === 'projects' && fits(e));
     if (projects > 0) others.unshift(...others.splice(projects, 1));
   }
-  for (const e of others) {
-    if (chosen.length >= howMany - (likedPick ? 1 : 0)) break;
-    chosen.push(e);
+  // D'abord des formats dont les minimums tiennent ensemble dans le temps, puis n'importe lesquels
+  const slots = howMany - (likedPick ? 1 : 0);
+  const reserved = likedPick?.minMinutes ?? 0;
+  for (const strict of [true, false]) {
+    for (const e of others) {
+      if (chosen.length >= slots) break;
+      if (chosen.includes(e)) continue;
+      const needed =
+        chosen.reduce((sum, x) => sum + x.minMinutes, 0) +
+        e.minMinutes +
+        reserved +
+        (slots - chosen.length - 1) * shortest;
+      if (strict && needed > o.minutes) continue;
+      chosen.push(e);
+    }
   }
   if (likedPick) chosen.push(likedPick);
 
@@ -691,9 +739,22 @@ export function pickExercises(o: PickOptions): Pick[] {
 
   // Minutes réparties à parts égales, arrondies à 5 et plafonnées, le reste sur un format sans plafond
   const each = Math.max(5, Math.floor(o.minutes / chosen.length / 5) * 5);
-  const split = chosen.map((exercise) => ({
+  const minutes = chosen.map((e) => Math.min(each, e.maxMinutes ?? each));
+  // Un format sous son minimum (le volume technique veut 30 min) en prend à l'autre, s'il en a de trop
+  const least = (e: Exercise) => Math.ceil(e.minMinutes / 5) * 5;
+  chosen.forEach((e, i) => {
+    chosen.forEach((other, j) => {
+      const spare = minutes[j] - least(other);
+      const give = Math.min(spare, least(e) - minutes[i]);
+      if (j !== i && give > 0) {
+        minutes[j] -= give;
+        minutes[i] += give;
+      }
+    });
+  });
+  const split = chosen.map((exercise, i) => ({
     exercise,
-    minutes: Math.min(each, exercise.maxMinutes ?? each),
+    minutes: minutes[i],
     role: role(exercise),
     points: profilePoints(exercise),
   }));

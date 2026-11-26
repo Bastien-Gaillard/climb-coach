@@ -1,4 +1,4 @@
-import { FONT, gradeFromValue } from '@climb-coach/grades';
+import { FONT, gradeFromValue, gradeValue } from '@climb-coach/grades';
 import { Injectable } from '@nestjs/common';
 import { MOBILITY_POINTS, pointLabels } from '../auth/climbing-points';
 import { REFERENCE_SYSTEM } from '../sessions/climb-normalizer';
@@ -18,6 +18,10 @@ const TECHNIQUE_DRILLS = [
   'Grimper lentement, en 3 temps par mouvement',
   'Rester bras tendus le plus possible',
 ];
+
+/** Difficulté d'un format du cœur : la cotation la plus dure qu'il demande. */
+const gradeRank = (b: PlanBlock) =>
+  b.target ? gradeValue(b.target.grade, REFERENCE_SYSTEM[b.target.style]) : -1;
 
 /** Générateur déterministe : sert seul sans clé Mistral, et de filet de sécurité sinon. */
 @Injectable()
@@ -77,7 +81,8 @@ export class RuleBasedGenerator implements PlanGenerator {
 
   /**
    * Cœur de séance en bloc : 1 ou 2 formats du catalogue, qui changent d'une séance à l'autre.
-   * Chaque format est une partie de la séance, avec son propre minuteur.
+   * Chaque format est une partie de la séance, avec son propre minuteur. Le plus exigeant passe
+   * en premier.
    */
   private boulderMain(
     ctx: GeneratorContext,
@@ -97,9 +102,9 @@ export class RuleBasedGenerator implements PlanGenerator {
       weakPoints: ctx.weakPoints,
       likedPoints: ctx.likedPoints,
     });
-    return picks.map(({ exercise, minutes: m, role, points }) => {
+    const blocks = picks.map(({ exercise, minutes: m, role, points }) => {
       const built = exercise.build({
-        maxSent: a.maxSent,
+        level: a.level,
         project: a.project,
         light,
         minutes: m,
@@ -113,15 +118,17 @@ export class RuleBasedGenerator implements PlanGenerator {
         target: { style: 'boulder' as const, grade: this.grade('boulder', clamp(built.target)) },
         instructions: [
           ...built.instructions,
-          ...(role === 'weak'
-            ? [`Ton point faible (${pointLabels(points)}) : en premier, frais`]
-            : []),
-          ...(role === 'liked'
-            ? [`Pour le plaisir (${pointLabels(points)}) : on finit dessus`]
-            : []),
+          ...(role === 'weak' ? [`Travaille ton point faible : ${pointLabels(points)}`] : []),
+          ...(role === 'liked' ? [`Pour le plaisir : ${pointLabels(points)}`] : []),
         ],
       };
     });
+    // Le format le plus exigeant d'abord, quand on est frais : des blocs durs après 25 min de
+    // volume se grimpent en force, pas proprement
+    return blocks
+      .map((block, i) => ({ block, i }))
+      .sort((x, y) => gradeRank(y.block) - gradeRank(x.block) || x.i - y.i)
+      .map((x) => x.block);
   }
 
   /** Un jour, une sélection : la séance du lendemain ne propose pas les mêmes formats. */
@@ -159,15 +166,15 @@ export class RuleBasedGenerator implements PlanGenerator {
     const easyCount = minutes >= 18 ? 6 : minutes >= 15 ? 5 : 4;
     const instructions = [
       'Au sol, 5 min : cardio léger, puis poignets, doigts et épaules',
-      `${easyCount} ${u} en ${label(a.maxSent - 4 - light)}, lentement, avec la consigne du jour`,
+      `${easyCount} ${u} en ${label(a.level - 4 - light)}, lentement, avec la consigne du jour`,
     ];
     if (a.focus === 'strength') {
       instructions.push(
-        `Puis un ${this.unit(a.style, false)} par couleur jusqu’à ${label(a.maxSent)}, repos 3 min avant la suite`,
+        `Puis un ${this.unit(a.style, false)} par couleur jusqu’à ${label(a.level)}, repos 3 min avant la suite`,
       );
     } else if (a.focus === 'endurance') {
       instructions.push(
-        `Puis un ${this.unit(a.style, false)} par couleur jusqu’à ${label(a.maxSent - 2 - light)}`,
+        `Puis un ${this.unit(a.style, false)} par couleur jusqu’à ${label(a.level - 2 - light)}`,
       );
     }
     if (careful) instructions.push('Pas de petites prises ni de mouvements dynamiques');
@@ -207,7 +214,7 @@ export class RuleBasedGenerator implements PlanGenerator {
         };
       }
       case 'endurance': {
-        const target = this.grade(style, a.maxSent - 3 - light);
+        const target = this.grade(style, a.level - 3 - light);
         if (style === 'boulder') {
           const sets = Math.max(1, Math.floor(minutes / 12));
           return {
@@ -236,7 +243,7 @@ export class RuleBasedGenerator implements PlanGenerator {
         };
       }
       case 'technique': {
-        const target = this.grade(style, a.maxSent - 2 - light);
+        const target = this.grade(style, a.level - 2 - light);
         const drillCount = Math.min(TECHNIQUE_DRILLS.length, Math.max(2, Math.floor(minutes / 12)));
         const offset = (a.daysSinceLast ?? 0) % TECHNIQUE_DRILLS.length;
         const drills = Array.from(

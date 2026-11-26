@@ -11,7 +11,7 @@ Je grimpe plusieurs fois par semaine et je ne savais jamais quoi faire en arriva
   - l'alternance des types de travail (force → endurance → technique) ;
   - le repos depuis la dernière séance et la fatigue (séance allégée si besoin, reprise en douceur après 2 semaines d'arrêt) ;
   - la progression (2 réussites au niveau max → on vise un cran au-dessus).
-- **Mistral + règles** : la séance est générée par **Mistral** quand une clé est configurée. Sa réponse est validée (schéma, temps, cotations) ; au moindre problème, un **générateur à règles** déterministe prend le relais.
+- **Règles pour la séance, Mistral pour le planning** : la séance du jour est construite par un **générateur à règles** déterministe. **Mistral** ne sert qu'au planning du mois, parce qu'il lit les notes de séance (douleurs, blessures) ; sa réponse est validée, et les règles prennent le relais au moindre problème.
 - **Mes salles** : chaque salle se configure depuis l'interface (nom, discipline, système de cotation, couleurs et leurs plages), avec un aperçu des plages pour repérer trous et chevauchements.
 - **Convertisseur** : cotations (française, YDS, Fontainebleau, V-scale) et **couleurs d'une salle à l'autre**.
 - **Historique** avec courbe de progression.
@@ -40,7 +40,7 @@ climb-coach/
 ├── apps/api/            NestJS : séances, génération, conversions
 │   ├── src/sessions/      CRUD + normalisation des cotations à la saisie
 │   ├── src/gyms/          CRUD des salles et de leurs couleurs
-│   ├── src/plans/         analyse de l'historique, générateurs (règles, Mistral), fallback
+│   ├── src/plans/         analyse de l'historique, générateur à règles, planning (Mistral)
 │   ├── src/db/            schéma Drizzle, migrations, seed
 │   └── test/              tests e2e
 └── apps/web/            Angular : génération, saisie, historique, salles, convertisseur
@@ -51,18 +51,13 @@ flowchart LR
   W[Angular] -->|POST /api/plans/generate| P[PlansService]
   P --> H[(Postgres : historique)]
   P --> A[analyzeHistory]
-  A --> M[MistralGenerator]
-  M -->|JSON| V{zod + temps + cotations}
-  V -->|ok| R[Séance]
-  V -->|ko / timeout / pas de clé| RB[RuleBasedGenerator]
-  A --> RB
-  RB --> R
+  A --> RB[RuleBasedGenerator]
+  RB --> R[Séance]
 ```
 
 ### Quelques choix
 
-- **Le LLM n'est jamais cru sur parole.** La réponse doit passer le même schéma zod que le générateur à règles, tenir dans le temps dispo (sans le gaspiller) et n'utiliser que des cotations qui existent. Sinon : fallback, et la raison est renvoyée au front (« Mistral n'a pas pu répondre (Timeout) »).
-- **Les règles préparent le prompt.** `analyzeHistory` calcule le focus, l'intensité, le niveau visé et explique ses choix ; Mistral reçoit ce résumé plutôt que l'historique brut. Les deux générateurs restent cohérents, et le prompt est court.
+- **Le LLM seulement là où il apporte quelque chose.** Pour la séance, Mistral ne faisait que recopier les formats proposés par les règles : il a été retiré. Il garde le planning du mois, où lire les notes libres compte. Sa réponse n'y est jamais crue sur parole (schéma zod, une relance, puis les règles).
 - **Une échelle de référence par discipline.** Toutes les cotations sont stockées dans un seul système (française pour la voie, Font pour le bloc) avec une valeur numérique : la progression et les comparaisons deviennent triviales.
 - **Une couleur = une plage.** Convertir une couleur d'une salle à l'autre renvoie plusieurs couleurs avec leur taux de recouvrement, pas une réponse unique fausse.
 - **La lib de conversion est un package à part**, testée seule et importée par l'API et par le front (conversion instantanée côté navigateur, seules les salles viennent de l'API).
@@ -109,7 +104,7 @@ pnpm --filter @climb-coach/api test:e2e     # e2e (DATABASE_URL vers une base de
 pnpm lint && pnpm typecheck
 ```
 
-Plus de 120 tests : conversions et validation des salles, règles de génération, validation et fallback Mistral (fetch mocké), endpoints de bout en bout sur Postgres, composants Angular.
+Plus de 120 tests : conversions et validation des salles, règles de génération, client et planning Mistral (fetch mocké), endpoints de bout en bout sur Postgres, composants Angular.
 
 ## API
 

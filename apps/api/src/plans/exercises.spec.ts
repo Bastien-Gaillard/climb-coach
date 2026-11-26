@@ -1,10 +1,16 @@
 import { CLIMBING_POINTS } from '../auth/climbing-points';
-import { catalogForPrompt, EXERCISES, formatsFor, pickExercises } from './exercises';
+import {
+  catalogForPrompt,
+  EXERCISES,
+  formatsFor,
+  minutesPerBlock,
+  pickExercises,
+} from './exercises';
 
 const grade = (v: number) => `G${v}`;
 const byId = (id: string) => EXERCISES.find((e) => e.id === id)!;
 const build = (id: string, minutes: number, extra = {}) =>
-  byId(id).build({ maxSent: 6, project: 8, light: 0, minutes, grade, ...extra });
+  byId(id).build({ level: 6, project: 8, light: 0, minutes, grade, ...extra });
 
 describe('catalogue des formats', () => {
   it('14 formats : 4 de force, 6 d’endurance, 4 de technique, ids uniques', () => {
@@ -17,7 +23,7 @@ describe('catalogue des formats', () => {
   it('chaque format se rédige pour toutes les durées utiles, en lignes courtes', () => {
     for (const e of EXERCISES) {
       for (const minutes of [e.minMinutes, 30, 45, e.maxMinutes ?? 80]) {
-        const b = e.build({ maxSent: 6, project: 8, light: 0, minutes, grade });
+        const b = e.build({ level: 6, project: 8, light: 0, minutes, grade });
         expect(b.title).toBe(e.name);
         expect(b.instructions.length).toBeGreaterThanOrEqual(2);
         expect(b.instructions.length).toBeLessThanOrEqual(6);
@@ -60,19 +66,49 @@ describe('catalogue des formats', () => {
   });
 
   it('3 essais max : la moitié à son niveau, la moitié au-dessus', () => {
-    expect(build('three-tries', 30).instructions.slice(0, 2)).toEqual([
-      '3 blocs en G6',
-      '3 blocs en G8',
+    expect(build('three-tries', 40).instructions.slice(0, 2)).toEqual([
+      '2 blocs en G6',
+      '2 blocs en G8',
     ]);
     const same = byId('three-tries').build({
-      maxSent: 6,
+      level: 6,
       project: 6,
       light: 0,
-      minutes: 30,
+      minutes: 40,
       grade,
     });
-    expect(same.instructions[0]).toBe('6 blocs en G6');
+    expect(same.instructions[0]).toBe('4 blocs en G6');
     expect(same.instructions[1]).toBe('3 essais max par bloc : raté au 3e, tu passes au suivant');
+  });
+
+  it('le nombre de blocs tient dans le temps annoncé, essais et repos compris', () => {
+    const blocks = (id: string, minutes: number) =>
+      Number(/^(\d+) blocs?/.exec(build(id, minutes).instructions[0])![1]);
+    // Tes 5 plus durs : 2 essais en moyenne × (1 min + 3 min de repos) = 8 min par bloc
+    expect(blocks('top-five', 25)).toBe(3);
+    expect(blocks('top-five', 40)).toBe(5);
+    for (const m of [20, 25, 30, 40]) {
+      expect(blocks('top-five', m) * minutesPerBlock(2, 3)).toBeLessThanOrEqual(m);
+    }
+    expect(build('top-five', 25).instructions).toContain(
+      'Arrête au bout de 25 min, même s’il reste des blocs',
+    );
+    // 3 essais max : 2,5 essais en moyenne
+    const three = (m: number) =>
+      build('three-tries', m)
+        .instructions.slice(0, 2)
+        .reduce((sum, line) => sum + Number(/^(\d+) blocs?/.exec(line)![1]), 0);
+    for (const m of [25, 30, 45, 60]) {
+      expect(three(m) * minutesPerBlock(2.5, 3)).toBeLessThanOrEqual(m);
+    }
+  });
+
+  it('flash : à son niveau maîtrisé, jamais au-dessus, avec la règle de repli', () => {
+    const b = build('flash', 25);
+    expect(b.target).toBe(6);
+    expect(b.instructions[0]).toBe('5 blocs en G6, jamais essayés');
+    expect(b.instructions).toContain('Départ pas passé : l’essai compte quand même');
+    expect(b.instructions).toContain('2 échecs de suite : continue en G4');
   });
 
   it('un bloc par minute : mélange des deux couleurs sous le niveau, jamais plus de 25 min', () => {
@@ -97,7 +133,7 @@ describe('catalogue des formats', () => {
   });
 
   it('la séance légère baisse les cotations d’un cran', () => {
-    const b = byId('volume').build({ maxSent: 6, project: 8, light: 1, minutes: 30, grade });
+    const b = byId('volume').build({ level: 6, project: 8, light: 1, minutes: 30, grade });
     expect(b.instructions[0]).toBe('15 blocs en G3');
   });
 });

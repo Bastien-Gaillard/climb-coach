@@ -2,9 +2,8 @@ import { EXAMPLE_GYMS } from '@climb-coach/grades';
 import { schedulePlans, sessions as sessionsTable, users } from '../db/schema';
 import { GymsService } from '../gyms/gyms.service';
 import { SessionsService } from '../sessions/sessions.service';
-import { MistralError, MistralGenerator } from './mistral.generator';
+import { MistralClient, MistralError } from './mistral.client';
 import { MistralScheduleAdvisor } from './mistral.schedule';
-import { Plan } from './plan.schema';
 import { PlansService } from './plans.service';
 import { RuleBasedGenerator } from './rule-based.generator';
 import { MonthPlan } from './mistral.schedule';
@@ -12,19 +11,8 @@ import { session } from './test-helpers';
 
 const now = new Date('2025-11-23T18:00:00Z');
 
-const mistralPlan: Plan = {
-  focus: 'technique',
-  intensity: 'normal',
-  summary: 'Plan Mistral',
-  blocks: [
-    { kind: 'warmup', title: 'Échauffement', minutes: 15, instructions: ['Mobilité'] },
-    { kind: 'main', title: 'Flash', minutes: 45, instructions: ['5 blocs en 6A'] },
-  ],
-};
-
 function setup({
   enabled,
-  mistral,
   advise,
   level = null,
   cue = { cue: null, since: 0 },
@@ -35,7 +23,6 @@ function setup({
   cue?: { cue: string | null; since: number };
   /** Nombre de séances du compte. */
   sessionCount?: number;
-  mistral?: () => Promise<Plan>;
   advise?: () => Promise<MonthPlan>;
   /** Niveau stable déclaré par le compte dans la salle. */
   level?: string | null;
@@ -80,10 +67,7 @@ function setup({
   const sessions = {
     findRecent: jest.fn().mockResolvedValue([]),
   } as unknown as SessionsService;
-  const mistralGen = {
-    enabled,
-    generate: jest.fn(mistral ?? (async () => mistralPlan)),
-  } as unknown as MistralGenerator;
+  const mistral = { enabled, status: { enabled, state: 'ok' } } as unknown as MistralClient;
   const rules = new RuleBasedGenerator();
   const rulesSpy = jest.spyOn(rules, 'generate');
 
@@ -97,19 +81,10 @@ function setup({
     advisePlan: jest.fn(advise ?? (async () => Promise.reject(new MistralError('non prévu')))),
   } as unknown as MistralScheduleAdvisor;
 
-  const service = new PlansService(
-    db as never,
-    () => now,
-    sessions,
-    mistralGen,
-    rules,
-    gyms,
-    advisor,
-  );
+  const service = new PlansService(db as never, () => now, sessions, mistral, rules, gyms, advisor);
   return {
     service,
     inserted,
-    mistralGen,
     rulesSpy,
     sessions,
     advisor,
@@ -120,24 +95,18 @@ function setup({
 }
 
 describe('PlansService.generate', () => {
-  it('utilise Mistral quand il répond correctement', async () => {
+  it('génère la séance avec les règles seules, même avec Mistral configuré', async () => {
     const { service, rulesSpy, inserted } = setup({ enabled: true });
     const result = await service.generate('u1', 60);
 
-    expect(result).toMatchObject({ source: 'mistral', plan: { summary: 'Plan Mistral' } });
-    expect(result.fallbackReason).toBeUndefined();
-    expect(rulesSpy).not.toHaveBeenCalled();
+    expect(result.source).toBe('rules');
+    expect(rulesSpy).toHaveBeenCalledTimes(1);
     expect(inserted).toEqual([
-      { userId: 'u1', availableMinutes: 60, source: 'mistral', plan: result.plan },
+      { userId: 'u1', availableMinutes: 60, source: 'rules', plan: result.plan },
     ]);
   });
 
-  it('ajoute vidéo et ⓘ à chaque format du cœur de séance, Mistral comme règles', async () => {
-    const fromMistral = await setup({ enabled: true }).service.generate('u1', 60);
-    expect(fromMistral.plan.blocks[0].video).toBeUndefined();
-    expect(fromMistral.plan.blocks[1].video).toMatch(/^https:\/\/www\.youtube\.com\//);
-    expect(fromMistral.plan.blocks[1].info?.how.length).toBeGreaterThan(0);
-
+  it('ajoute vidéo et ⓘ à chaque format du cœur de séance', async () => {
     const fromRules = await setup({ enabled: false }).service.generate('u1', 90);
     const mains = fromRules.plan.blocks.filter((b) => b.kind === 'main');
     expect(mains.length).toBeGreaterThan(0);
@@ -180,34 +149,11 @@ describe('PlansService.generate', () => {
     });
   });
 
-  it('retombe sur les règles si Mistral échoue, en gardant la raison', async () => {
-    const { service, rulesSpy } = setup({
-      enabled: true,
-      mistral: async () => {
-        throw new MistralError('Timeout');
-      },
-    });
-    const result = await service.generate('u1', 60);
-
-    expect(result.source).toBe('rules');
-    expect(result.fallbackReason).toBe('Timeout');
-    expect(rulesSpy).toHaveBeenCalledTimes(1);
-  });
-
-  it('n’appelle pas Mistral sans clé', async () => {
-    const { service, mistralGen } = setup({ enabled: false });
-    const result = await service.generate('u1', 45);
-
-    expect(result.source).toBe('rules');
-    expect(result.fallbackReason).toBeUndefined();
-    expect(mistralGen.generate).not.toHaveBeenCalled();
-  });
-
   it('passe l’historique du compte et l’heure au générateur', async () => {
-    const { service, mistralGen, sessions } = setup({ enabled: true });
+    const { service, rulesSpy, sessions } = setup({ enabled: true });
     await service.generate('u1', 90);
     expect(sessions.findRecent).toHaveBeenCalledWith('u1', 10);
-    expect(mistralGen.generate).toHaveBeenCalledWith({
+    expect(rulesSpy).toHaveBeenCalledWith({
       availableMinutes: 90,
       now,
       history: [],
@@ -219,10 +165,10 @@ describe('PlansService.generate', () => {
   });
 
   it('passe le niveau déclaré dans la salle du jour', async () => {
-    const { service, mistralGen, gyms } = setup({ enabled: true, level: 'bleu' });
+    const { service, rulesSpy, gyms } = setup({ enabled: true, level: 'bleu' });
     await service.generate('u1', 60, 'alpha-bloc');
     expect(gyms.levelOf).toHaveBeenCalledWith('u1', 'alpha-bloc');
-    expect(mistralGen.generate).toHaveBeenCalledWith(
+    expect(rulesSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         level: expect.objectContaining({ color: 'bleu', next: 'rouge' }),
       }),
@@ -230,67 +176,61 @@ describe('PlansService.generate', () => {
   });
 
   it('sans salle choisie : le niveau de la salle du dernier bloc noté en couleur', async () => {
-    const { service, mistralGen, gyms, sessions } = setup({ enabled: true, level: 'bleu' });
+    const { service, rulesSpy, gyms, sessions } = setup({ enabled: true, level: 'bleu' });
     const last = session(2, now, { climbList: [{ grade: '6A', value: 6 }] });
     last.climbs[0].gymId = 'alpha-bloc';
     (sessions.findRecent as jest.Mock).mockResolvedValue([last]);
     await service.generate('u1', 60);
     expect(gyms.levelOf).toHaveBeenCalledWith('u1', 'alpha-bloc');
-    expect(mistralGen.generate).toHaveBeenCalledWith(
+    expect(rulesSpy).toHaveBeenCalledWith(
       expect.objectContaining({ level: expect.objectContaining({ color: 'bleu' }) }),
     );
   });
 
   it('sans salle ni bloc en couleur : pas de niveau déclaré', async () => {
-    const { service, mistralGen, gyms } = setup({ enabled: true, level: 'bleu' });
+    const { service, rulesSpy, gyms } = setup({ enabled: true, level: 'bleu' });
     await service.generate('u1', 60);
     expect(gyms.levelOf).not.toHaveBeenCalled();
-    expect((mistralGen.generate as jest.Mock).mock.calls[0][0].level).toBeUndefined();
+    expect(rulesSpy.mock.calls[0][0].level).toBeUndefined();
   });
 
   it('passe l’objectif et le type choisi au générateur', async () => {
-    const { service, mistralGen } = setup({ enabled: true });
+    const { service, rulesSpy } = setup({ enabled: true });
     await service.generate('u1', 60, undefined, [], { focusGoal: 'strength' }, 'endurance');
-    expect(mistralGen.generate).toHaveBeenCalledWith(
+    expect(rulesSpy).toHaveBeenCalledWith(
       expect.objectContaining({ focusGoal: 'strength', requestedFocus: 'endurance' }),
     );
   });
 
   it('passe les points faibles et ce qu’il aime au générateur', async () => {
-    const { service, mistralGen } = setup({ enabled: true });
+    const { service, rulesSpy } = setup({ enabled: true });
     await service.generate('u1', 60, undefined, [], {
       weakPoints: ['crimps'],
       likedPoints: ['power'],
     });
-    expect(mistralGen.generate).toHaveBeenCalledWith(
+    expect(rulesSpy).toHaveBeenCalledWith(
       expect.objectContaining({ weakPoints: ['crimps'], likedPoints: ['power'] }),
     );
   });
 
   it('passe le matériel du profil au générateur', async () => {
-    const { service, mistralGen } = setup({ enabled: true });
+    const { service, rulesSpy } = setup({ enabled: true });
     await service.generate('u1', 60, undefined, ['elastic', 'hangboard']);
-    expect(mistralGen.generate).toHaveBeenCalledWith(
+    expect(rulesSpy).toHaveBeenCalledWith(
       expect.objectContaining({ equipment: ['elastic', 'hangboard'] }),
     );
   });
 
   it('ajoute les couleurs de la salle choisie aux niveaux visés', async () => {
-    const withTarget: Plan = {
-      ...mistralPlan,
-      blocks: [
-        mistralPlan.blocks[0],
-        { ...mistralPlan.blocks[1], target: { style: 'boulder', grade: '6B' } },
-      ],
-    };
-    const { service, mistralGen } = setup({ enabled: true, mistral: async () => withTarget });
+    const { service, rulesSpy } = setup({ enabled: false });
     const result = await service.generate('u1', 60, 'alpha-bloc');
 
-    expect(mistralGen.generate).toHaveBeenCalledWith(
+    expect(rulesSpy).toHaveBeenCalledWith(
       expect.objectContaining({ gym: expect.objectContaining({ id: 'alpha-bloc' }) }),
     );
     expect(result.gym).toEqual({ id: 'alpha-bloc', name: 'Salle Alpha (bloc)' });
-    expect(result.plan.blocks[1].target?.colors).toEqual([{ color: 'rouge', hex: '#ef4444' }]);
+    const main = result.plan.blocks.find((b) => b.kind === 'main');
+    expect(main?.target?.colors?.length).toBeGreaterThan(0);
   });
 });
 

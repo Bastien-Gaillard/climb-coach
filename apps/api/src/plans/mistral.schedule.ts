@@ -4,7 +4,7 @@ import { ClimbingPoint, pointLabels } from '../auth/climbing-points';
 import { SessionWithClimbs } from '../sessions/sessions.service';
 import { favoredFocus } from './focus-balance';
 import { FOCUS_LABEL } from './history-analysis';
-import { ChatMessage, extractJson, MistralError, MistralGenerator } from './mistral.generator';
+import { ChatMessage, extractJson, MistralClient, MistralError } from './mistral.client';
 import { Focus, FocusSchema } from './plan.schema';
 import { AdvisedSession, diffDays, IDEAL_MINUTES, localDay, Schedule } from './schedule';
 
@@ -336,7 +336,7 @@ export function completeMonthPlan(
 /** Demande à Mistral le plan du mois, en interprétant les notes. */
 @Injectable()
 export class MistralScheduleAdvisor {
-  constructor(private readonly mistral: MistralGenerator) {}
+  constructor(private readonly mistral: MistralClient) {}
 
   get enabled(): boolean {
     return this.mistral.enabled;
@@ -354,23 +354,20 @@ export class MistralScheduleAdvisor {
     ];
     const perWeek = base.sessionsPerWeek;
     const doneToday = isDoneToday(history, base.today);
-    const content = await this.mistral.chat(messages, 'low');
+    const content = await this.mistral.chat(messages);
     let plan: MonthPlan;
     try {
       plan = parseMonthPlan(content, perWeek);
     } catch (e) {
       if (!(e instanceof MistralError)) throw e;
-      const retry = await this.mistral.chat(
-        [
-          ...messages,
-          { role: 'assistant', content },
-          {
-            role: 'user',
-            content: `Ta réponse est invalide : ${e.message}. Renvoie uniquement le JSON corrigé.`,
-          },
-        ],
-        'low',
-      );
+      const retry = await this.mistral.chat([
+        ...messages,
+        { role: 'assistant', content },
+        {
+          role: 'user',
+          content: `Ta réponse est invalide : ${e.message}. Renvoie uniquement le JSON corrigé.`,
+        },
+      ]);
       plan = parseMonthPlan(retry, perWeek);
     }
 

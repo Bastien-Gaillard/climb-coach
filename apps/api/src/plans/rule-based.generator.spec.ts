@@ -1,3 +1,5 @@
+import { defineGym, gradeValue } from '@climb-coach/grades';
+import { declaredLevel } from './declared-level';
 import { splitTime } from './generator';
 import { analyzeHistory } from './history-analysis';
 import { planFitsTime, PlanSchema } from './plan.schema';
@@ -440,7 +442,7 @@ describe('RuleBasedGenerator', () => {
 });
 
 describe('séance avec le profil', () => {
-  it('le point faible ouvre le cœur de séance, ce qu’il aime le ferme', async () => {
+  it('signale le point faible et ce qu’il aime, le format le plus exigeant en premier', async () => {
     const plan = await generator.generate({
       availableMinutes: 90,
       now,
@@ -451,8 +453,70 @@ describe('séance avec le profil', () => {
     expect(plan.focus).toBe('technique');
     const mains = plan.blocks.filter((b) => b.kind === 'main');
     expect(mains.length).toBe(2);
-    expect(mains[0].instructions.join(' ')).toContain('Ton point faible (placement des pieds)');
-    expect(mains[1].instructions.join(' ')).toContain('Pour le plaisir (lecture des blocs');
+    const text = mains.map((b) => b.instructions.join(' ')).join(' ');
+    expect(text).toContain('Travaille ton point faible : placement des pieds');
+    expect(text).toContain('Pour le plaisir : lecture des blocs');
+    const value = (b: (typeof mains)[number]) => gradeValue(b.target!.grade, 'font');
+    expect(value(mains[0])).toBeGreaterThanOrEqual(value(mains[1]));
     expect(PlanSchema.safeParse(plan).success).toBe(true);
+  });
+});
+
+describe('séance technique', () => {
+  const gym = defineGym({
+    id: 'digne',
+    name: 'Digne @ Bloc',
+    discipline: 'boulder',
+    system: 'font',
+    colors: [
+      { color: 'Vert', min: '5+', max: '6A' },
+      { color: 'Bleu', min: '6A+', max: '6B' },
+      { color: 'Rose', min: '6B+', max: '6C' },
+    ],
+  });
+  const level = declaredLevel(gym, 'Bleu')!;
+  // Un rose réussi une fois ne fait pas du rose le niveau maîtrisé
+  const history = [
+    session(3, now, {
+      focus: 'strength',
+      climbList: [{ grade: '6C', value: gradeValue('6C', 'font') }],
+    }),
+  ];
+
+  it('flash et tes plus durs sur le niveau déclaré (bleu), pas sur la meilleure réussite', async () => {
+    for (let day = 0; day < 12; day++) {
+      const plan = await generator.generate({
+        availableMinutes: 90,
+        now: new Date(now.getTime() + day * 86_400_000),
+        history,
+        gym,
+        level,
+        requestedFocus: 'technique',
+      });
+      for (const b of plan.blocks.filter((x) => x.kind === 'main')) {
+        expect(gradeValue(b.target!.grade, 'font')).toBeLessThanOrEqual(gradeValue('6A+', 'font'));
+      }
+    }
+  });
+
+  it('le volume technique a au moins 30 min et passe après un format plus dur', async () => {
+    let seen = 0;
+    for (let day = 0; day < 20; day++) {
+      const plan = await generator.generate({
+        availableMinutes: 90,
+        now: new Date(now.getTime() + day * 86_400_000),
+        history,
+        gym,
+        level,
+        requestedFocus: 'technique',
+      });
+      const mains = plan.blocks.filter((x) => x.kind === 'main');
+      const i = mains.findIndex((b) => b.title.endsWith('Volume technique'));
+      if (i < 0) continue;
+      seen++;
+      expect(mains[i].minutes).toBeGreaterThanOrEqual(30);
+      if (mains.length > 1) expect(i).toBe(mains.length - 1);
+    }
+    expect(seen).toBeGreaterThan(0);
   });
 });

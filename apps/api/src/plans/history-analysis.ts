@@ -18,6 +18,12 @@ export interface HistoryAnalysis {
   style: Style;
   /** Meilleure cotation réussie récemment (valeur de référence). */
   maxSent: number;
+  /**
+   * Niveau maîtrisé, celui que les formats prennent pour repère : le niveau stable déclaré dans
+   * la salle s'il y en a un, sinon la meilleure réussite récente. Un rose réussi une fois ne fait
+   * pas passer les flashs et les volumes en rose quand le niveau déclaré est bleu.
+   */
+  level: number;
   /** Niveau à viser aujourd'hui (maxSent + 1 si la dernière séance l'a validé). */
   project: number;
   focus: Focus;
@@ -51,29 +57,33 @@ export const FOCUS_LABEL: Record<Focus, string> = {
 export const ofFocus = (f: Focus) => (f === 'endurance' ? 'd’endurance' : `de ${FOCUS_LABEL[f]}`);
 
 export function analyzeHistory(ctx: GeneratorContext): HistoryAnalysis {
-  return withDeclaredLevel(analyzeSessions(ctx), ctx.level);
+  const a = analyzeSessions(ctx);
+  return withDeclaredLevel({ ...a, level: a.maxSent }, ctx.level);
 }
 
 /**
- * Le niveau stable déclaré dans la salle sert de plancher : l'historique ne fait descendre ni le
- * niveau max ni le niveau visé en force en dessous. Celui-ci vise la couleur suivante.
+ * Le niveau stable déclaré dans la salle est le niveau maîtrisé : les formats se règlent dessus,
+ * même si l'historique contient une réussite plus dure. Il sert aussi de plancher : l'historique
+ * ne fait descendre ni la meilleure réussite ni le niveau visé en force en dessous. Celui-ci vise
+ * la couleur suivante.
  */
 function withDeclaredLevel(a: HistoryAnalysis, level?: DeclaredLevel): HistoryAnalysis {
   if (!level || level.style !== a.style) return a;
   const top = MAX_LEVEL[a.style];
-  const maxSent = Math.min(top, Math.max(a.maxSent, level.value));
+  const stable = Math.min(top, level.value);
+  const maxSent = Math.min(top, Math.max(a.maxSent, stable));
   const project = Math.min(top, Math.max(a.project, level.project, maxSent));
-  if (maxSent === a.maxSent && project === a.project) return a;
   const aim = level.next ? `, on vise le ${level.next} au max en force` : '';
   return {
     ...a,
     maxSent,
+    level: stable,
     project,
     reasons: [...a.reasons, `Niveau stable déclaré à ${level.gymName} : ${level.color}${aim}`],
   };
 }
 
-function analyzeSessions(ctx: GeneratorContext): HistoryAnalysis {
+function analyzeSessions(ctx: GeneratorContext): Omit<HistoryAnalysis, 'level'> {
   const recent = ctx.history.slice(0, RECENT_SESSIONS);
   const last = recent[0];
 

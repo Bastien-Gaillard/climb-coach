@@ -12,7 +12,6 @@
     <span class="overline"
       >Bloc {{ index() + 1 }} / {{ blocks().length }} · total {{ elapsed() }} min</span
     >
-    <span class="badge accent">{{ generated()!.source === 'mistral' ? 'IA' : 'Règles' }}</span>
   </div>
   @switch (push.state()) { @case ('ask') {
   <button type="button" class="notif" (click)="push.enable()" data-testid="push-enable">
@@ -76,9 +75,10 @@
     }
   </ol>
 
-  @if (b.kind === 'warmup' && cue(); as c) {
+  @if ((b.kind === 'warmup' || (b.kind === 'main' && generated()!.plan.focus === 'technique')) &&
+  cue(); as c) {
   <div class="cue" data-testid="cue">
-    <span class="overline">Consigne du jour</span>
+    <span class="overline">{{ b.kind === 'main' ? 'Objectif' : 'Consigne du jour' }}</span>
     <strong>{{ c.text }}</strong>
     @if (c.info) {
     <app-info [info]="c.info" [video]="c.video" />

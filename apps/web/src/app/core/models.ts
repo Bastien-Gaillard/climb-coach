@@ -130,8 +130,8 @@ export interface Plan {
 
 export interface GeneratedPlan {
   id: string;
+  /** « mistral » seulement pour les anciennes séances : elles sont toutes faites par les règles. */
   source: 'mistral' | 'rules';
-  fallbackReason?: string;
   availableMinutes: number;
   gym?: { id: string; name: string };
   plan: Plan;

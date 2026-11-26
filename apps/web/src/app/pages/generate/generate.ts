@@ -14,7 +14,6 @@ import {
   videoLabel,
 } from '../../core/labels';
 import { Focus, Gym, PlannedSession, Schedule, Session } from '../../core/models';
-import { AiStatusStore } from '../../core/ai-status.store';
 import { PlanStore } from '../../core/plan.store';
 import { holdVars } from '../../shared/hold';
 import { Icon } from '../../shared/icon';
@@ -35,7 +34,6 @@ export class GeneratePage implements OnInit {
   private readonly api = inject(ApiService);
   private readonly router = inject(Router);
   private readonly store = inject(PlanStore);
-  private readonly aiStatus = inject(AiStatusStore);
 
   protected readonly presets = [45, 60, 90, 120];
   protected readonly focusLabel = FOCUS_LABEL;
@@ -169,8 +167,6 @@ export class GeneratePage implements OnInit {
     this.api.generatePlan(this.minutes(), this.gymId(), this.focus()).subscribe({
       next: (res) => {
         this.store.set(res);
-        // Règles au lieu de Mistral : on vérifie tout de suite si c'est le quota
-        if (res.fallbackReason) this.aiStatus.refresh();
         this.loading.set(false);
         window.scrollTo?.({ top: 0 });
       },

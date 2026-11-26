@@ -18,7 +18,7 @@ import { DeclaredLevel, declaredLevel } from './declared-level';
 import { GeneratorContext } from './generator';
 import { withCatalog } from './exercise-videos';
 import { withGymColors } from './gym-colors';
-import { MistralGenerator } from './mistral.generator';
+import { MistralClient } from './mistral.client';
 import { ADVICE_HORIZON_DAYS, MistralScheduleAdvisor } from './mistral.schedule';
 import { Focus, Plan } from './plan.schema';
 
@@ -37,9 +37,8 @@ export type Clock = () => Date;
 
 export interface GeneratedPlanResult {
   id: string;
-  source: 'mistral' | 'rules';
-  /** Pourquoi Mistral n'a pas été utilisé, s'il était configuré. */
-  fallbackReason?: string;
+  /** Toujours « rules » : Mistral ne sert plus qu'au planning du mois. */
+  source: 'rules';
   availableMinutes: number;
   /** Salle choisie : les niveaux visés portent ses couleurs. */
   gym?: { id: string; name: string };
@@ -83,13 +82,16 @@ export class PlansService {
     @Inject(DB) private readonly db: Database,
     @Inject(CLOCK) private readonly clock: Clock,
     private readonly sessions: SessionsService,
-    private readonly mistral: MistralGenerator,
+    private readonly mistral: MistralClient,
     private readonly rules: RuleBasedGenerator,
     private readonly gyms: GymsService,
     private readonly advisor: MistralScheduleAdvisor,
   ) {}
 
-  /** Essaie Mistral, retombe sur les règles si l'appel ou la réponse pose problème. */
+  /**
+   * Séance du jour, construite par les règles seules : Mistral ne ferait que recopier les formats
+   * que les règles lui proposent. Il ne sert plus qu'au planning du mois.
+   */
   async generate(
     userId: string,
     availableMinutes: number,
@@ -117,20 +119,8 @@ export class PlansService {
     if (level) ctx.level = level;
     if (requestedFocus) ctx.requestedFocus = requestedFocus;
 
-    let source: GeneratedPlanResult['source'] = 'rules';
-    let fallbackReason: string | undefined;
-    let plan: Plan | undefined;
-
-    if (this.mistral.enabled) {
-      try {
-        plan = await this.mistral.generate(ctx);
-        source = 'mistral';
-      } catch (e) {
-        fallbackReason = (e as Error).message;
-        this.logger.warn(`Mistral indisponible, génération par règles : ${fallbackReason}`);
-      }
-    }
-    plan ??= await this.rules.generate(ctx);
+    const source = 'rules' as const;
+    let plan = await this.rules.generate(ctx);
     plan = withCatalog(withGymColors(plan, gym));
     plan = { ...plan, cue: cueView(await this.dailyCue(userId, points.weakPoints ?? [])) };
 
@@ -142,7 +132,6 @@ export class PlansService {
     return {
       id: saved.id,
       source,
-      fallbackReason,
       availableMinutes,
       ...(gym && { gym: { id: gym.id, name: gym.name } }),
       plan,
@@ -370,7 +359,7 @@ export class PlansService {
       .onConflictDoUpdate({ target: schedulePlans.userId, set: values });
   }
 
-  /** État de Mistral (quota, débit, panne), partagé par la génération et le planning. */
+  /** État de Mistral (quota, débit, panne) pour le planning du mois. */
   aiStatus() {
     return this.mistral.status;
   }
